@@ -66,7 +66,7 @@ export const vToolCallPart = v.object({
   type: v.literal("tool-call"),
   toolCallId: v.string(),
   toolName: v.string(),
-  args: v.any(), // TODO: need to be optional?
+  args: v.optional(v.any()),
   providerOptions,
   experimental_providerMetadata,
 });
@@ -103,6 +103,7 @@ const vToolResultPart = v.object({
   toolCallId: v.string(),
   toolName: v.string(),
   result: v.any(),
+  args: v.optional(v.any()),
   experimental_content: v.optional(vToolResultContent),
   isError: v.optional(v.boolean()),
   providerOptions,
@@ -148,3 +149,100 @@ export const vMessage = v.union(
   vSystemMessage
 );
 export type Message = Infer<typeof vMessage>;
+
+export const vSource = v.object({
+  type: v.literal("source"),
+  text: v.string(),
+});
+
+export const vFinishReason = v.union(
+  v.literal("stop"),
+  v.literal("length"),
+  v.literal("content-filter"),
+  v.literal("tool-calls"),
+  v.literal("error"),
+  v.literal("other"),
+  v.literal("unknown")
+);
+
+export const vLanguageModelV1CallWarning = v.union(
+  v.object({
+    type: v.literal("unsupported-setting"),
+    setting: v.string(),
+    details: v.optional(v.string()),
+  }),
+  v.object({
+    type: v.literal("unsupported-tool"),
+    tool: v.any(),
+    details: v.optional(v.string()),
+  }),
+  v.object({
+    type: v.literal("other"),
+    message: v.string(),
+  })
+);
+export const vStep = v.object({
+  stepType: v.union(
+    v.literal("initial"),
+    v.literal("continue"),
+    v.literal("tool-result")
+  ),
+  isContinued: v.boolean(),
+  text: v.string(),
+  reasoning: v.optional(v.string()),
+  reasoningDetails: v.optional(v.array(v.string())),
+  files: v.optional(v.array(v.string())),
+  sources: v.optional(v.array(vSource)),
+  toolCalls: v.array(vToolCallPart),
+  toolResults: v.array(vToolResultPart),
+  finishReason: vFinishReason,
+  usage: v.optional(
+    v.object({
+      promptTokens: v.number(),
+      completionTokens: v.number(),
+      totalTokens: v.number(),
+    })
+  ),
+  warnings: v.optional(v.array(vLanguageModelV1CallWarning)),
+  logprobs: v.optional(
+    v.array(
+      v.object({
+        token: v.string(),
+        logprob: v.number(),
+        topLogprobs: v.array(
+          v.object({
+            token: v.string(),
+            logprob: v.number(),
+          })
+        ),
+      })
+    )
+  ),
+  request: v.optional(
+    v.object({
+      body: v.optional(v.any()),
+      headers: v.optional(v.record(v.string(), v.string())),
+      method: v.optional(v.string()),
+      url: v.optional(v.string()),
+    })
+  ),
+  response: v.optional(
+    v.object({
+      id: v.string(),
+      timestamp: v.number(),
+      modelId: v.string(),
+      headers: v.optional(v.record(v.string(), v.string())),
+      messages: v.array(
+        v.object({
+          id: v.string(),
+          role: v.string(),
+          content: v.string(),
+        })
+      ),
+      body: v.optional(v.any()),
+    })
+  ),
+  providerMetadata: v.optional(v.record(v.string(), v.any())),
+  experimental_providerMetadata,
+});
+export type Step = Infer<typeof vStep>;

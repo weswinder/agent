@@ -26,7 +26,7 @@ export type SerializedMessage = SerializeUrlsAndUint8Arrays<CoreMessage>;
 export function serializeMessage(message: CoreMessage): SerializedMessage {
   const content = message.content;
   if (typeof content === "string") {
-    return { ...message, content } as Message;
+    return { ...message, content } as SerializedMessage;
   }
   const serialized = content.map((part) => {
     switch (part.type) {

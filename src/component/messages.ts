@@ -7,7 +7,7 @@ import {
   query,
 } from "./_generated/server.js";
 import { omit, pick } from "convex-helpers";
-import { vChatStatus, vMessage, vMessageStatus } from "../validators.js";
+import { vChatStatus, vMessage, vMessageStatus, vStep } from "../validators.js";
 import { stream } from "convex-helpers/server/stream";
 import { mergedStream } from "convex-helpers/server/stream";
 import { nullable, partial } from "convex-helpers/validators";
@@ -224,8 +224,8 @@ async function deletePageForDomainId(
       async (c) =>
         stream(ctx.db, schema)
           .query("messages")
-          .withIndex("chatId_status_isStep_order_stepOrder", (q) =>
-            q.eq("chatId", c._id)
+          .withIndex("chatId_status_order", (q) =>
+            q.eq("chatId", c._id).eq("status", "success")
           ),
       ["chatId"]
     )
@@ -299,7 +299,6 @@ export const addMessage = mutation({
     chatId: v.id("chats"),
     message: v.optional(vMessage),
     fileId: v.optional(v.id("files")),
-    isStep: v.optional(v.boolean()),
     addPending: v.optional(v.boolean()),
     failPendingSteps: v.optional(v.boolean()),
   },
@@ -307,7 +306,7 @@ export const addMessage = mutation({
     if (args.failPendingSteps) {
       const pendingMessages = await ctx.db
         .query("messages")
-        .withIndex("status_chatId_order_stepOrder", (q) =>
+        .withIndex("status_chatId_order", (q) =>
           q.eq("status", "pending").eq("chatId", args.chatId)
         )
         .collect();
@@ -317,22 +316,18 @@ export const addMessage = mutation({
     }
     const maxMessage = await stream(ctx.db, schema)
       .query("messages")
-      .withIndex("chatId_status_isStep_order_stepOrder", (q) =>
-        q.eq("chatId", args.chatId).eq("status", "success").eq("isStep", true)
+      .withIndex("chatId_status_order", (q) =>
+        q.eq("chatId", args.chatId).eq("status", "success")
       )
       .order("desc")
       .first();
-    const isStep = args.isStep ?? true;
     const lastOrder = maxMessage?.order ?? -1;
-    const order = isStep ? lastOrder + 1 : lastOrder;
-    const stepOrder = isStep ? (maxMessage?.stepOrder ?? -1) + 1 : 0;
+    const order = lastOrder + 1;
 
     const messageId = await ctx.db.insert("messages", {
       chatId: args.chatId,
       message: args.message,
       order,
-      isStep,
-      stepOrder,
       fileId: args.fileId,
       status: args.message ? "success" : "pending",
     });
@@ -342,8 +337,6 @@ export const addMessage = mutation({
         chatId: args.chatId,
         status: "pending",
         order: order + 1,
-        isStep: false,
-        stepOrder: 0,
       });
       const pending = (await ctx.db.get(pendingId))!;
       return { message, pending };
@@ -362,7 +355,7 @@ export const addSteps = mutation({
     messageId: v.id("messages"),
     steps: v.array(
       v.object({
-        message: vMessage,
+        step: vStep,
         fileId: v.optional(v.id("files")),
       })
     ),
@@ -371,22 +364,14 @@ export const addSteps = mutation({
   handler: async (ctx, args) => {
     const parentMessage = await ctx.db.get(args.messageId);
     assert(parentMessage, `Message ${args.messageId} not found`);
-    assert(!parentMessage.isStep, `Message ${args.messageId} is a step`);
     const steps = await ctx.db
-      .query("messages")
-      .withIndex("chatId_status_isStep_order_stepOrder", (q) =>
-        q
-          .eq("chatId", args.chatId)
-          .eq("status", "success")
-          .eq("isStep", true)
-          .eq("order", parentMessage.order)
+      .query("steps")
+      .withIndex("chatId_messageId_stepOrder", (q) =>
+        q.eq("chatId", args.chatId).eq("messageId", args.messageId)
       )
       .collect();
     let nextStepOrder;
     if (args.failPreviousSteps) {
-      if (parentMessage.status === "pending") {
-        await ctx.db.patch(parentMessage._id, { status: "failed" });
-      }
       for (const step of steps) {
         await ctx.db.patch(step._id, { status: "failed" });
       }
@@ -394,23 +379,23 @@ export const addSteps = mutation({
     } else {
       nextStepOrder = (steps.at(-1)?.stepOrder ?? -1) + 1;
     }
-    const results: Doc<"messages">[] = [];
-    for (const { message, fileId } of args.steps) {
-      const stepId = await ctx.db.insert("messages", {
+    const results: Doc<"steps">[] = [];
+    for (const { step, fileId } of args.steps) {
+      const stepId = await ctx.db.insert("steps", {
         chatId: args.chatId,
-        message,
+        messageId: args.messageId,
         order: parentMessage.order,
-        isStep: nextStepOrder === 0 ? false : true,
         stepOrder: nextStepOrder,
         status: "success",
         fileId,
+        step,
       });
       results.push((await ctx.db.get(stepId))!);
       nextStepOrder++;
     }
     return results;
   },
-  returns: v.array(v.doc("messages")),
+  returns: v.array(v.doc("steps")),
 });
 
 export const updateMessage = mutation({
@@ -456,11 +441,10 @@ export const getMessages = query({
         ? statuses.map((status) =>
             stream(ctx.db, schema)
               .query("messages")
-              .withIndex("chatId_status_isStep_order_stepOrder", (q) =>
+              .withIndex("chatId_status_order", (q) =>
                 q
                   .eq("chatId", args.chatId)
                   .eq("status", status)
-                  .eq("isStep", isStep)
                   .gte("order", args.orderOffset ?? 0)
               )
               .order(order)
@@ -468,7 +452,7 @@ export const getMessages = query({
         : statuses.map((status) =>
             stream(ctx.db, schema)
               .query("messages")
-              .withIndex("status_chatId_order_stepOrder", (q) =>
+              .withIndex("status_chatId_order", (q) =>
                 q
                   .eq("status", status)
                   .eq("chatId", args.chatId)

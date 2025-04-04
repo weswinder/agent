@@ -49,7 +49,6 @@ export declare const components: {
           chatId: string;
           failPendingSteps?: boolean;
           fileId?: string;
-          isStep?: boolean;
           message?:
             | {
                 content:
@@ -110,7 +109,7 @@ export declare const components: {
                           type: "redacted-reasoning";
                         }
                       | {
-                          args: any;
+                          args?: any;
                           experimental_providerMetadata?: Record<string, any>;
                           providerOptions?: Record<string, any>;
                           toolCallId: string;
@@ -124,6 +123,7 @@ export declare const components: {
               }
             | {
                 content: Array<{
+                  args?: any;
                   experimental_content?: Array<
                     | { text: string; type: "text" }
                     | { data: string; mimeType?: string; type: "image" }
@@ -153,7 +153,6 @@ export declare const components: {
             _id: string;
             chatId: string;
             fileId?: string;
-            isStep: boolean;
             message?:
               | {
                   content:
@@ -214,7 +213,7 @@ export declare const components: {
                             type: "redacted-reasoning";
                           }
                         | {
-                            args: any;
+                            args?: any;
                             experimental_providerMetadata?: Record<string, any>;
                             providerOptions?: Record<string, any>;
                             toolCallId: string;
@@ -228,6 +227,7 @@ export declare const components: {
                 }
               | {
                   content: Array<{
+                    args?: any;
                     experimental_content?: Array<
                       | { text: string; type: "text" }
                       | { data: string; mimeType?: string; type: "image" }
@@ -252,14 +252,12 @@ export declare const components: {
                 };
             order: number;
             status: "pending" | "success" | "failed";
-            stepOrder: number;
           };
           pending?: {
             _creationTime: number;
             _id: string;
             chatId: string;
             fileId?: string;
-            isStep: boolean;
             message?:
               | {
                   content:
@@ -320,7 +318,7 @@ export declare const components: {
                             type: "redacted-reasoning";
                           }
                         | {
-                            args: any;
+                            args?: any;
                             experimental_providerMetadata?: Record<string, any>;
                             providerOptions?: Record<string, any>;
                             toolCallId: string;
@@ -334,6 +332,7 @@ export declare const components: {
                 }
               | {
                   content: Array<{
+                    args?: any;
                     experimental_content?: Array<
                       | { text: string; type: "text" }
                       | { data: string; mimeType?: string; type: "image" }
@@ -358,7 +357,6 @@ export declare const components: {
                 };
             order: number;
             status: "pending" | "success" | "failed";
-            stepOrder: number;
           };
         }
       >;
@@ -371,102 +369,80 @@ export declare const components: {
           messageId: string;
           steps: Array<{
             fileId?: string;
-            message:
-              | {
-                  content:
-                    | string
-                    | Array<
-                        | {
-                            experimental_providerMetadata?: Record<string, any>;
-                            providerOptions?: Record<string, any>;
-                            text: string;
-                            type: "text";
-                          }
-                        | {
-                            experimental_providerMetadata?: Record<string, any>;
-                            image: string | ArrayBuffer;
-                            mimeType?: string;
-                            providerOptions?: Record<string, any>;
-                            type: "image";
-                          }
-                        | {
-                            data: string | ArrayBuffer;
-                            experimental_providerMetadata?: Record<string, any>;
-                            mimeType: string;
-                            providerOptions?: Record<string, any>;
-                            type: "file";
-                          }
-                      >;
-                  experimental_providerMetadata?: Record<string, any>;
-                  providerOptions?: Record<string, any>;
-                  role: "user";
-                }
-              | {
-                  content:
-                    | string
-                    | Array<
-                        | {
-                            experimental_providerMetadata?: Record<string, any>;
-                            providerOptions?: Record<string, any>;
-                            text: string;
-                            type: "text";
-                          }
-                        | {
-                            data: string | ArrayBuffer;
-                            experimental_providerMetadata?: Record<string, any>;
-                            mimeType: string;
-                            providerOptions?: Record<string, any>;
-                            type: "file";
-                          }
-                        | {
-                            experimental_providerMetadata?: Record<string, any>;
-                            providerOptions?: Record<string, any>;
-                            text: string;
-                            type: "reasoning";
-                          }
-                        | {
-                            data: string;
-                            experimental_providerMetadata?: Record<string, any>;
-                            providerOptions?: Record<string, any>;
-                            type: "redacted-reasoning";
-                          }
-                        | {
-                            args: any;
-                            experimental_providerMetadata?: Record<string, any>;
-                            providerOptions?: Record<string, any>;
-                            toolCallId: string;
-                            toolName: string;
-                            type: "tool-call";
-                          }
-                      >;
-                  experimental_providerMetadata?: Record<string, any>;
-                  providerOptions?: Record<string, any>;
-                  role: "assistant";
-                }
-              | {
-                  content: Array<{
-                    experimental_content?: Array<
-                      | { text: string; type: "text" }
-                      | { data: string; mimeType?: string; type: "image" }
-                    >;
-                    experimental_providerMetadata?: Record<string, any>;
-                    isError?: boolean;
-                    providerOptions?: Record<string, any>;
-                    result: any;
-                    toolCallId: string;
-                    toolName: string;
-                    type: "tool-result";
-                  }>;
-                  experimental_providerMetadata?: Record<string, any>;
-                  providerOptions?: Record<string, any>;
-                  role: "tool";
-                }
-              | {
-                  content: string;
-                  experimental_providerMetadata?: Record<string, any>;
-                  providerOptions?: Record<string, any>;
-                  role: "system";
-                };
+            step: {
+              experimental_providerMetadata?: Record<string, any>;
+              files?: Array<string>;
+              finishReason:
+                | "stop"
+                | "length"
+                | "content-filter"
+                | "tool-calls"
+                | "error"
+                | "other"
+                | "unknown";
+              isContinued: boolean;
+              logprobs?: Array<{
+                logprob: number;
+                token: string;
+                topLogprobs: Array<{ logprob: number; token: string }>;
+              }>;
+              providerMetadata?: Record<string, any>;
+              reasoning?: string;
+              reasoningDetails?: Array<string>;
+              request?: {
+                body?: any;
+                headers?: Record<string, string>;
+                method?: string;
+                url?: string;
+              };
+              response?: {
+                body?: any;
+                headers?: Record<string, string>;
+                id: string;
+                messages: Array<{ content: string; id: string; role: string }>;
+                modelId: string;
+                timestamp: number;
+              };
+              sources?: Array<{ text: string; type: "source" }>;
+              stepType: "initial" | "continue" | "tool-result";
+              text: string;
+              toolCalls: Array<{
+                args?: any;
+                experimental_providerMetadata?: Record<string, any>;
+                providerOptions?: Record<string, any>;
+                toolCallId: string;
+                toolName: string;
+                type: "tool-call";
+              }>;
+              toolResults: Array<{
+                args?: any;
+                experimental_content?: Array<
+                  | { text: string; type: "text" }
+                  | { data: string; mimeType?: string; type: "image" }
+                >;
+                experimental_providerMetadata?: Record<string, any>;
+                isError?: boolean;
+                providerOptions?: Record<string, any>;
+                result: any;
+                toolCallId: string;
+                toolName: string;
+                type: "tool-result";
+              }>;
+              usage?: {
+                completionTokens: number;
+                promptTokens: number;
+                totalTokens: number;
+              };
+              warnings?: Array<
+                | {
+                    details?: string;
+                    setting: string;
+                    type: "unsupported-setting";
+                  }
+                | { details?: string; tool: any; type: "unsupported-tool" }
+                | { message: string; type: "other" }
+              >;
+            };
           }>;
         },
         Array<{
@@ -474,105 +450,83 @@ export declare const components: {
           _id: string;
           chatId: string;
           fileId?: string;
-          isStep: boolean;
-          message?:
-            | {
-                content:
-                  | string
-                  | Array<
-                      | {
-                          experimental_providerMetadata?: Record<string, any>;
-                          providerOptions?: Record<string, any>;
-                          text: string;
-                          type: "text";
-                        }
-                      | {
-                          experimental_providerMetadata?: Record<string, any>;
-                          image: string | ArrayBuffer;
-                          mimeType?: string;
-                          providerOptions?: Record<string, any>;
-                          type: "image";
-                        }
-                      | {
-                          data: string | ArrayBuffer;
-                          experimental_providerMetadata?: Record<string, any>;
-                          mimeType: string;
-                          providerOptions?: Record<string, any>;
-                          type: "file";
-                        }
-                    >;
-                experimental_providerMetadata?: Record<string, any>;
-                providerOptions?: Record<string, any>;
-                role: "user";
-              }
-            | {
-                content:
-                  | string
-                  | Array<
-                      | {
-                          experimental_providerMetadata?: Record<string, any>;
-                          providerOptions?: Record<string, any>;
-                          text: string;
-                          type: "text";
-                        }
-                      | {
-                          data: string | ArrayBuffer;
-                          experimental_providerMetadata?: Record<string, any>;
-                          mimeType: string;
-                          providerOptions?: Record<string, any>;
-                          type: "file";
-                        }
-                      | {
-                          experimental_providerMetadata?: Record<string, any>;
-                          providerOptions?: Record<string, any>;
-                          text: string;
-                          type: "reasoning";
-                        }
-                      | {
-                          data: string;
-                          experimental_providerMetadata?: Record<string, any>;
-                          providerOptions?: Record<string, any>;
-                          type: "redacted-reasoning";
-                        }
-                      | {
-                          args: any;
-                          experimental_providerMetadata?: Record<string, any>;
-                          providerOptions?: Record<string, any>;
-                          toolCallId: string;
-                          toolName: string;
-                          type: "tool-call";
-                        }
-                    >;
-                experimental_providerMetadata?: Record<string, any>;
-                providerOptions?: Record<string, any>;
-                role: "assistant";
-              }
-            | {
-                content: Array<{
-                  experimental_content?: Array<
-                    | { text: string; type: "text" }
-                    | { data: string; mimeType?: string; type: "image" }
-                  >;
-                  experimental_providerMetadata?: Record<string, any>;
-                  isError?: boolean;
-                  providerOptions?: Record<string, any>;
-                  result: any;
-                  toolCallId: string;
-                  toolName: string;
-                  type: "tool-result";
-                }>;
-                experimental_providerMetadata?: Record<string, any>;
-                providerOptions?: Record<string, any>;
-                role: "tool";
-              }
-            | {
-                content: string;
-                experimental_providerMetadata?: Record<string, any>;
-                providerOptions?: Record<string, any>;
-                role: "system";
-              };
+          messageId: string;
           order: number;
           status: "pending" | "success" | "failed";
+          step: {
+            experimental_providerMetadata?: Record<string, any>;
+            files?: Array<string>;
+            finishReason:
+              | "stop"
+              | "length"
+              | "content-filter"
+              | "tool-calls"
+              | "error"
+              | "other"
+              | "unknown";
+            isContinued: boolean;
+            logprobs?: Array<{
+              logprob: number;
+              token: string;
+              topLogprobs: Array<{ logprob: number; token: string }>;
+            }>;
+            providerMetadata?: Record<string, any>;
+            reasoning?: string;
+            reasoningDetails?: Array<string>;
+            request?: {
+              body?: any;
+              headers?: Record<string, string>;
+              method?: string;
+              url?: string;
+            };
+            response?: {
+              body?: any;
+              headers?: Record<string, string>;
+              id: string;
+              messages: Array<{ content: string; id: string; role: string }>;
+              modelId: string;
+              timestamp: number;
+            };
+            sources?: Array<{ text: string; type: "source" }>;
+            stepType: "initial" | "continue" | "tool-result";
+            text: string;
+            toolCalls: Array<{
+              args?: any;
+              experimental_providerMetadata?: Record<string, any>;
+              providerOptions?: Record<string, any>;
+              toolCallId: string;
+              toolName: string;
+              type: "tool-call";
+            }>;
+            toolResults: Array<{
+              args?: any;
+              experimental_content?: Array<
+                | { text: string; type: "text" }
+                | { data: string; mimeType?: string; type: "image" }
+              >;
+              experimental_providerMetadata?: Record<string, any>;
+              isError?: boolean;
+              providerOptions?: Record<string, any>;
+              result: any;
+              toolCallId: string;
+              toolName: string;
+              type: "tool-result";
+            }>;
+            usage?: {
+              completionTokens: number;
+              promptTokens: number;
+              totalTokens: number;
+            };
+            warnings?: Array<
+              | {
+                  details?: string;
+                  setting: string;
+                  type: "unsupported-setting";
+                }
+              | { details?: string; tool: any; type: "unsupported-tool" }
+              | { message: string; type: "other" }
+            >;
+          };
           stepOrder: number;
         }>
       >;
@@ -699,7 +653,6 @@ export declare const components: {
             _id: string;
             chatId: string;
             fileId?: string;
-            isStep: boolean;
             message?:
               | {
                   content:
@@ -760,7 +713,7 @@ export declare const components: {
                             type: "redacted-reasoning";
                           }
                         | {
-                            args: any;
+                            args?: any;
                             experimental_providerMetadata?: Record<string, any>;
                             providerOptions?: Record<string, any>;
                             toolCallId: string;
@@ -774,6 +727,7 @@ export declare const components: {
                 }
               | {
                   content: Array<{
+                    args?: any;
                     experimental_content?: Array<
                       | { text: string; type: "text" }
                       | { data: string; mimeType?: string; type: "image" }
@@ -798,7 +752,6 @@ export declare const components: {
                 };
             order: number;
             status: "pending" | "success" | "failed";
-            stepOrder: number;
           }>;
         }
       >;
@@ -889,7 +842,7 @@ export declare const components: {
                           type: "redacted-reasoning";
                         }
                       | {
-                          args: any;
+                          args?: any;
                           experimental_providerMetadata?: Record<string, any>;
                           providerOptions?: Record<string, any>;
                           toolCallId: string;
@@ -903,6 +856,7 @@ export declare const components: {
               }
             | {
                 content: Array<{
+                  args?: any;
                   experimental_content?: Array<
                     | { text: string; type: "text" }
                     | { data: string; mimeType?: string; type: "image" }
