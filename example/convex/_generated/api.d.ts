@@ -40,14 +40,117 @@ export declare const internal: FilterApi<
 
 export declare const components: {
   ai: {
-    lib: {
-      add: FunctionReference<
+    messages: {
+      archiveChat: FunctionReference<
         "mutation",
         "internal",
-        { count: number; name: string; shards?: number },
+        { chatId: string },
+        {
+          _creationTime: number;
+          _id: string;
+          defaultSystemPrompt?: string;
+          domainId?: string;
+          order?: number;
+          status: "active" | "archived";
+          summary?: string;
+          title?: string;
+        }
+      >;
+      createChat: FunctionReference<
+        "mutation",
+        "internal",
+        {
+          defaultSystemPrompt?: string;
+          domainId?: string;
+          summary?: string;
+          title?: string;
+        },
+        {
+          _creationTime: number;
+          _id: string;
+          defaultSystemPrompt?: string;
+          domainId?: string;
+          order?: number;
+          status: "active" | "archived";
+          summary?: string;
+          title?: string;
+        }
+      >;
+      deleteAllForDomainId: FunctionReference<
+        "action",
+        "internal",
+        { domainId: string },
         null
       >;
-      count: FunctionReference<"query", "internal", { name: string }, number>;
+      deleteAllForDomainIdAsync: FunctionReference<
+        "mutation",
+        "internal",
+        { domainId: string },
+        boolean
+      >;
+      getChat: FunctionReference<
+        "query",
+        "internal",
+        { chatId: string },
+        {
+          _creationTime: number;
+          _id: string;
+          defaultSystemPrompt?: string;
+          domainId?: string;
+          order?: number;
+          status: "active" | "archived";
+          summary?: string;
+          title?: string;
+        } | null
+      >;
+      getChatsByDomainId: FunctionReference<
+        "query",
+        "internal",
+        {
+          cursor?: string | null;
+          domainId: string;
+          limit?: number;
+          offset?: number;
+          statuses?: Array<"active" | "archived">;
+        },
+        {
+          chats: Array<{
+            _creationTime: number;
+            _id: string;
+            defaultSystemPrompt?: string;
+            domainId?: string;
+            order?: number;
+            status: "active" | "archived";
+            summary?: string;
+            title?: string;
+          }>;
+          continueCursor: string;
+          isDone: boolean;
+        }
+      >;
+      updateChat: FunctionReference<
+        "mutation",
+        "internal",
+        {
+          chatId: string;
+          patch: {
+            defaultSystemPrompt?: string;
+            status?: "active" | "archived";
+            summary?: string;
+            title?: string;
+          };
+        },
+        {
+          _creationTime: number;
+          _id: string;
+          defaultSystemPrompt?: string;
+          domainId?: string;
+          order?: number;
+          status: "active" | "archived";
+          summary?: string;
+          title?: string;
+        }
+      >;
     };
   };
 };

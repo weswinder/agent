@@ -9,12 +9,14 @@
  */
 
 import type * as lib from "../lib.js";
+import type * as messages from "../messages.js";
 
 import type {
   ApiFromModules,
   FilterApi,
   FunctionReference,
 } from "convex/server";
+
 /**
  * A utility for referencing Convex functions in your app's API.
  *
@@ -25,16 +27,120 @@ import type {
  */
 declare const fullApi: ApiFromModules<{
   lib: typeof lib;
+  messages: typeof messages;
 }>;
 export type Mounts = {
-  lib: {
-    add: FunctionReference<
+  messages: {
+    archiveChat: FunctionReference<
       "mutation",
       "public",
-      { count: number; name: string; shards?: number },
+      { chatId: string },
+      {
+        _creationTime: number;
+        _id: string;
+        defaultSystemPrompt?: string;
+        domainId?: string;
+        order?: number;
+        status: "active" | "archived";
+        summary?: string;
+        title?: string;
+      }
+    >;
+    createChat: FunctionReference<
+      "mutation",
+      "public",
+      {
+        defaultSystemPrompt?: string;
+        domainId?: string;
+        summary?: string;
+        title?: string;
+      },
+      {
+        _creationTime: number;
+        _id: string;
+        defaultSystemPrompt?: string;
+        domainId?: string;
+        order?: number;
+        status: "active" | "archived";
+        summary?: string;
+        title?: string;
+      }
+    >;
+    deleteAllForDomainId: FunctionReference<
+      "action",
+      "public",
+      { domainId: string },
       null
     >;
-    count: FunctionReference<"query", "public", { name: string }, number>;
+    deleteAllForDomainIdAsync: FunctionReference<
+      "mutation",
+      "public",
+      { domainId: string },
+      boolean
+    >;
+    getChat: FunctionReference<
+      "query",
+      "public",
+      { chatId: string },
+      {
+        _creationTime: number;
+        _id: string;
+        defaultSystemPrompt?: string;
+        domainId?: string;
+        order?: number;
+        status: "active" | "archived";
+        summary?: string;
+        title?: string;
+      } | null
+    >;
+    getChatsByDomainId: FunctionReference<
+      "query",
+      "public",
+      {
+        cursor?: string | null;
+        domainId: string;
+        limit?: number;
+        offset?: number;
+        statuses?: Array<"active" | "archived">;
+      },
+      {
+        chats: Array<{
+          _creationTime: number;
+          _id: string;
+          defaultSystemPrompt?: string;
+          domainId?: string;
+          order?: number;
+          status: "active" | "archived";
+          summary?: string;
+          title?: string;
+        }>;
+        continueCursor: string;
+        isDone: boolean;
+      }
+    >;
+    updateChat: FunctionReference<
+      "mutation",
+      "public",
+      {
+        chatId: string;
+        patch: {
+          defaultSystemPrompt?: string;
+          status?: "active" | "archived";
+          summary?: string;
+          title?: string;
+        };
+      },
+      {
+        _creationTime: number;
+        _id: string;
+        defaultSystemPrompt?: string;
+        domainId?: string;
+        order?: number;
+        status: "active" | "archived";
+        summary?: string;
+        title?: string;
+      }
+    >;
   };
 };
 // For now fullApiWithMounts is only fullApi which provides

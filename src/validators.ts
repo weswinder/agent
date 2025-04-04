@@ -5,6 +5,8 @@ import { Infer, v } from "convex/values";
 const providerOptions = v.optional(v.record(v.string(), v.any()));
 const experimental_providerMetadata = providerOptions;
 
+export const vChatStatus = v.union(v.literal("active"), v.literal("archived"));
+
 export const vRole = v.union(
   v.literal("system"),
   v.literal("user"),

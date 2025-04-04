@@ -71,7 +71,8 @@
   },
   "peerDependencies": {
     "ai": "^4.2.11",
-    "convex": "^1.22.0"
+    "convex": "^1.22.0",
+    "convex-helpers": "^0.1.77"
   },
   "devDependencies": {
     "@eslint/js": "^9.9.1",
