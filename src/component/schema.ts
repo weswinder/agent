@@ -1,6 +1,6 @@
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
-import { vChatStatus, vMessage } from "../validators";
+import { vChatStatus, vMessage, vMessageStatus } from "../validators";
 import { typedV } from "convex-helpers/validators";
 
 export const schema = defineSchema({
@@ -15,24 +15,12 @@ export const schema = defineSchema({
   // TODO: text search on title/ summary
   messages: defineTable({
     chatId: v.id("chats"),
-    visibleOrder: v.optional(v.number()), // order amongst visible messages
+    message: v.optional(vMessage),
     order: v.number(), // includes system & tool messages
-    message: vMessage,
-    fileId: v.optional(v.id("files")),
-    visibleParent: v.optional(v.id("messages")),
     visible: v.boolean(), // excludes system & tool messages
-    status: v.union(
-      v.object({
-        kind: v.literal("pending"),
-      }),
-      v.object({
-        kind: v.literal("success"),
-      }),
-      v.object({
-        kind: v.literal("failed"),
-        // error: v.string(),
-      })
-    ),
+    visibleOrder: v.number(), // order amongst visible messages
+    fileId: v.optional(v.id("files")),
+    status: vMessageStatus,
   })
     // Allows finding successful visible messages in order
     // Also surface pending messages separately to e.g. stream
@@ -50,7 +38,9 @@ export const schema = defineSchema({
     storageId: v.string(),
     hash: v.string(),
     refcount: v.number(),
-  }).index("hash", ["hash"]),
+  })
+    .index("hash", ["hash"])
+    .index("refcount", ["refcount"]),
 });
 
 export const vv = typedV(schema);

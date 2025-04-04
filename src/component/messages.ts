@@ -5,15 +5,23 @@ import {
   mutation,
   MutationCtx,
   query,
+  QueryCtx,
 } from "./_generated/server.js";
 import { omit, pick } from "convex-helpers";
-import { vChatStatus } from "../validators.js";
+import {
+  Message,
+  vChatStatus,
+  vMessage,
+  vMessageStatus,
+} from "../validators.js";
 import { stream } from "convex-helpers/server/stream";
 import { mergedStream } from "convex-helpers/server/stream";
 import { nullable, partial } from "convex-helpers/validators";
 import { assert } from "convex-helpers";
 import { internal } from "./_generated/api.js";
 import { ObjectType } from "convex/values";
+import { Doc, Id } from "./_generated/dataModel.js";
+import { paginator } from "convex-helpers/server/pagination";
 
 export const getChat = query({
   args: { chatId: v.id("chats") },
@@ -228,7 +236,7 @@ async function deletePageForDomainId(
       numItems: 100,
       cursor: args.messagesCursor ?? null,
     });
-  await Promise.all(messages.page.map((m) => ctx.db.delete(m._id)));
+  await Promise.all(messages.page.map((m) => deleteMessage(ctx, m)));
   if (messages.isDone) {
     const chats = await chatStreams.paginate({
       numItems: 100,
@@ -248,6 +256,183 @@ async function deletePageForDomainId(
   };
 }
 
+async function deleteMessage(ctx: MutationCtx, messageDoc: Doc<"messages">) {
+  await ctx.db.delete(messageDoc._id);
+  if (messageDoc.fileId) {
+    const file = await ctx.db.get(messageDoc.fileId);
+    if (file) {
+      await ctx.db.patch(messageDoc.fileId, { refcount: file.refcount - 1 });
+    }
+  }
+}
+
+export const getFilesToDelete = query({
+  args: {
+    cursor: v.optional(v.string()),
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const files = await paginator(ctx.db, schema)
+      .query("files")
+      .withIndex("refcount", (q) => q.eq("refcount", 0))
+      .paginate({
+        numItems: args.limit ?? 100,
+        cursor: args.cursor ?? null,
+      });
+    return {
+      files: files.page,
+      continueCursor: files.continueCursor,
+      isDone: files.isDone,
+    };
+  },
+  returns: v.object({
+    files: v.array(v.doc("files")),
+    continueCursor: v.string(),
+    isDone: v.boolean(),
+  }),
+});
+
+const vMessageDoc = schema.tables.messages.validator;
+const messageStatuses = vMessageDoc.fields.status.members.map((m) => m.value);
+
+function visibleMessagesStreamsDesc(ctx: QueryCtx, chatId: Id<"chats">) {
+  return messageStatuses.map((status) =>
+    stream(ctx.db, schema)
+      .query("messages")
+      .withIndex("chatId_status_visible_visibleOrder", (q) =>
+        q.eq("chatId", chatId).eq("status", status).eq("visible", true)
+      )
+      .order("desc")
+  );
+}
+
+function allMessagesStreamsDesc(ctx: QueryCtx, chatId: Id<"chats">) {
+  return messageStatuses.map((status) =>
+    stream(ctx.db, schema)
+      .query("messages")
+      .withIndex("status_chatId_order", (q) =>
+        q.eq("status", status).eq("chatId", chatId)
+      )
+  );
+}
+
+export const addMessage = mutation({
+  args: {
+    chatId: v.id("chats"),
+    message: v.optional(vMessage),
+    fileId: v.optional(v.id("files")),
+    visible: v.optional(v.boolean()),
+    addPending: v.optional(v.boolean()),
+    clearPending: v.optional(v.boolean()),
+  },
+  handler: async (ctx, args) => {
+    if (args.clearPending) {
+      const pendingMessages = await ctx.db
+        .query("messages")
+        .withIndex("status_chatId_order", (q) =>
+          q.eq("status", "pending").eq("chatId", args.chatId)
+        )
+        .collect();
+      await Promise.all(pendingMessages.map((m) => ctx.db.delete(m._id)));
+    }
+    const maxVisibleMessage = await mergedStream(
+      visibleMessagesStreamsDesc(ctx, args.chatId),
+      ["visibleOrder"]
+    ).first();
+    const visible = args.visible ?? true;
+    const lastVisibleOrder = maxVisibleMessage?.visibleOrder ?? -1;
+    const visibleOrder = visible ? lastVisibleOrder + 1 : lastVisibleOrder;
+
+    const maxOrder = await mergedStream(
+      allMessagesStreamsDesc(ctx, args.chatId),
+      ["order"]
+    ).first();
+    const order = (maxOrder?.order ?? -1) + 1;
+    const messageId = await ctx.db.insert("messages", {
+      chatId: args.chatId,
+      message: args.message,
+      order,
+      visible,
+      visibleOrder,
+      fileId: args.fileId,
+      status: args.message ? "success" : "pending",
+    });
+    const message = (await ctx.db.get(messageId))!;
+    if (args.addPending) {
+      const pendingId = await ctx.db.insert("messages", {
+        chatId: args.chatId,
+        status: "pending",
+        order: order + 1,
+        visible,
+        visibleOrder: visible ? visibleOrder + 1 : visibleOrder,
+      });
+      const pending = (await ctx.db.get(pendingId))!;
+      return { message, pending };
+    }
+    return { message };
+  },
+  returns: v.object({
+    message: v.doc("messages"),
+    pending: v.optional(v.doc("messages")),
+  }),
+});
+
+export const getMessages = query({
+  args: {
+    chatId: v.id("chats"),
+    visible: v.optional(v.boolean()),
+    order: v.optional(v.union(v.literal("asc"), v.literal("desc"))),
+    limit: v.optional(v.number()),
+    // Note: the other arguments cannot change from when the cursor was created.
+    cursor: v.optional(v.string()),
+    offset: v.optional(v.number()),
+    statuses: v.optional(v.array(vMessageStatus)),
+  },
+  handler: async (ctx, args) => {
+    const statuses = args.statuses ?? ["success"];
+    const visible = args.visible;
+    const order = args.order ?? "desc";
+    const streams =
+      visible !== undefined
+        ? statuses.map((status) =>
+            stream(ctx.db, schema)
+              .query("messages")
+              .withIndex("chatId_status_visible_visibleOrder", (q) =>
+                q
+                  .eq("chatId", args.chatId)
+                  .eq("status", status)
+                  .eq("visible", visible)
+                  .gte("visibleOrder", args.offset ?? 0)
+              )
+              .order(order)
+          )
+        : statuses.map((status) =>
+            stream(ctx.db, schema)
+              .query("messages")
+              .withIndex("status_chatId_order", (q) =>
+                q
+                  .eq("status", status)
+                  .eq("chatId", args.chatId)
+                  .gte("order", args.offset ?? 0)
+              )
+              .order(order)
+          );
+    const messages = await mergedStream(streams, ["order"]).paginate({
+      numItems: args.limit ?? 100,
+      cursor: args.cursor ?? null,
+    });
+    return {
+      messages: messages.page,
+      continueCursor: messages.continueCursor,
+      isDone: messages.isDone,
+    };
+  },
+  returns: v.object({
+    messages: v.array(v.doc("messages")),
+    continueCursor: v.string(),
+    isDone: v.boolean(),
+  }),
+});
 // const vMemoryConfig = v.object({
 //   lastMessages: v.optional(v.union(v.number(), v.literal(false))),
 //   semanticRecall: v.optional(

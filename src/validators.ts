@@ -6,6 +6,12 @@ const providerOptions = v.optional(v.record(v.string(), v.any()));
 const experimental_providerMetadata = providerOptions;
 
 export const vChatStatus = v.union(v.literal("active"), v.literal("archived"));
+export const vMessageStatus = v.union(
+  v.literal("pending"),
+  v.literal("success"),
+  v.literal("failed")
+);
+
 
 export const vRole = v.union(
   v.literal("system"),
