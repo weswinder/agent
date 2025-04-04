@@ -362,13 +362,119 @@ export declare const components: {
           };
         }
       >;
-      addStep: FunctionReference<
+      addSteps: FunctionReference<
         "mutation",
         "internal",
         {
           chatId: string;
-          failPendingSteps?: boolean;
+          failPreviousSteps?: boolean;
+          messageId: string;
+          steps: Array<{
+            fileId?: string;
+            message:
+              | {
+                  content:
+                    | string
+                    | Array<
+                        | {
+                            experimental_providerMetadata?: Record<string, any>;
+                            providerOptions?: Record<string, any>;
+                            text: string;
+                            type: "text";
+                          }
+                        | {
+                            experimental_providerMetadata?: Record<string, any>;
+                            image: string | ArrayBuffer;
+                            mimeType?: string;
+                            providerOptions?: Record<string, any>;
+                            type: "image";
+                          }
+                        | {
+                            data: string | ArrayBuffer;
+                            experimental_providerMetadata?: Record<string, any>;
+                            mimeType: string;
+                            providerOptions?: Record<string, any>;
+                            type: "file";
+                          }
+                      >;
+                  experimental_providerMetadata?: Record<string, any>;
+                  providerOptions?: Record<string, any>;
+                  role: "user";
+                }
+              | {
+                  content:
+                    | string
+                    | Array<
+                        | {
+                            experimental_providerMetadata?: Record<string, any>;
+                            providerOptions?: Record<string, any>;
+                            text: string;
+                            type: "text";
+                          }
+                        | {
+                            data: string | ArrayBuffer;
+                            experimental_providerMetadata?: Record<string, any>;
+                            mimeType: string;
+                            providerOptions?: Record<string, any>;
+                            type: "file";
+                          }
+                        | {
+                            experimental_providerMetadata?: Record<string, any>;
+                            providerOptions?: Record<string, any>;
+                            text: string;
+                            type: "reasoning";
+                          }
+                        | {
+                            data: string;
+                            experimental_providerMetadata?: Record<string, any>;
+                            providerOptions?: Record<string, any>;
+                            type: "redacted-reasoning";
+                          }
+                        | {
+                            args: any;
+                            experimental_providerMetadata?: Record<string, any>;
+                            providerOptions?: Record<string, any>;
+                            toolCallId: string;
+                            toolName: string;
+                            type: "tool-call";
+                          }
+                      >;
+                  experimental_providerMetadata?: Record<string, any>;
+                  providerOptions?: Record<string, any>;
+                  role: "assistant";
+                }
+              | {
+                  content: Array<{
+                    experimental_content?: Array<
+                      | { text: string; type: "text" }
+                      | { data: string; mimeType?: string; type: "image" }
+                    >;
+                    experimental_providerMetadata?: Record<string, any>;
+                    isError?: boolean;
+                    providerOptions?: Record<string, any>;
+                    result: any;
+                    toolCallId: string;
+                    toolName: string;
+                    type: "tool-result";
+                  }>;
+                  experimental_providerMetadata?: Record<string, any>;
+                  providerOptions?: Record<string, any>;
+                  role: "tool";
+                }
+              | {
+                  content: string;
+                  experimental_providerMetadata?: Record<string, any>;
+                  providerOptions?: Record<string, any>;
+                  role: "system";
+                };
+          }>;
+        },
+        Array<{
+          _creationTime: number;
+          _id: string;
+          chatId: string;
           fileId?: string;
+          isStep: boolean;
           message?:
             | {
                 content:
@@ -465,9 +571,10 @@ export declare const components: {
                 providerOptions?: Record<string, any>;
                 role: "system";
               };
-          messageId: string;
-        },
-        any
+          order: number;
+          status: "pending" | "success" | "failed";
+          stepOrder: number;
+        }>
       >;
       archiveChat: FunctionReference<
         "mutation",
