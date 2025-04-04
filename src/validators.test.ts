@@ -1,5 +1,5 @@
 import { Infer } from "convex/values";
-import { expectTypeOf, test } from "vitest";
+import { expectTypeOf } from "vitest";
 import {
   vAssistantContent,
   vAssistantMessage,

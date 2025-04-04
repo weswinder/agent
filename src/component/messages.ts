@@ -5,7 +5,6 @@ import {
   mutation,
   MutationCtx,
   query,
-  QueryCtx,
 } from "./_generated/server.js";
 import { omit, pick } from "convex-helpers";
 import { vChatStatus, vMessage, vMessageStatus } from "../validators.js";
@@ -15,7 +14,7 @@ import { nullable, partial } from "convex-helpers/validators";
 import { assert } from "convex-helpers";
 import { internal } from "./_generated/api.js";
 import { ObjectType } from "convex/values";
-import { Doc, Id } from "./_generated/dataModel.js";
+import { Doc } from "./_generated/dataModel.js";
 import { paginator } from "convex-helpers/server/pagination";
 
 export const getChat = query({
