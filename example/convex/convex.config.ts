@@ -1,7 +1,7 @@
 import { defineApp } from "convex/server";
-import ai from "@convex-dev/ai/convex.config";
+import agent from "@convex-dev/agent/convex.config";
 
 const app = defineApp();
-app.use(ai);
+app.use(agent);
 
 export default app;

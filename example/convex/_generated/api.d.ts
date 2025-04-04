@@ -39,7 +39,7 @@ export declare const internal: FilterApi<
 >;
 
 export declare const components: {
-  ai: {
+  agent: {
     messages: {
       addMessage: FunctionReference<
         "mutation",

@@ -1,11 +1,11 @@
 {
-  "name": "@convex-dev/ai",
-  "description": "A ai component for Convex.",
-  "repository": "github:get-convex/ai",
-  "homepage": "https://github.com/get-convex/ai#readme",
+  "name": "@convex-dev/agent",
+  "description": "A agent component for Convex.",
+  "repository": "github:get-convex/agent",
+  "homepage": "https://github.com/get-convex/agent#readme",
   "bugs": {
     "email": "support@convex.dev",
-    "url": "https://github.com/get-convex/ai/issues"
+    "url": "https://github.com/get-convex/agent/issues"
   },
   "version": "0.1.0",
   "license": "Apache-2.0",

@@ -1,6 +1,6 @@
-# Convex AI Component
+# Convex Agent Component
 
-[![npm version](https://badge.fury.io/js/@convex-dev%2Fai.svg)](https://badge.fury.io/js/@convex-dev%2Fai)
+[![npm version](https://badge.fury.io/js/@convex-dev%2fagent.svg)](https://badge.fury.io/js/@convex-dev%2fagent)
 
 <!-- START: Include on https://convex.dev/components -->
 
@@ -8,7 +8,7 @@
 - [ ] Why should you use this component?
 - [ ] Links to Stack / other resources?
 
-Found a bug? Feature request? [File it here](https://github.com/get-convex/ai/issues).
+Found a bug? Feature request? [File it here](https://github.com/get-convex/agent/issues).
 
 ## Pre-requisite: Convex
 
@@ -23,7 +23,7 @@ Run `npm create convex` or follow any of the [quickstarts](https://docs.convex.d
 Install the component package:
 
 ```ts
-npm install @convex-dev/ai
+npm install @convex-dev/agent
 ```
 
 Create a `convex.config.ts` file in your app's `convex/` folder and install the component by calling `use`:
@@ -31,10 +31,10 @@ Create a `convex.config.ts` file in your app's `convex/` folder and install the 
 ```ts
 // convex/convex.config.ts
 import { defineApp } from "convex/server";
-import ai from "@convex-dev/ai/convex.config";
+import agent from "@convex-dev/agent/convex.config";
 
 const app = defineApp();
-app.use(ai);
+app.use(agent);
 
 export default app;
 ```
@@ -43,9 +43,9 @@ export default app;
 
 ```ts
 import { components } from "./_generated/api";
-import { AI } from "@convex-dev/ai";
+import { Agent } from "@convex-dev/agent";
 
-const ai = new AI(components.ai, {
+const agent = new Agent(components.agent, {
   ...options,
 });
 ```

@@ -8,7 +8,7 @@ function App() {
 
   return (
     <>
-      <h1>Convex AI Component Example</h1>
+      <h1>Convex Agent Component Example</h1>
       <div className="card">
         <button onClick={() => addOne()}>count is {count}</button>
         <p>

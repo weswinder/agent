@@ -6,7 +6,7 @@ import schema from "./schema.js";
 import { api } from "./_generated/api.js";
 import { modules } from "./setup.test.js";
 
-describe("ai", () => {
+describe("agent", () => {
   test("add and subtract", async () => {
     const t = convexTest(schema, modules);
   });
