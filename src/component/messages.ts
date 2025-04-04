@@ -8,12 +8,7 @@ import {
   QueryCtx,
 } from "./_generated/server.js";
 import { omit, pick } from "convex-helpers";
-import {
-  Message,
-  vChatStatus,
-  vMessage,
-  vMessageStatus,
-} from "../validators.js";
+import { vChatStatus, vMessage, vMessageStatus } from "../validators.js";
 import { stream } from "convex-helpers/server/stream";
 import { mergedStream } from "convex-helpers/server/stream";
 import { nullable, partial } from "convex-helpers/validators";
@@ -51,7 +46,7 @@ export const getChatsByDomainId = query({
             .gte("order", args.offset ?? 0)
         )
     );
-    const chats = await mergedStream(streams, ["order"]).paginate({
+    const chats = await mergedStream(streams, ["order", "stepOrder"]).paginate({
       numItems: args.limit ?? 100,
       cursor: args.cursor ?? null,
     });
@@ -82,7 +77,10 @@ export const createChat = mutation({
         )
         .order("desc")
     );
-    const latestChat = await mergedStream(streams, ["order"]).first();
+    const latestChat = await mergedStream(streams, [
+      "order",
+      "stepOrder",
+    ]).first();
     const order = (latestChat?.order ?? -1) + 1;
     const chatId = await ctx.db.insert("chats", {
       ...args,
@@ -227,7 +225,7 @@ async function deletePageForDomainId(
       async (c) =>
         stream(ctx.db, schema)
           .query("messages")
-          .withIndex("chatId_status_visible_visibleOrder", (q) =>
+          .withIndex("chatId_status_isStep_order_stepOrder", (q) =>
             q.eq("chatId", c._id)
           ),
       ["chatId"]
@@ -292,68 +290,50 @@ export const getFilesToDelete = query({
   }),
 });
 
-const vMessageDoc = schema.tables.messages.validator;
-const messageStatuses = vMessageDoc.fields.status.members.map((m) => m.value);
-
-function visibleMessagesStreamsDesc(ctx: QueryCtx, chatId: Id<"chats">) {
-  return messageStatuses.map((status) =>
-    stream(ctx.db, schema)
-      .query("messages")
-      .withIndex("chatId_status_visible_visibleOrder", (q) =>
-        q.eq("chatId", chatId).eq("status", status).eq("visible", true)
-      )
-      .order("desc")
-  );
-}
-
-function allMessagesStreamsDesc(ctx: QueryCtx, chatId: Id<"chats">) {
-  return messageStatuses.map((status) =>
-    stream(ctx.db, schema)
-      .query("messages")
-      .withIndex("status_chatId_order", (q) =>
-        q.eq("status", status).eq("chatId", chatId)
-      )
-  );
-}
+export const vMessageDoc = schema.tables.messages.validator;
+export const messageStatuses = vMessageDoc.fields.status.members.map(
+  (m) => m.value
+);
 
 export const addMessage = mutation({
   args: {
     chatId: v.id("chats"),
     message: v.optional(vMessage),
     fileId: v.optional(v.id("files")),
-    visible: v.optional(v.boolean()),
+    isStep: v.optional(v.boolean()),
     addPending: v.optional(v.boolean()),
-    clearPending: v.optional(v.boolean()),
+    failPendingSteps: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
-    if (args.clearPending) {
+    if (args.failPendingSteps) {
       const pendingMessages = await ctx.db
         .query("messages")
-        .withIndex("status_chatId_order", (q) =>
+        .withIndex("status_chatId_order_stepOrder", (q) =>
           q.eq("status", "pending").eq("chatId", args.chatId)
         )
         .collect();
-      await Promise.all(pendingMessages.map((m) => ctx.db.delete(m._id)));
+      await Promise.all(
+        pendingMessages.map((m) => ctx.db.patch(m._id, { status: "failed" }))
+      );
     }
-    const maxVisibleMessage = await mergedStream(
-      visibleMessagesStreamsDesc(ctx, args.chatId),
-      ["visibleOrder"]
-    ).first();
-    const visible = args.visible ?? true;
-    const lastVisibleOrder = maxVisibleMessage?.visibleOrder ?? -1;
-    const visibleOrder = visible ? lastVisibleOrder + 1 : lastVisibleOrder;
+    const maxMessage = await stream(ctx.db, schema)
+      .query("messages")
+      .withIndex("chatId_status_isStep_order_stepOrder", (q) =>
+        q.eq("chatId", args.chatId).eq("status", "success").eq("isStep", true)
+      )
+      .order("desc")
+      .first();
+    const isStep = args.isStep ?? true;
+    const lastOrder = maxMessage?.order ?? -1;
+    const order = isStep ? lastOrder + 1 : lastOrder;
+    const stepOrder = isStep ? (maxMessage?.stepOrder ?? -1) + 1 : 0;
 
-    const maxOrder = await mergedStream(
-      allMessagesStreamsDesc(ctx, args.chatId),
-      ["order"]
-    ).first();
-    const order = (maxOrder?.order ?? -1) + 1;
     const messageId = await ctx.db.insert("messages", {
       chatId: args.chatId,
       message: args.message,
       order,
-      visible,
-      visibleOrder,
+      isStep,
+      stepOrder,
       fileId: args.fileId,
       status: args.message ? "success" : "pending",
     });
@@ -363,8 +343,8 @@ export const addMessage = mutation({
         chatId: args.chatId,
         status: "pending",
         order: order + 1,
-        visible,
-        visibleOrder: visible ? visibleOrder + 1 : visibleOrder,
+        isStep: false,
+        stepOrder: 0,
       });
       const pending = (await ctx.db.get(pendingId))!;
       return { message, pending };
@@ -377,47 +357,120 @@ export const addMessage = mutation({
   }),
 });
 
+export const addStep = mutation({
+  args: {
+    chatId: v.id("chats"),
+    messageId: v.id("messages"),
+    fileId: v.optional(v.id("files")),
+    message: v.optional(vMessage),
+    failPendingSteps: v.optional(v.boolean()),
+  },
+  handler: async (ctx, args) => {
+    const message = await ctx.db.get(args.messageId);
+    assert(message, `Message ${args.messageId} not found`);
+    assert(!message.isStep, `Message ${args.messageId} is a step`);
+    const steps = await ctx.db
+      .query("messages")
+      .withIndex("chatId_status_isStep_order_stepOrder", (q) =>
+        q
+          .eq("chatId", args.chatId)
+          .eq("status", "success")
+          .eq("isStep", true)
+          .eq("order", message.order)
+      )
+      .collect();
+    let maxStepOrder;
+    if (args.failPendingSteps && message.status === "pending") {
+      for (const step of steps) {
+        if (step.status === "pending") {
+          await ctx.db.patch(step._id, { status: "failed" });
+        }
+      }
+      maxStepOrder =
+        steps.filter((s) => s.status === "success").at(-1)?.stepOrder ?? 0;
+    } else {
+      maxStepOrder = steps.at(-1)?.stepOrder ?? 0;
+    }
+    const stepId = await ctx.db.insert("messages", {
+      chatId: args.chatId,
+      message: args.message,
+      order: message.order,
+      isStep: true,
+      stepOrder: maxStepOrder + 1,
+      status: args.message ? "success" : "pending",
+      fileId: args.fileId,
+    });
+    return (await ctx.db.get(stepId))!;
+  },
+});
+
+export const updateMessage = mutation({
+  args: {
+    messageId: v.id("messages"),
+    message: vMessage,
+  },
+  handler: async (ctx, args) => {
+    const message = await ctx.db.get(args.messageId);
+    assert(message, `Message ${args.messageId} not found`);
+    await ctx.db.patch(args.messageId, {
+      message: args.message,
+    });
+    if (message.status === "pending") {
+      await ctx.db.patch(args.messageId, {
+        status: "success",
+      });
+    }
+  },
+});
+
 export const getMessages = query({
   args: {
     chatId: v.id("chats"),
-    visible: v.optional(v.boolean()),
+    isStep: v.optional(v.boolean()),
     order: v.optional(v.union(v.literal("asc"), v.literal("desc"))),
     limit: v.optional(v.number()),
     // Note: the other arguments cannot change from when the cursor was created.
     cursor: v.optional(v.string()),
-    offset: v.optional(v.number()),
+    // Note: the offset is for the top-level messages, not including steps.
+    // If you're only paginating over visible messages, this works.
+    // To go to the next "page" including non-visible messages, use continueCursor,
+    // or find the last order in the previous page to go from.
+    orderOffset: v.optional(v.number()),
     statuses: v.optional(v.array(vMessageStatus)),
   },
   handler: async (ctx, args) => {
     const statuses = args.statuses ?? ["success"];
-    const visible = args.visible;
+    const isStep = args.isStep;
     const order = args.order ?? "desc";
     const streams =
-      visible !== undefined
+      isStep !== undefined
         ? statuses.map((status) =>
             stream(ctx.db, schema)
               .query("messages")
-              .withIndex("chatId_status_visible_visibleOrder", (q) =>
+              .withIndex("chatId_status_isStep_order_stepOrder", (q) =>
                 q
                   .eq("chatId", args.chatId)
                   .eq("status", status)
-                  .eq("visible", visible)
-                  .gte("visibleOrder", args.offset ?? 0)
+                  .eq("isStep", isStep)
+                  .gte("order", args.orderOffset ?? 0)
               )
               .order(order)
           )
         : statuses.map((status) =>
             stream(ctx.db, schema)
               .query("messages")
-              .withIndex("status_chatId_order", (q) =>
+              .withIndex("status_chatId_order_stepOrder", (q) =>
                 q
                   .eq("status", status)
                   .eq("chatId", args.chatId)
-                  .gte("order", args.offset ?? 0)
+                  .gte("order", args.orderOffset ?? 0)
               )
               .order(order)
           );
-    const messages = await mergedStream(streams, ["order"]).paginate({
+    const messages = await mergedStream(streams, [
+      "order",
+      "stepOrder",
+    ]).paginate({
       numItems: args.limit ?? 100,
       cursor: args.cursor ?? null,
     });
