@@ -1,7 +1,7 @@
 import { api } from "../component/_generated/api";
 import { RunActionCtx, RunMutationCtx, RunQueryCtx, UseApi } from "./types";
 import type { EmbeddingModelV1, LanguageModelV1 } from "@ai-sdk/provider";
-import { MessageStatus, Step } from "../validators";
+import { MessageStatus, SearchOptions, Step } from "../validators";
 import type {
   StreamTextResult,
   Tool,
@@ -23,18 +23,16 @@ import {
 } from "ai";
 import { assert } from "convex-helpers";
 import { omit } from "convex-helpers";
-import { extractText } from "../shared";
+import { DEFAULT_MESSAGE_RANGE, extractText } from "../shared";
 
-export type SearchOptions = {
+export type ContextOptions = {
   includeToolMessages?: boolean;
   recentMessages?: number;
-  textSearch?: boolean;
-  vectorSearch?: boolean;
   searchOptions?: {
-    vector?: number[];
-    text?: string;
-    topK?: number;
-    messageRange?: { before: number; after: number };
+    limit: number;
+    textSearch?: boolean;
+    vectorSearch?: boolean;
+    messageRange: { before: number; after: number };
   };
   searchOtherChats?: boolean;
 };
@@ -135,22 +133,24 @@ export class Agent {
       userId?: string;
       chatId?: string;
       messages: CoreMessage[];
-    } & SearchOptions
+    } & ContextOptions
   ): Promise<CoreMessage[]> {
     assert(args.userId || args.chatId, "Specify userId or chatId");
     // Fetch the latest messages from the chat
     const contextMessages: CoreMessage[] = [];
-    if (args.textSearch || args.vectorSearch) {
+    if (args.searchOptions?.textSearch || args.searchOptions?.vectorSearch) {
       if (!("runAction" in ctx)) {
         throw new Error("searchUserMessages only works in an action");
       }
-      contextMessages.push(
-        ...(await ctx.runAction(this.component.messages.searchMessages, {
+      const searchMessages = await ctx.runAction(
+        this.component.messages.searchMessages,
+        {
           userId: args.searchOtherChats ? args.userId : undefined,
           chatId: args.chatId,
           ...(await this.searchWithDefaults(args, args.messages)),
-        }))
+        }
       );
+      contextMessages.push(...searchMessages.map((m) => m.message!));
     }
     if (args.chatId) {
       const { messages } = await ctx.runQuery(
@@ -220,7 +220,7 @@ export class Agent {
     }: {
       userId?: string;
       chatId?: string;
-    } & SearchOptions,
+    } & ContextOptions,
     args: Partial<Parameters<typeof generateText>[0]>
   ): Promise<{ text: string }> {
     const { prompt, messages: raw, ...rest } = args;
@@ -249,7 +249,7 @@ export class Agent {
       userId,
       chatId,
       ...searchArgs
-    }: { userId?: string; chatId?: string } & SearchOptions,
+    }: { userId?: string; chatId?: string } & ContextOptions,
     args: Partial<
       Parameters<typeof streamText<TOOLS, OUTPUT, PARTIAL_OUTPUT>>[0]
     >
@@ -289,38 +289,35 @@ export class Agent {
   }
 
   async searchWithDefaults(
-    searchArgs: SearchOptions,
+    searchArgs: ContextOptions,
     messages: CoreMessage[]
   ): Promise<SearchOptions> {
-    const search = {
-      includeToolMessages: false,
-      recentMessages: 30,
-      searchOtherChats: false,
-      ...searchArgs,
+    assert(
+      searchArgs.searchOptions?.textSearch ||
+        searchArgs.searchOptions?.vectorSearch,
+      "searchOptions is required"
+    );
+    assert(messages.length > 0, "Core messages cannot be empty");
+    const text = extractText(messages.at(-1)!);
+    const search: SearchOptions = {
+      limit: searchArgs.searchOptions?.limit ?? 10,
+      messageRange: {
+        ...DEFAULT_MESSAGE_RANGE,
+        ...searchArgs.searchOptions?.messageRange,
+      },
+      text: extractText(messages.at(-1)!),
     };
-    if (searchArgs.textSearch || searchArgs.vectorSearch) {
-      assert(messages.length > 0, "Core messages cannot be empty");
-      const text = extractText(messages.at(-1)!);
-      search.searchOptions = {
-        topK: searchArgs.searchOptions?.topK ?? 10,
-        messageRange: {
-          before: 2,
-          after: 1,
-          ...searchArgs.searchOptions?.messageRange,
-        },
-        text: text,
-        vector:
-          searchArgs.searchOptions?.vector ??
-          ((text &&
-            this.options.textEmbedding &&
-            (
-              await this.options.textEmbedding.doEmbed({
-                values: [text],
-              })
-            ).embeddings[0]) ||
-            undefined),
-        ...searchArgs.searchOptions,
-      };
+    if (
+      searchArgs.searchOptions?.vectorSearch &&
+      text &&
+      this.options.textEmbedding
+    ) {
+      search.vector = (
+        await this.options.textEmbedding.doEmbed({
+          values: [text],
+        })
+      ).embeddings[0];
+      search.vectorModel = this.options.textEmbedding.modelId;
     }
     return search;
   }

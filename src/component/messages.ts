@@ -1,4 +1,18 @@
-import { schema, v } from "./schema.js";
+import { assert, omit, pick } from "convex-helpers";
+import { paginator } from "convex-helpers/server/pagination";
+import { mergedStream, stream } from "convex-helpers/server/stream";
+import { nullable, partial } from "convex-helpers/validators";
+import { ObjectType } from "convex/values";
+import { DEFAULT_MESSAGE_RANGE, extractText, isTool } from "../shared.js";
+import {
+  vChatStatus,
+  vMessage,
+  vMessageStatus,
+  vSearchOptions,
+  vStep,
+} from "../validators.js";
+import { api, internal } from "./_generated/api.js";
+import { Doc, Id } from "./_generated/dataModel.js";
 import {
   action,
   internalMutation,
@@ -7,17 +21,7 @@ import {
   MutationCtx,
   query,
 } from "./_generated/server.js";
-import { omit, pick } from "convex-helpers";
-import { vChatStatus, vMessage, vMessageStatus, vStep } from "../validators.js";
-import { stream } from "convex-helpers/server/stream";
-import { mergedStream } from "convex-helpers/server/stream";
-import { nullable, partial } from "convex-helpers/validators";
-import { assert } from "convex-helpers";
-import { api, internal } from "./_generated/api.js";
-import { ObjectType } from "convex/values";
-import { Doc, Id } from "./_generated/dataModel.js";
-import { paginator } from "convex-helpers/server/pagination";
-import { isTool, extractText, DEFAULT_MESSAGE_RANGE } from "../shared.js";
+import { schema, v } from "./schema.js";
 import {
   getVectorTableName,
   VectorDimension,
@@ -517,16 +521,7 @@ export const searchMessages = action({
   args: {
     userId: v.optional(v.string()),
     chatId: v.optional(v.id("chats")),
-    vector: v.optional(v.array(v.number())),
-    vectorModel: v.optional(v.string()),
-    text: v.optional(v.string()),
-    limit: v.number(),
-    messageRange: v.optional(
-      v.object({
-        before: v.number(),
-        after: v.number(),
-      })
-    ),
+    ...vSearchOptions.fields,
   },
   returns: v.array(v.doc("messages")),
   handler: async (ctx, args): Promise<Doc<"messages">[]> => {

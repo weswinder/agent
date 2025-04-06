@@ -237,3 +237,12 @@ export const vStep = v.object({
   experimental_providerMetadata,
 });
 export type Step = Infer<typeof vStep>;
+
+export const vSearchOptions = v.object({
+  vector: v.optional(v.array(v.number())),
+  vectorModel: v.optional(v.string()),
+  text: v.optional(v.string()),
+  limit: v.number(),
+  messageRange: v.optional(v.object({ before: v.number(), after: v.number() })),
+});
+export type SearchOptions = Infer<typeof vSearchOptions>;
