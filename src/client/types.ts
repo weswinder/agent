@@ -4,15 +4,22 @@ import {
   GenericMutationCtx,
   Expand,
   FunctionReference,
+  GenericActionCtx,
 } from "convex/server";
 import { GenericId } from "convex/values";
 
 /* Type utils follow */
-type RunQueryCtx = {
+export type RunQueryCtx = {
   runQuery: GenericQueryCtx<GenericDataModel>["runQuery"];
 };
-type RunMutationCtx = {
+export type RunMutationCtx = {
+  runQuery: GenericMutationCtx<GenericDataModel>["runQuery"];
   runMutation: GenericMutationCtx<GenericDataModel>["runMutation"];
+};
+export type RunActionCtx = {
+  runQuery: GenericActionCtx<GenericDataModel>["runQuery"];
+  runMutation: GenericActionCtx<GenericDataModel>["runMutation"];
+  runAction: GenericActionCtx<GenericDataModel>["runAction"];
 };
 
 export type OpaqueIds<T> =
