@@ -2,6 +2,7 @@ import { schema, v } from "./schema.js";
 import {
   action,
   internalMutation,
+  internalQuery,
   mutation,
   MutationCtx,
   query,
@@ -12,11 +13,17 @@ import { stream } from "convex-helpers/server/stream";
 import { mergedStream } from "convex-helpers/server/stream";
 import { nullable, partial } from "convex-helpers/validators";
 import { assert } from "convex-helpers";
-import { internal } from "./_generated/api.js";
+import { api, internal } from "./_generated/api.js";
 import { ObjectType } from "convex/values";
-import { Doc } from "./_generated/dataModel.js";
+import { Doc, Id } from "./_generated/dataModel.js";
 import { paginator } from "convex-helpers/server/pagination";
-import { isTool, extractText } from "../shared.js";
+import { isTool, extractText, DEFAULT_MESSAGE_RANGE } from "../shared.js";
+import {
+  getVectorTableName,
+  VectorDimension,
+  VectorDimensions,
+  vVectorId,
+} from "./vector/tables.js";
 
 export const getChat = query({
   args: { chatId: v.id("chats") },
@@ -511,8 +518,9 @@ export const searchMessages = action({
     userId: v.optional(v.string()),
     chatId: v.optional(v.id("chats")),
     vector: v.optional(v.array(v.number())),
+    vectorModel: v.optional(v.string()),
     text: v.optional(v.string()),
-    topK: v.optional(v.number()),
+    limit: v.number(),
     messageRange: v.optional(
       v.object({
         before: v.number(),
@@ -520,11 +528,169 @@ export const searchMessages = action({
       })
     ),
   },
+  returns: v.array(v.doc("messages")),
+  handler: async (ctx, args): Promise<Doc<"messages">[]> => {
+    assert(args.userId || args.chatId, "Specify userId or chatId");
+    const limit = args.limit;
+    let textSearchMessages: Doc<"messages">[] | undefined;
+    if (args.text) {
+      textSearchMessages = await ctx.runQuery(api.messages.textSearch, {
+        userId: args.userId,
+        chatId: args.chatId,
+        text: args.text,
+        limit,
+      });
+    }
+    if (args.vector) {
+      const dimension = args.vector.length as VectorDimension;
+      if (!VectorDimensions.includes(dimension)) {
+        throw new Error(`Unsupported vector dimension: ${dimension}`);
+      }
+      const model = args.vectorModel ?? "unknown";
+      const tableName = getVectorTableName(dimension);
+      const vectors = (
+        await ctx.vectorSearch(tableName, "vector", {
+          vector: args.vector,
+          filter: (q) =>
+            args.userId
+              ? q.eq("model_kind_userId", [model, "chat", args.userId])
+              : q.eq("model_kind_chatId", [model, "chat", args.chatId!]),
+          limit,
+        })
+      ).filter((v) => v._score > 0.5);
+      // Reciprocal rank fusion
+      const k = 10;
+      const textEmbeddingIds = textSearchMessages?.map((m) => m.embeddingId);
+      const vectorScores = vectors
+        .map((v, i) => ({
+          id: v._id,
+          score:
+            1 / (i + k) +
+            1 / (textEmbeddingIds?.indexOf(v._id) ?? Infinity + k),
+        }))
+        .sort((a, b) => b.score - a.score);
+      const vectorIds = vectorScores.slice(0, limit).map((v) => v.id);
+
+      const messages: Doc<"messages">[] = await ctx.runQuery(
+        internal.messages._fetchVectorMessages,
+        {
+          userId: args.userId,
+          chatId: args.chatId,
+          vectorIds,
+          textSearchMessages: textSearchMessages
+            ?.filter((m) => !vectorIds.includes(m.embeddingId!))
+            .slice(0, limit - vectorIds.length),
+          messageRange: args.messageRange ?? DEFAULT_MESSAGE_RANGE,
+        }
+      );
+      return messages;
+    }
+    return textSearchMessages?.flat() ?? [];
+  },
+});
+
+export const _fetchVectorMessages = internalQuery({
+  args: {
+    userId: v.optional(v.string()),
+    chatId: v.optional(v.id("chats")),
+    vectorIds: v.array(vVectorId),
+    textSearchMessages: v.optional(v.array(v.doc("messages"))),
+    messageRange: v.object({ before: v.number(), after: v.number() }),
+  },
+  returns: v.array(v.doc("messages")),
+  handler: async (ctx, args): Promise<Doc<"messages">[]> => {
+    const messages = (
+      await Promise.all(
+        args.vectorIds.map((embeddingId) =>
+          ctx.db
+            .query("messages")
+            .withIndex("embeddingId", (q) => q.eq("embeddingId", embeddingId))
+            .filter(
+              (q) =>
+                args.userId
+                  ? q.eq("userId", args.userId)
+                  : // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    q.eq("chatId", args.chatId as any) // not sure why it's failing...
+            )
+            .first()
+        )
+      )
+    ).filter((m): m is Doc<"messages"> => m !== undefined);
+    messages.push(...(args.textSearchMessages ?? []));
+    messages.sort((a, b) => a.order! - b.order!);
+    // Fetch the surrounding messages
+    const included: Record<Id<"chats">, Set<number>> = {};
+    for (const m of messages) {
+      if (!included[m.chatId]) {
+        included[m.chatId] = new Set();
+      }
+      included[m.chatId].add(m.order!);
+    }
+    const ranges: Record<Id<"chats">, Doc<"messages">[]> = {};
+    const { before, after } = args.messageRange;
+    for (const m of messages) {
+      const order = m.order!;
+      let earliest = order - before;
+      let latest = order + after;
+      for (; earliest <= latest; earliest++) {
+        if (!included[m.chatId].has(earliest)) {
+          break;
+        }
+      }
+      for (; latest >= earliest; latest--) {
+        if (!included[m.chatId].has(latest)) {
+          break;
+        }
+      }
+      for (let i = earliest; i <= latest; i++) {
+        included[m.chatId].add(i);
+      }
+      if (earliest !== latest) {
+        const surrounding = await ctx.db
+          .query("messages")
+          .withIndex("chatId_status_tool_order", (q) =>
+            q
+              .eq("chatId", m.chatId)
+              .eq("status", "success")
+              .eq("tool", false)
+              .gt("order", earliest)
+              .lt("order", latest)
+          )
+          .collect();
+        if (!ranges[m.chatId]) {
+          ranges[m.chatId] = [];
+        }
+        ranges[m.chatId].push(...surrounding);
+      }
+    }
+    return Object.values(ranges)
+      .map((r) => r.sort((a, b) => a.order! - b.order!))
+      .flat();
+  },
+});
+
+// returns ranges of messages in order of text search relevance,
+// excluding duplicates in later ranges.
+export const textSearch = query({
+  args: {
+    chatId: v.optional(v.id("chats")),
+    userId: v.optional(v.string()),
+    text: v.string(),
+    limit: v.number(),
+  },
   handler: async (ctx, args) => {
     assert(args.userId || args.chatId, "Specify userId or chatId");
-    // TODO: implement vector search + text search + w/e else.
-    return [];
+    const messages = await ctx.db
+      .query("messages")
+      .withSearchIndex("text_search", (q) =>
+        args.userId
+          ? q.search("text", args.text).eq("userId", args.userId)
+          : q.search("text", args.text).eq("chatId", args.chatId!)
+      )
+      .take(args.limit);
+    return messages;
   },
+  returns: v.array(v.doc("messages")),
 });
 
 // const vMemoryConfig = v.object({

@@ -14,8 +14,8 @@ const embeddings = {
   userId: v.optional(v.string()),
   chatId: v.optional(v.string()),
   // not set for private chats
-  model_kind_userId_role: v.optional(v.array(v.string())),
-  model_kind_chatId_role: v.optional(v.array(v.string())),
+  model_kind_userId: v.optional(v.array(v.string())),
+  model_kind_chatId: v.optional(v.array(v.string())),
   vector: v.array(v.number()),
 };
 
@@ -23,7 +23,7 @@ function table<D extends number>(dimensions: D): Table<D> {
   return defineTable(embeddings).vectorIndex("vector", {
     vectorField: "vector",
     dimensions,
-    filterFields: ["model_kind_userId_role", "model_kind_chatId_role"],
+    filterFields: ["model_kind_userId", "model_kind_chatId"],
   });
 }
 
@@ -61,9 +61,12 @@ type VectorIndex<D extends number> = {
   };
 };
 
+export function getVectorTableName(dimension: VectorDimension) {
+  return `embeddings_${dimension}` as VectorTableName;
+}
 export function getVectorIdInfo(ctx: QueryCtx, id: VectorTableId) {
   for (const dimension of VectorDimensions) {
-    const tableName = `embeddings_${dimension}` as VectorTableName;
+    const tableName = getVectorTableName(dimension);
     if (ctx.db.normalizeId(tableName, id)) {
       return { tableName, dimension };
     }

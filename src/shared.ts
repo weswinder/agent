@@ -31,3 +31,5 @@ export function extractText(message: Message | CoreMessage) {
   }
   return undefined;
 }
+
+export const DEFAULT_MESSAGE_RANGE = { before: 2, after: 1 };

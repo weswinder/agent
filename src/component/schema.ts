@@ -42,7 +42,9 @@ export const schema = defineSchema({
     .searchIndex("text_search", {
       searchField: "text",
       filterFields: ["userId", "chatId"],
-    }),
+    })
+    // Allows finding messages by vector embedding id
+    .index("embeddingId", ["embeddingId"]),
 
   steps: defineTable({
     chatId: v.id("chats"),
