@@ -621,7 +621,7 @@ export type Mounts = {
         isDone: boolean;
       }
     >;
-    getMessages: FunctionReference<
+    getChatMessages: FunctionReference<
       "query",
       "public",
       {

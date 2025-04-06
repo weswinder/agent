@@ -1,5 +1,5 @@
 import { api } from "../component/_generated/api";
-import { RunMutationCtx, RunQueryCtx, UseApi } from "./types";
+import { RunActionCtx, RunMutationCtx, RunQueryCtx, UseApi } from "./types";
 import type { EmbeddingModelV1, LanguageModelV1 } from "@ai-sdk/provider";
 import { MessageStatus, Step } from "../validators";
 import type {
@@ -22,13 +22,30 @@ import {
   coreMessageSchema,
 } from "ai";
 import { assert } from "convex-helpers";
-export class Agent<EmbeddingValue = string> {
+import { omit } from "convex-helpers";
+import { extractText } from "../shared";
+
+export type SearchOptions = {
+  includeToolMessages?: boolean;
+  recentMessages?: number;
+  textSearch?: boolean;
+  vectorSearch?: boolean;
+  searchOptions?: {
+    vector?: number[];
+    text?: string;
+    topK?: number;
+    messageRange?: { before: number; after: number };
+  };
+  searchOtherChats?: boolean;
+};
+
+export class Agent {
   constructor(
     public component: UseApi<typeof api>,
     public options: {
       name?: string;
-      languageModel: LanguageModelV1;
-      embeddingModel: EmbeddingModelV1<EmbeddingValue>;
+      chat: LanguageModelV1;
+      textEmbedding?: EmbeddingModelV1<string>;
       defaultSystemPrompt?: string;
       tools?: Record<string, Tool>;
     }
@@ -45,7 +62,32 @@ export class Agent<EmbeddingValue = string> {
     }
   ): Promise<{
     chatId: string;
+  }>;
+  async startChat(
+    ctx: RunActionCtx,
+    args: {
+      userId: string;
+      private?: boolean;
+      parentChatIds?: string[];
+      title?: string;
+      summary?: string;
+    }
+  ): Promise<{
+    chatId: string;
     chat: Chat;
+  }>;
+  async startChat(
+    ctx: RunActionCtx | RunMutationCtx,
+    args: {
+      userId: string;
+      private?: boolean;
+      parentChatIds?: string[];
+      title?: string;
+      summary?: string;
+    }
+  ): Promise<{
+    chatId: string;
+    chat?: Chat;
   }> {
     const chatDoc = await ctx.runMutation(this.component.messages.createChat, {
       defaultSystemPrompt: this.options.defaultSystemPrompt,
@@ -53,6 +95,9 @@ export class Agent<EmbeddingValue = string> {
       title: args.title,
       summary: args.summary,
     });
+    if (!("runAction" in ctx)) {
+      return { chatId: chatDoc._id };
+    }
     const { chat } = await this.continueChat(ctx, {
       chatId: chatDoc._id,
       userId: args.userId,
@@ -64,7 +109,7 @@ export class Agent<EmbeddingValue = string> {
   }
 
   async continueChat(
-    ctx: RunMutationCtx,
+    ctx: RunActionCtx,
     {
       chatId,
       userId,
@@ -84,19 +129,43 @@ export class Agent<EmbeddingValue = string> {
     };
   }
 
-  async getContextualMessages(
-    ctx: RunQueryCtx,
+  async fetchContextMessages(
+    ctx: RunQueryCtx | RunActionCtx,
     args: {
       userId?: string;
       chatId?: string;
-      system?: string;
-      prompt?: string;
-      messages?: CoreMessage[] | Omit<Message, "id">[];
-    }
-  ): Promise<{ messages: CoreMessage[] }> {
+      messages: CoreMessage[];
+    } & SearchOptions
+  ): Promise<CoreMessage[]> {
     assert(args.userId || args.chatId, "Specify userId or chatId");
-    assert(args.messages || args.prompt, "Specify messages or prompt");
-    return { messages: [] };
+    // Fetch the latest messages from the chat
+    const contextMessages: CoreMessage[] = [];
+    if (args.textSearch || args.vectorSearch) {
+      if (!("runAction" in ctx)) {
+        throw new Error("searchUserMessages only works in an action");
+      }
+      contextMessages.push(
+        ...(await ctx.runAction(this.component.messages.searchMessages, {
+          userId: args.searchOtherChats ? args.userId : undefined,
+          chatId: args.chatId,
+          ...(await this.searchWithDefaults(args, args.messages)),
+        }))
+      );
+    }
+    if (args.chatId) {
+      const { messages } = await ctx.runQuery(
+        this.component.messages.getChatMessages,
+        {
+          chatId: args.chatId,
+          isTool: args.includeToolMessages ?? false,
+          limit: args.recentMessages,
+          order: "desc",
+          statuses: ["success"],
+        }
+      );
+      contextMessages.push(...messages.map((m) => m.message!));
+    }
+    return contextMessages;
   }
 
   async saveMessages(
@@ -135,80 +204,39 @@ export class Agent<EmbeddingValue = string> {
 
   /**
    * This behaves like {@link generateText} except that it add context based on
-   * the userId and chatId. It does not save the resulting message to the chat,
+   * the userId and chatId. It saves the input and resulting messages to the
+   * chat, if specified.
    * however. To do that, use {@link continueChat} or {@link saveMessages}.
    * @param ctx The context of the agent.
    * @param args The arguments to the generateText function.
    * @returns The result of the generateText function.
    */
   async generateText(
-    ctx: RunMutationCtx,
+    ctx: RunActionCtx,
     {
       userId,
       chatId,
+      ...searchArgs
     }: {
       userId?: string;
       chatId?: string;
-    },
+    } & SearchOptions,
     args: Partial<Parameters<typeof generateText>[0]>
   ): Promise<{ text: string }> {
-    const messageArgs =
-      args.messages ?? args.prompt
-        ? [{ role: "user", content: args.prompt }]
-        : [];
-    if (args.system) {
-      messageArgs.unshift({
-        role: "system",
-        content: args.system,
-      });
-    }
-    const msgIn =
-      args.messages ?? args.prompt ? { prompt: args.prompt } : undefined;
-    assert(msgIn, "Either prompt or messages must be provided");
-    const mes = detect;
-    const messages = await this.getContextualMessages(ctx, {
-      userId: args.userId,
-      chatId: args.chatId,
-      system: args.system,
-      prompt: args.prompt,
-      messages: args.messages,
+    const { prompt, messages: raw, ...rest } = args;
+    const messages = promptOrMessagesToCoreMessages({ prompt, messages: raw });
+    const contextMessages = await this.fetchContextMessages(ctx, {
+      userId,
+      chatId,
+      messages,
+      ...searchArgs,
     });
     return generateText({
-      model: this.options?.languageModel,
-      system: this.options?.defaultSystemPrompt,
-      ...args,
+      model: this.options.chat,
+      messages: [...contextMessages, ...messages],
+      system: this.options.defaultSystemPrompt,
+      ...rest,
     });
-  }
-
-  convertToCoreMessages(args: {
-    system?: string;
-    prompt?: string;
-    messages?: CoreMessage[] | Omit<Message, "id">[];
-  }): CoreMessage[] {
-    const messages: CoreMessage[] = [];
-    if (args.system) {
-      messages.push({ role: "system", content: args.system });
-    }
-    if (!args.messages) {
-      assert(args.prompt, "messages or prompt is required");
-      messages.push({ role: "user", content: args.prompt });
-    } else if (
-      args.messages.some(
-        (m) =>
-          typeof m === "object" &&
-          m !== null &&
-          (m.role === "data" || // UI-only role
-            "toolInvocations" in m || // UI-specific field
-            "parts" in m || // UI-specific field
-            "experimental_attachments" in m)
-      )
-    ) {
-      messages.push(...convertToCoreMessages(args.messages as Message[]));
-    } else {
-      messages.push(...coreMessageSchema.array().parse(args.messages));
-    }
-    assert(messages.length > 0, "Messages must contain at least one message");
-    return messages;
   }
 
   async streamText<
@@ -217,20 +245,28 @@ export class Agent<EmbeddingValue = string> {
     PARTIAL_OUTPUT = never,
   >(
     ctx: RunMutationCtx,
-    { userId, chatId }: { userId?: string; chatId?: string },
+    {
+      userId,
+      chatId,
+      ...searchArgs
+    }: { userId?: string; chatId?: string } & SearchOptions,
     args: Partial<
       Parameters<typeof streamText<TOOLS, OUTPUT, PARTIAL_OUTPUT>>[0]
     >
   ): Promise<StreamTextResult<TOOLS, PARTIAL_OUTPUT>> {
-    const messages = await this.getContextualMessages(ctx, {
+    const { prompt, messages: raw, ...rest } = args;
+    const messages = promptOrMessagesToCoreMessages({ prompt, messages: raw });
+    const contextMessages = await this.fetchContextMessages(ctx, {
       userId,
       chatId,
-      prompt: args.prompt,
-      messages: args.messages,
+      messages,
+      ...searchArgs,
     });
     return streamText({
-      model: this.options!.languageModel!,
-      ...args,
+      model: this.options.chat,
+      messages: [...contextMessages, ...messages],
+      system: this.options.defaultSystemPrompt,
+      ...rest,
       onChunk: async (chunk) => {
         console.log("onChunk", chunk);
         return args.onChunk?.(chunk);
@@ -252,7 +288,44 @@ export class Agent<EmbeddingValue = string> {
     });
   }
 
-  async getMessages(
+  async searchWithDefaults(
+    searchArgs: SearchOptions,
+    messages: CoreMessage[]
+  ): Promise<SearchOptions> {
+    const search = {
+      includeToolMessages: false,
+      recentMessages: 30,
+      searchOtherChats: false,
+      ...searchArgs,
+    };
+    if (searchArgs.textSearch || searchArgs.vectorSearch) {
+      assert(messages.length > 0, "Core messages cannot be empty");
+      const text = extractText(messages.at(-1)!);
+      search.searchOptions = {
+        topK: searchArgs.searchOptions?.topK ?? 10,
+        messageRange: {
+          before: 2,
+          after: 1,
+          ...searchArgs.searchOptions?.messageRange,
+        },
+        text: text,
+        vector:
+          searchArgs.searchOptions?.vector ??
+          ((text &&
+            this.options.textEmbedding &&
+            (
+              await this.options.textEmbedding.doEmbed({
+                values: [text],
+              })
+            ).embeddings[0]) ||
+            undefined),
+        ...searchArgs.searchOptions,
+      };
+    }
+    return search;
+  }
+
+  async getChatMessages(
     ctx: RunQueryCtx,
     args: { chatId: string; limit?: number; statuses?: MessageStatus[] }
   ): Promise<{
@@ -311,6 +384,37 @@ export function tool<PARAMETERS extends ToolParameters, RESULT>(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (tool as any).__acceptUserIdAndChatId = true;
   return tool;
+}
+
+export function promptOrMessagesToCoreMessages(args: {
+  system?: string;
+  prompt?: string;
+  messages?: CoreMessage[] | Omit<Message, "id">[];
+}): CoreMessage[] {
+  const messages: CoreMessage[] = [];
+  if (args.system) {
+    messages.push({ role: "system", content: args.system });
+  }
+  if (!args.messages) {
+    assert(args.prompt, "messages or prompt is required");
+    messages.push({ role: "user", content: args.prompt });
+  } else if (
+    args.messages.some(
+      (m) =>
+        typeof m === "object" &&
+        m !== null &&
+        (m.role === "data" || // UI-only role
+          "toolInvocations" in m || // UI-specific field
+          "parts" in m || // UI-specific field
+          "experimental_attachments" in m)
+    )
+  ) {
+    messages.push(...convertToCoreMessages(args.messages as Message[]));
+  } else {
+    messages.push(...coreMessageSchema.array().parse(args.messages));
+  }
+  assert(messages.length > 0, "Messages must contain at least one message");
+  return messages;
 }
 
 // export function convexValidatorSchema<T>(validator: Validator<unknown>)  {

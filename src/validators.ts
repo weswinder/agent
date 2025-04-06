@@ -1,3 +1,4 @@
+import { pretendRequired } from "convex-helpers/validators";
 import { Infer, v } from "convex/values";
 
 // const deprecated = v.optional(v.any()) as unknown as VNull<unknown, "optional">;
@@ -66,7 +67,7 @@ export const vToolCallPart = v.object({
   type: v.literal("tool-call"),
   toolCallId: v.string(),
   toolName: v.string(),
-  args: v.optional(v.any()),
+  args: pretendRequired(v.any()),
   providerOptions,
   experimental_providerMetadata,
 });

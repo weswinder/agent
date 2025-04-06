@@ -7,13 +7,7 @@ import {
   query,
 } from "./_generated/server.js";
 import { omit, pick } from "convex-helpers";
-import {
-  Message,
-  vChatStatus,
-  vMessage,
-  vMessageStatus,
-  vStep,
-} from "../validators.js";
+import { vChatStatus, vMessage, vMessageStatus, vStep } from "../validators.js";
 import { stream } from "convex-helpers/server/stream";
 import { mergedStream } from "convex-helpers/server/stream";
 import { nullable, partial } from "convex-helpers/validators";
@@ -22,6 +16,7 @@ import { internal } from "./_generated/api.js";
 import { ObjectType } from "convex/values";
 import { Doc } from "./_generated/dataModel.js";
 import { paginator } from "convex-helpers/server/pagination";
+import { isTool, extractText } from "../shared.js";
 
 export const getChat = query({
   args: { chatId: v.id("chats") },
@@ -383,37 +378,6 @@ export const addMessages = mutation({
   }),
 });
 
-function isTool(message: Message) {
-  return (
-    message.role === "tool" ||
-    (message.role === "assistant" &&
-      Array.isArray(message.content) &&
-      message.content.some((c) => c.type === "tool-call"))
-  );
-}
-
-function extractText(message: Message) {
-  switch (message.role) {
-    case "user":
-      if (typeof message.content === "string") {
-        return message.content;
-      }
-      return message.content
-        .filter((c) => c.type === "text")
-        .map((c) => c.text)
-        .join("");
-    case "assistant":
-      if (typeof message.content === "string") {
-        return message.content;
-      }
-      return message.content
-        .filter((c) => c.type === "text")
-        .map((c) => c.text)
-        .join("");
-  }
-  return undefined;
-}
-
 export const addSteps = mutation({
   args: {
     chatId: v.id("chats"),
@@ -487,7 +451,7 @@ export const updateMessage = mutation({
   },
 });
 
-export const getMessages = query({
+export const getChatMessages = query({
   args: {
     chatId: v.id("chats"),
     isTool: v.optional(v.boolean()),
@@ -495,11 +459,6 @@ export const getMessages = query({
     limit: v.optional(v.number()),
     // Note: the other arguments cannot change from when the cursor was created.
     cursor: v.optional(v.string()),
-    // Note: the offset is for the top-level messages, not including steps.
-    // If you're only paginating over visible messages, this works.
-    // To go to the next "page" including non-visible messages, use continueCursor,
-    // or find the last order in the previous page to go from.
-    orderOffset: v.optional(v.number()),
     statuses: v.optional(v.array(vMessageStatus)),
   },
   handler: async (ctx, args) => {
@@ -516,7 +475,6 @@ export const getMessages = query({
                   .eq("chatId", args.chatId)
                   .eq("status", status)
                   .eq("tool", isTool)
-                  .gte("order", args.orderOffset ?? 0)
               )
               .order(order)
           )
@@ -524,10 +482,7 @@ export const getMessages = query({
             stream(ctx.db, schema)
               .query("messages")
               .withIndex("status_chatId_order", (q) =>
-                q
-                  .eq("status", status)
-                  .eq("chatId", args.chatId)
-                  .gte("order", args.orderOffset ?? 0)
+                q.eq("status", status).eq("chatId", args.chatId)
               )
               .order(order)
           );
@@ -550,6 +505,28 @@ export const getMessages = query({
     isDone: v.boolean(),
   }),
 });
+
+export const searchMessages = action({
+  args: {
+    userId: v.optional(v.string()),
+    chatId: v.optional(v.id("chats")),
+    vector: v.optional(v.array(v.number())),
+    text: v.optional(v.string()),
+    topK: v.optional(v.number()),
+    messageRange: v.optional(
+      v.object({
+        before: v.number(),
+        after: v.number(),
+      })
+    ),
+  },
+  handler: async (ctx, args) => {
+    assert(args.userId || args.chatId, "Specify userId or chatId");
+    // TODO: implement vector search + text search + w/e else.
+    return [];
+  },
+});
+
 // const vMemoryConfig = v.object({
 //   lastMessages: v.optional(v.union(v.number(), v.literal(false))),
 //   semanticRecall: v.optional(
@@ -595,7 +572,7 @@ export const getMessages = query({
 
 // const DEFAULT_MESSAGES_LIMIT = 40; // What pg & upstash do too.
 
-// export const getMessagesPage = query({
+// export const getChatMessagesPage = query({
 //   args: {
 //     threadId: v.string(),
 //     selectBy: v.optional(vSelectBy),

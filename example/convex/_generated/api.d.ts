@@ -635,7 +635,7 @@ export declare const components: {
           isDone: boolean;
         }
       >;
-      getMessages: FunctionReference<
+      getChatMessages: FunctionReference<
         "query",
         "internal",
         {
