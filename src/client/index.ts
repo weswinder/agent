@@ -49,7 +49,7 @@ export class Agent<EmbeddingValue = string> {
   }> {
     const chatDoc = await ctx.runMutation(this.component.messages.createChat, {
       defaultSystemPrompt: this.options.defaultSystemPrompt,
-      domainId: args.userId,
+      userId: args.userId,
       title: args.title,
       summary: args.summary,
     });

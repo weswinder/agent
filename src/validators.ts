@@ -11,7 +11,7 @@ export const vMessageStatus = v.union(
   v.literal("success"),
   v.literal("failed")
 );
-
+export type MessageStatus = Infer<typeof vMessageStatus>;
 
 export const vRole = v.union(
   v.literal("system"),
@@ -155,6 +155,29 @@ export const vSource = v.object({
   text: v.string(),
 });
 
+export const vRequest = v.object({
+  body: v.optional(v.any()),
+  // These are not usually present
+  headers: v.optional(v.record(v.string(), v.string())),
+  method: v.optional(v.string()),
+  url: v.optional(v.string()),
+});
+
+export const vResponse = v.object({
+  id: v.string(),
+  timestamp: v.number(),
+  modelId: v.string(),
+  headers: v.optional(v.record(v.string(), v.string())), // clear these?
+  messages: v.array(
+    v.object({
+      id: v.string(),
+      role: v.string(),
+      content: v.string(),
+    })
+  ),
+  body: v.optional(v.any()),
+});
+
 export const vFinishReason = v.union(
   v.literal("stop"),
   v.literal("length"),
@@ -204,45 +227,12 @@ export const vStep = v.object({
     })
   ),
   warnings: v.optional(v.array(vLanguageModelV1CallWarning)),
-  logprobs: v.optional(
-    v.array(
-      v.object({
-        token: v.string(),
-        logprob: v.number(),
-        topLogprobs: v.array(
-          v.object({
-            token: v.string(),
-            logprob: v.number(),
-          })
-        ),
-      })
-    )
-  ),
-  request: v.optional(
-    v.object({
-      body: v.optional(v.any()),
-      headers: v.optional(v.record(v.string(), v.string())),
-      method: v.optional(v.string()),
-      url: v.optional(v.string()),
-    })
-  ),
-  response: v.optional(
-    v.object({
-      id: v.string(),
-      timestamp: v.number(),
-      modelId: v.string(),
-      headers: v.optional(v.record(v.string(), v.string())),
-      messages: v.array(
-        v.object({
-          id: v.string(),
-          role: v.string(),
-          content: v.string(),
-        })
-      ),
-      body: v.optional(v.any()),
-    })
-  ),
-  providerMetadata: v.optional(v.record(v.string(), v.any())),
+  logprobs: v.optional(v.any()),
+  request: v.optional(vRequest),
+  response: v.optional(vResponse),
+  messages: v.array(vMessage),
+  providerOptions,
+  providerMetadata: providerOptions,
   experimental_providerMetadata,
 });
 export type Step = Infer<typeof vStep>;

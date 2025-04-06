@@ -6,20 +6,27 @@ import vectorTables, { vVectorId } from "./vector/tables";
 
 export const schema = defineSchema({
   chats: defineTable({
-    domainId: v.optional(v.string()), // Unset for anonymous
+    userId: v.optional(v.string()), // Unset for anonymous
     order: v.optional(v.number()), // within a domain
     defaultSystemPrompt: v.optional(v.string()),
     title: v.optional(v.string()),
     summary: v.optional(v.string()),
     status: vChatStatus,
-  }).index("status_domainId_order", ["status", "domainId", "order"]),
+    // If this is a chat continuation, we can use this to find context from
+    // the parent chat(s). There are multiple if the chat is a merging of
+    // multiple chats.
+    parentChatIds: v.optional(v.array(v.id("chats"))),
+  }).index("status_userId_order", ["status", "userId", "order"]),
   // TODO: text search on title/ summary
   messages: defineTable({
+    userId: v.optional(v.string()), // useful for future indexes (text search)
     chatId: v.id("chats"),
+    agentName: v.optional(v.string()),
     message: v.optional(vMessage),
     model: v.optional(v.string()),
     text: v.optional(v.string()),
     embeddingId: v.optional(vVectorId),
+    // TODO: add sub-messages back in? or be able to skip them?
     tool: v.boolean(),
     order: v.optional(v.number()), // Set when the message is finished
     fileId: v.optional(v.id("files")),
@@ -30,7 +37,7 @@ export const schema = defineSchema({
     .index("chatId_status_tool_order", ["chatId", "status", "tool", "order"])
     // Allows finding all chat messages in order
     // Allows finding all failed messages to evaluate
-    .index("status_tool_chatId_order", ["status", "tool", "chatId", "order"])
+    .index("status_chatId_order", ["status", "chatId", "order"])
     // Allows text search on message content
     .searchIndex("text_search", {
       searchField: "text",

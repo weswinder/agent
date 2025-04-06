@@ -7,7 +7,13 @@ import {
   query,
 } from "./_generated/server.js";
 import { omit, pick } from "convex-helpers";
-import { vChatStatus, vMessage, vMessageStatus, vStep } from "../validators.js";
+import {
+  Message,
+  vChatStatus,
+  vMessage,
+  vMessageStatus,
+  vStep,
+} from "../validators.js";
 import { stream } from "convex-helpers/server/stream";
 import { mergedStream } from "convex-helpers/server/stream";
 import { nullable, partial } from "convex-helpers/validators";
@@ -25,9 +31,9 @@ export const getChat = query({
   returns: v.union(v.doc("chats"), v.null()),
 });
 
-export const getChatsByDomainId = query({
+export const getChatsByUserId = query({
   args: {
-    domainId: v.string(),
+    userId: v.string(),
     // Note: the other arguments cannot change from when the cursor was created.
     cursor: v.optional(v.union(v.string(), v.null())),
     limit: v.optional(v.number()),
@@ -38,10 +44,10 @@ export const getChatsByDomainId = query({
     const streams = (args.statuses ?? ["active"]).map((status) =>
       stream(ctx.db, schema)
         .query("chats")
-        .withIndex("status_domainId_order", (q) =>
+        .withIndex("status_userId_order", (q) =>
           q
             .eq("status", status)
-            .eq("domainId", args.domainId)
+            .eq("userId", args.userId)
             .gte("order", args.offset ?? 0)
         )
     );
@@ -71,8 +77,8 @@ export const createChat = mutation({
     const streams = statuses.map((status) =>
       stream(ctx.db, schema)
         .query("chats")
-        .withIndex("status_domainId_order", (q) =>
-          q.eq("status", status).eq("domainId", args.domainId)
+        .withIndex("status_userId_order", (q) =>
+          q.eq("status", status).eq("userId", args.userId)
         )
         .order("desc")
     );
@@ -125,8 +131,8 @@ export const archiveChat = mutation({
   returns: v.doc("chats"),
 });
 
-export const deleteAllForDomainId = action({
-  args: { domainId: v.string() },
+export const deleteAllForUserId = action({
+  args: { userId: v.string() },
   handler: async (ctx, args) => {
     let messagesCursor = null;
     let chatsCursor = null;
@@ -136,8 +142,8 @@ export const deleteAllForDomainId = action({
         messagesCursor: string;
         chatsCursor: string | null;
         isDone: boolean;
-      } = await ctx.runMutation(internal.messages._deletePageForDomainId, {
-        domainId: args.domainId,
+      } = await ctx.runMutation(internal.messages._deletePageForUserId, {
+        userId: args.userId,
         messagesCursor,
         chatsCursor,
       });
@@ -149,13 +155,13 @@ export const deleteAllForDomainId = action({
   returns: v.null(),
 });
 
-export const deleteAllForDomainIdAsync = mutation({
+export const deleteAllForUserIdAsync = mutation({
   args: {
-    domainId: v.string(),
+    userId: v.string(),
   },
   handler: async (ctx, args) => {
-    const isDone = await deleteAllFroDomainIdAsyncHandler(ctx, {
-      domainId: args.domainId,
+    const isDone = await deleteAllFroUserIdAsyncHandler(ctx, {
+      userId: args.userId,
       messagesCursor: null,
       chatsCursor: null,
     });
@@ -165,7 +171,7 @@ export const deleteAllForDomainIdAsync = mutation({
 });
 
 const deleteAllArgs = {
-  domainId: v.string(),
+  userId: v.string(),
   messagesCursor: nullable(v.string()),
   chatsCursor: nullable(v.string()),
 };
@@ -177,22 +183,22 @@ const deleteAllReturns = {
 };
 type DeleteAllReturns = ObjectType<typeof deleteAllReturns>;
 
-export const _deleteAllForDomainIdAsync = internalMutation({
+export const _deleteAllForUserIdAsync = internalMutation({
   args: deleteAllArgs,
-  handler: deleteAllFroDomainIdAsyncHandler,
+  handler: deleteAllFroUserIdAsyncHandler,
 });
 
-async function deleteAllFroDomainIdAsyncHandler(
+async function deleteAllFroUserIdAsyncHandler(
   ctx: MutationCtx,
   args: DeleteAllArgs
 ): Promise<boolean> {
-  const result = await deletePageForDomainId(ctx, args);
+  const result = await deletePageForUserId(ctx, args);
   if (!result.isDone) {
     await ctx.scheduler.runAfter(
       0,
-      internal.messages._deleteAllForDomainIdAsync,
+      internal.messages._deleteAllForUserIdAsync,
       {
-        domainId: args.domainId,
+        userId: args.userId,
         messagesCursor: result.messagesCursor,
         chatsCursor: result.chatsCursor,
       }
@@ -201,20 +207,20 @@ async function deleteAllFroDomainIdAsyncHandler(
   return result.isDone;
 }
 
-export const _deletePageForDomainId = internalMutation({
+export const _deletePageForUserId = internalMutation({
   args: deleteAllArgs,
-  handler: deletePageForDomainId,
+  handler: deletePageForUserId,
   returns: deleteAllReturns,
 });
-async function deletePageForDomainId(
+async function deletePageForUserId(
   ctx: MutationCtx,
   args: DeleteAllArgs
 ): Promise<DeleteAllReturns> {
   const streams = statuses.map((status) =>
     stream(ctx.db, schema)
       .query("chats")
-      .withIndex("status_domainId_order", (q) =>
-        q.eq("status", status).eq("domainId", args.domainId)
+      .withIndex("status_userId_order", (q) =>
+        q.eq("status", status).eq("userId", args.userId)
       )
       .order("desc")
   );
@@ -222,12 +228,17 @@ async function deletePageForDomainId(
   const messages = await chatStreams
     .flatMap(
       async (c) =>
-        stream(ctx.db, schema)
-          .query("messages")
-          .withIndex("chatId_status_order", (q) =>
-            q.eq("chatId", c._id).eq("status", "success")
+        mergedStream(
+          [true, false].map((tool) =>
+            stream(ctx.db, schema)
+              .query("messages")
+              .withIndex("chatId_status_tool_order", (q) =>
+                q.eq("chatId", c._id).eq("status", "success").eq("tool", tool)
+              )
           ),
-      ["chatId"]
+          ["order"]
+        ),
+      ["order"]
     )
     .paginate({
       numItems: 100,
@@ -294,16 +305,25 @@ export const messageStatuses = vMessageDoc.fields.status.members.map(
   (m) => m.value
 );
 
-export const addMessage = mutation({
+export const addMessages = mutation({
   args: {
     chatId: v.id("chats"),
-    message: v.optional(vMessage),
-    fileId: v.optional(v.id("files")),
+    messages: v.array(
+      v.object({
+        message: vMessage,
+        fileId: v.optional(v.id("files")),
+      })
+    ),
+    model: v.optional(v.string()),
+    agentName: v.optional(v.string()),
     addPending: v.optional(v.boolean()),
     failPendingSteps: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
-    if (args.failPendingSteps) {
+    const chat = await ctx.db.get(args.chatId);
+    assert(chat, `Chat ${args.chatId} not found`);
+    const { failPendingSteps, addPending, messages, ...rest } = args;
+    if (failPendingSteps) {
       const pendingMessages = await ctx.db
         .query("messages")
         .withIndex("status_chatId_order", (q) =>
@@ -314,40 +334,85 @@ export const addMessage = mutation({
         pendingMessages.map((m) => ctx.db.patch(m._id, { status: "failed" }))
       );
     }
+    let order: number | undefined;
     const maxMessage = await stream(ctx.db, schema)
       .query("messages")
-      .withIndex("chatId_status_order", (q) =>
-        q.eq("chatId", args.chatId).eq("status", "success")
+      .withIndex("chatId_status_tool_order", (q) =>
+        q.eq("chatId", args.chatId).eq("status", "success").eq("tool", false)
       )
       .order("desc")
       .first();
-    const lastOrder = maxMessage?.order ?? -1;
-    const order = lastOrder + 1;
-
-    const messageId = await ctx.db.insert("messages", {
-      chatId: args.chatId,
-      message: args.message,
-      order,
-      fileId: args.fileId,
-      status: args.message ? "success" : "pending",
-    });
-    const message = (await ctx.db.get(messageId))!;
-    if (args.addPending) {
+    order = maxMessage?.order ?? -1;
+    const toReturn: Doc<"messages">[] = [];
+    if (messages.length > 0) {
+      for (const { message, fileId } of messages) {
+        const tool = isTool(message);
+        if (!tool) {
+          order++;
+        }
+        const text = extractText(message);
+        const messageId = await ctx.db.insert("messages", {
+          ...rest,
+          userId: chat.userId,
+          order,
+          tool,
+          text,
+          fileId,
+          status: "success",
+        });
+        toReturn.push((await ctx.db.get(messageId))!);
+      }
+    }
+    // TODO: kick off batch embedding job
+    if (addPending) {
       const pendingId = await ctx.db.insert("messages", {
-        chatId: args.chatId,
-        status: "pending",
+        ...rest,
+        userId: chat.userId,
         order: order + 1,
+        tool: false,
+        status: "pending",
       });
       const pending = (await ctx.db.get(pendingId))!;
-      return { message, pending };
+      return { messages: toReturn, pending };
     }
-    return { message };
+    return { messages: toReturn };
   },
   returns: v.object({
-    message: v.doc("messages"),
+    messages: v.array(v.doc("messages")),
     pending: v.optional(v.doc("messages")),
   }),
 });
+
+function isTool(message: Message) {
+  return (
+    message.role === "tool" ||
+    (message.role === "assistant" &&
+      Array.isArray(message.content) &&
+      message.content.some((c) => c.type === "tool-call"))
+  );
+}
+
+function extractText(message: Message) {
+  switch (message.role) {
+    case "user":
+      if (typeof message.content === "string") {
+        return message.content;
+      }
+      return message.content
+        .filter((c) => c.type === "text")
+        .map((c) => c.text)
+        .join("");
+    case "assistant":
+      if (typeof message.content === "string") {
+        return message.content;
+      }
+      return message.content
+        .filter((c) => c.type === "text")
+        .map((c) => c.text)
+        .join("");
+  }
+  return undefined;
+}
 
 export const addSteps = mutation({
   args: {
@@ -364,6 +429,11 @@ export const addSteps = mutation({
   handler: async (ctx, args) => {
     const parentMessage = await ctx.db.get(args.messageId);
     assert(parentMessage, `Message ${args.messageId} not found`);
+    assert(
+      parentMessage.status === "success",
+      `${args.messageId} is not a success, it is ${parentMessage.status}`
+    );
+    assert(parentMessage.order !== undefined, `${args.messageId} has no order`);
     const steps = await ctx.db
       .query("steps")
       .withIndex("chatId_messageId_stepOrder", (q) =>
@@ -420,7 +490,7 @@ export const updateMessage = mutation({
 export const getMessages = query({
   args: {
     chatId: v.id("chats"),
-    isStep: v.optional(v.boolean()),
+    isTool: v.optional(v.boolean()),
     order: v.optional(v.union(v.literal("asc"), v.literal("desc"))),
     limit: v.optional(v.number()),
     // Note: the other arguments cannot change from when the cursor was created.
@@ -434,17 +504,18 @@ export const getMessages = query({
   },
   handler: async (ctx, args) => {
     const statuses = args.statuses ?? ["success"];
-    const isStep = args.isStep;
+    const isTool = args.isTool;
     const order = args.order ?? "desc";
     const streams =
-      isStep !== undefined
+      isTool !== undefined
         ? statuses.map((status) =>
             stream(ctx.db, schema)
               .query("messages")
-              .withIndex("chatId_status_order", (q) =>
+              .withIndex("chatId_status_tool_order", (q) =>
                 q
                   .eq("chatId", args.chatId)
                   .eq("status", status)
+                  .eq("tool", isTool)
                   .gte("order", args.orderOffset ?? 0)
               )
               .order(order)
