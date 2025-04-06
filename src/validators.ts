@@ -150,11 +150,12 @@ export const vMessage = v.union(
 );
 export type Message = Infer<typeof vMessage>;
 
-export const vMessageWithFile = v.object({
+export const vMessageWithFileAndId = v.object({
+  id: v.optional(v.string()),
   message: vMessage,
   fileId: v.optional(v.id("files")),
 });
-export type MessageWithFile = Infer<typeof vMessageWithFile>;
+export type MessageWithFileAndId = Infer<typeof vMessageWithFileAndId>;
 
 export const vSource = v.object({
   sourceType: v.literal("url"),
@@ -177,7 +178,7 @@ export const vResponse = v.object({
   timestamp: v.number(),
   modelId: v.string(),
   headers: v.optional(v.record(v.string(), v.string())), // clear these?
-  messages: v.array(vMessage),
+  messages: v.array(vMessageWithFileAndId),
   body: v.optional(v.any()),
 });
 
@@ -208,20 +209,26 @@ export const vLanguageModelV1CallWarning = v.union(
   })
 );
 export const vStep = v.object({
+  experimental_providerMetadata,
+  files: v.optional(v.array(v.any())),
+  finishReason: vFinishReason,
+  isContinued: v.boolean(),
+  logprobs: v.optional(v.any()),
+  providerMetadata: providerOptions,
+  providerOptions,
+  reasoning: v.optional(v.string()),
+  reasoningDetails: v.optional(v.array(v.any())),
+  request: v.optional(vRequest),
+  response: v.optional(vResponse),
+  sources: v.optional(v.array(vSource)),
   stepType: v.union(
     v.literal("initial"),
     v.literal("continue"),
     v.literal("tool-result")
   ),
-  isContinued: v.boolean(),
   text: v.string(),
-  reasoning: v.optional(v.string()),
-  reasoningDetails: v.optional(v.array(v.any())),
-  files: v.optional(v.array(v.any())),
-  sources: v.optional(v.array(vSource)),
   toolCalls: v.array(vToolCallPart),
   toolResults: v.array(vToolResultPart),
-  finishReason: vFinishReason,
   usage: v.optional(
     v.object({
       promptTokens: v.number(),
@@ -230,20 +237,16 @@ export const vStep = v.object({
     })
   ),
   warnings: v.optional(v.array(vLanguageModelV1CallWarning)),
-  logprobs: v.optional(v.any()),
-  request: v.optional(vRequest),
-  response: v.optional(vResponse),
-  providerOptions,
-  providerMetadata: providerOptions,
-  experimental_providerMetadata,
 });
 export type Step = Infer<typeof vStep>;
 
-export const vStepWithFile = v.object({
+export const vStepWithMessagesWithFileAndId = v.object({
   step: vStep,
-  fileId: v.optional(v.id("files")),
+  messages: v.array(vMessageWithFileAndId),
 });
-export type StepWithFile = Infer<typeof vStepWithFile>;
+export type StepWithMessagesWithFileAndId = Infer<
+  typeof vStepWithMessagesWithFileAndId
+>;
 
 export const vSearchOptions = v.object({
   vector: v.optional(v.array(v.number())),

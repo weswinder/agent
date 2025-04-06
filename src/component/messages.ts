@@ -2,14 +2,19 @@ import { assert, omit, pick } from "convex-helpers";
 import { paginator } from "convex-helpers/server/pagination";
 import { mergedStream, stream } from "convex-helpers/server/stream";
 import { nullable, partial } from "convex-helpers/validators";
-import { ObjectType } from "convex/values";
+import { Infer, ObjectType } from "convex/values";
 import { DEFAULT_MESSAGE_RANGE, extractText, isTool } from "../shared.js";
 import {
+  Message,
+  MessageWithFileAndId,
+  vAssistantMessage,
   vChatStatus,
   vMessageStatus,
-  vMessageWithFile,
+  vMessageWithFileAndId,
   vSearchOptions,
-  vStepWithFile,
+  vStep,
+  vStepWithMessagesWithFileAndId,
+  vToolMessage,
 } from "../validators.js";
 import { api, internal } from "./_generated/api.js";
 import { Doc, Id } from "./_generated/dataModel.js";
@@ -373,10 +378,12 @@ export const messageStatuses = vMessageDoc.fields.status.members.map(
 
 const addMessagesArgs = {
   chatId: v.id("chats"),
-  messages: v.array(vMessageWithFile),
+  stepId: v.optional(v.id("steps")),
+  parentMessageId: v.optional(v.id("messages")),
+  messages: v.array(vMessageWithFileAndId),
   model: v.optional(v.string()),
   agentName: v.optional(v.string()),
-  addPending: v.optional(v.boolean()),
+  pending: v.optional(v.boolean()),
   failPendingSteps: v.optional(v.boolean()),
 };
 export const addMessages = mutation({
@@ -393,7 +400,8 @@ async function addMessagesHandler(
 ) {
   const chat = await ctx.db.get(args.chatId);
   assert(chat, `Chat ${args.chatId} not found`);
-  const { failPendingSteps, addPending, messages, ...rest } = args;
+  const { failPendingSteps, pending, messages, parentMessageId, ...rest } =
+    args;
   if (failPendingSteps) {
     const pendingMessages = await ctx.db
       .query("messages")
@@ -407,6 +415,11 @@ async function addMessagesHandler(
   }
   let order: number | undefined;
   const maxMessage = await getMaxMessage(ctx, args.chatId);
+  // If the previous message isn't our parent, we make a new thread.
+  const threadId =
+    parentMessageId && maxMessage?._id === parentMessageId
+      ? maxMessage.threadId
+      : parentMessageId;
   order = maxMessage?.order ?? -1;
   const toReturn: Doc<"messages">[] = [];
   if (messages.length > 0) {
@@ -418,27 +431,16 @@ async function addMessagesHandler(
       const text = extractText(message);
       const messageId = await ctx.db.insert("messages", {
         ...rest,
+        threadId,
         userId: chat.userId,
         order,
         tool,
         text,
         fileId,
-        status: "success",
+        status: pending ? "pending" : "success",
       });
       toReturn.push((await ctx.db.get(messageId))!);
     }
-  }
-  // TODO: kick off batch embedding job
-  if (addPending) {
-    const pendingId = await ctx.db.insert("messages", {
-      ...rest,
-      userId: chat.userId,
-      order: order + 1,
-      tool: false,
-      status: "pending",
-    });
-    const pending = (await ctx.db.get(pendingId))!;
-    return { messages: toReturn, pending };
   }
   return { messages: toReturn };
 }
@@ -456,8 +458,8 @@ async function getMaxMessage(ctx: QueryCtx, chatId: Id<"chats">) {
 const addStepsArgs = {
   chatId: v.id("chats"),
   messageId: v.id("messages"),
-  steps: v.array(vStepWithFile),
-  failPreviousSteps: v.optional(v.boolean()),
+  steps: v.array(vStepWithMessagesWithFileAndId),
+  failPendingSteps: v.optional(v.boolean()),
 };
 
 export const addSteps = mutation({
@@ -475,74 +477,95 @@ async function addStepsHandler(
     parentMessage.status === "success",
     `${args.messageId} is not a success, it is ${parentMessage.status}`
   );
-  assert(parentMessage.order !== undefined, `${args.messageId} has no order`);
-  const steps = await ctx.db
+  const order = parentMessage.order;
+  assert(order !== undefined, `${args.messageId} has no order`);
+  let steps = await ctx.db
     .query("steps")
-    .withIndex("chatId_messageId_stepOrder", (q) =>
-      q.eq("chatId", args.chatId).eq("messageId", args.messageId)
+    .withIndex("status_chatId_order_stepOrder", (q) =>
+      // TODO: fetch pending, and commit later
+      q.eq("status", "success").eq("chatId", args.chatId).eq("order", order)
     )
     .collect();
-  let nextStepOrder;
-  if (args.failPreviousSteps) {
+  if (args.failPendingSteps) {
     for (const step of steps) {
-      await ctx.db.patch(step._id, { status: "failed" });
+      if (step.status === "pending") {
+        await ctx.db.patch(step._id, { status: "failed" });
+      }
     }
-    nextStepOrder = 0;
-  } else {
-    nextStepOrder = (steps.at(-1)?.stepOrder ?? -1) + 1;
+    steps = steps.filter((s) => s.status === "success");
   }
-  const results: Doc<"steps">[] = [];
-  for (const { step, fileId } of args.steps) {
+  let nextStepOrder = (steps.at(-1)?.stepOrder ?? -1) + 1;
+  for (const { step, messages } of args.steps) {
     const stepId = await ctx.db.insert("steps", {
       chatId: args.chatId,
-      messageId: args.messageId,
-      order: parentMessage.order,
+      parentMessageId: args.messageId,
+      order,
       stepOrder: nextStepOrder,
-      status: "success",
-      fileId,
+      status: "pending",
       step,
     });
-    results.push((await ctx.db.get(stepId))!);
+    await addMessagesHandler(ctx, {
+      chatId: args.chatId,
+      parentMessageId: args.messageId,
+      stepId,
+      messages,
+      model: parentMessage.model,
+      agentName: parentMessage.agentName,
+      pending: true,
+      failPendingSteps: false,
+    });
+    steps.push((await ctx.db.get(stepId))!);
     nextStepOrder++;
   }
-  return results;
+  return steps;
 }
 
-export const updateMessage = mutation({
+export const rollbackMessage = mutation({
   args: {
     messageId: v.id("messages"),
-    messages: v.array(vMessageWithFile),
-    steps: v.array(vStepWithFile),
+    error: v.optional(v.string()),
   },
   returns: v.null(),
-  handler: async (ctx, args) => {
-    const message = await ctx.db.get(args.messageId);
-    assert(message, `Message ${args.messageId} not found`);
-    const { messages: added } = await addMessagesHandler(ctx, {
-      chatId: message.chatId,
-      messages: args.messages.slice(0, -1),
-      agentName: message.agentName,
-      addPending: false,
-      failPendingSteps: true,
-      model: message.model,
+  handler: async (ctx, { messageId, error }) => {
+    const message = await ctx.db.get(messageId);
+    assert(message, `Message ${messageId} not found`);
+    await ctx.db.patch(messageId, {
+      status: "failed",
+      text: error ?? message.text,
     });
-    await addStepsHandler(ctx, {
-      chatId: message.chatId,
-      messageId: args.messageId,
-      steps: args.steps,
-      failPreviousSteps: true,
-    });
-    if (message.status === "pending") {
-      const lastMessage =
-        added.at(-1) || (await getMaxMessage(ctx, message.chatId));
-      await ctx.db.patch(args.messageId, {
-        status: "success",
-        message: args.messages.at(-1)!.message,
-        tool: isTool(args.messages.at(-1)!.message),
-        text: extractText(args.messages.at(-1)!.message),
-        fileId: args.messages.at(-1)!.fileId,
-        order: (lastMessage?.order ?? -1) + 1,
-      });
+  },
+});
+
+export const commitMessage = mutation({
+  args: {
+    messageId: v.id("messages"),
+  },
+  returns: v.null(),
+  handler: async (ctx, { messageId }) => {
+    const message = await ctx.db.get(messageId);
+    assert(message, `Message ${messageId} not found`);
+
+    const allSteps = await ctx.db
+      .query("steps")
+      .withIndex("parentMessageId", (q) => q.eq("parentMessageId", messageId))
+      .collect();
+    for (const step of allSteps) {
+      if (step.status === "pending") {
+        await ctx.db.patch(step._id, { status: "success" });
+      }
+    }
+    const order = message.order!;
+    const messages = await ctx.db
+      .query("messages")
+      .withIndex("status_chatId_order", (q) =>
+        q
+          .eq("status", "pending")
+          .eq("chatId", message.chatId)
+          .eq("order", order)
+      )
+      .collect();
+    for (const message of messages) {
+      await ctx.db.patch(message._id, { status: "success" });
     }
   },
 });

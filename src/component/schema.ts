@@ -8,6 +8,7 @@ export const schema = defineSchema({
   chats: defineTable({
     userId: v.optional(v.string()), // Unset for anonymous
     order: v.optional(v.number()), // within a domain
+    // TODO: is this bubbling up in continue?
     defaultSystemPrompt: v.optional(v.string()),
     title: v.optional(v.string()),
     summary: v.optional(v.string()),
@@ -19,8 +20,11 @@ export const schema = defineSchema({
   }).index("status_userId_order", ["status", "userId", "order"]),
   // TODO: text search on title/ summary
   messages: defineTable({
+    id: v.optional(v.string()), // external id, e.g. from Vercel AI SDK
     userId: v.optional(v.string()), // useful for future indexes (text search)
     chatId: v.id("chats"),
+    threadId: v.optional(v.id("messages")),
+    stepId: v.optional(v.id("steps")),
     agentName: v.optional(v.string()),
     message: v.optional(vMessage),
     model: v.optional(v.string()),
@@ -48,20 +52,20 @@ export const schema = defineSchema({
 
   steps: defineTable({
     chatId: v.id("chats"),
-    messageId: v.id("messages"),
+    // Could be different from the order if we fail.
+    parentMessageId: v.id("messages"),
     order: v.number(), // parent message order
     stepOrder: v.number(), // step order
     step: vStep,
-    fileId: v.optional(v.id("files")),
     status: vMessageStatus,
   })
-    .index("chatId_messageId_stepOrder", ["chatId", "messageId", "stepOrder"])
     .index("status_chatId_order_stepOrder", [
       "status",
       "chatId",
       "order",
       "stepOrder",
-    ]),
+    ])
+    .index("parentMessageId", ["parentMessageId"]),
 
   files: defineTable({
     storageId: v.string(),

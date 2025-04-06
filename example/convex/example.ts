@@ -1,10 +1,16 @@
-import { action } from "./_generated/server";
-import { components } from "./_generated/api";
+import { action, mutation } from "./_generated/server";
+import { api, components } from "./_generated/api";
 import { Agent } from "@convex-dev/agent";
-import { tool } from "ai";
+import { generateText, tool } from "ai";
 import { v } from "convex/values";
 import { openai } from "@ai-sdk/openai";
 import { z } from "zod";
+import {
+  serializeMessage,
+  serializeMessageWithId,
+  serializeResponse,
+  serializeStep,
+} from "../../src/mapping";
 
 export const weatherTool = tool({
   description: "Get the weather in a location",
@@ -18,6 +24,7 @@ export const weatherTool = tool({
 });
 
 const agent = new Agent(components.agent, {
+  name: "Example Agent",
   chat: openai.chat("gpt-4o-mini"),
   textEmbedding: openai.embedding("text-embedding-3-small"),
   defaultSystemPrompt: "You are a helpful assistant.",
@@ -42,6 +49,79 @@ const agent = new Agent(components.agent, {
 });
 
 const model = openai.chat("gpt-4o-mini");
+
+export const t = action({
+  args: {},
+  handler: async (ctx) => {
+    const { chatId, chat } = await agent.startChat(ctx, {
+      userId: "test",
+      title: "My first chat",
+      summary: "This is a summary of the chat.",
+    });
+    const result = await chat.generateText({
+      model,
+      maxSteps: 2,
+      prompt:
+        "What is the weather in San Francisco? " +
+        "Please get a second report if the first says it's over 60 degrees.",
+      tools: {
+        weather: weatherTool,
+      },
+      onStepFinish: async (step) => {
+        await ctx.runMutation(api.example.blindWrite, {
+          table: "stepsFinish",
+          doc: serializeStep(step),
+        });
+        await Promise.all(
+          step.response.messages.map((m) =>
+            ctx.runMutation(api.example.blindWrite, {
+              table: "msgFinish",
+              doc: serializeMessageWithId(m),
+            })
+          )
+        );
+      },
+    });
+    await ctx.runMutation(api.example.blindWrite, {
+      table: "results",
+      doc: JSON.parse(JSON.stringify(result)),
+    });
+    await Promise.all(
+      result.response.messages.map((m) =>
+        ctx.runMutation(api.example.blindWrite, {
+          table: "responseMessages",
+          doc: serializeMessageWithId(m),
+        })
+      )
+    );
+    await Promise.all(
+      serializeResponse(result.response).map((m) =>
+        ctx.runMutation(api.example.blindWrite, {
+          table: "messages",
+          doc: m,
+        })
+      )
+    );
+    await Promise.all(
+      result.steps.map((s) =>
+        ctx.runMutation(api.example.blindWrite, {
+          table: "steps",
+          doc: serializeStep(s),
+        })
+      )
+    );
+  },
+});
+
+export const blindWrite = mutation({
+  args: {
+    table: v.string(),
+    doc: v.any(),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.insert(args.table, args.doc);
+  },
+});
 
 export const generate = action({
   args: {

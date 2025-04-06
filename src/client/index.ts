@@ -25,7 +25,11 @@ import {
 // TODO: is this the only dependency that needs helpers in client?
 import { assert } from "convex-helpers";
 import { DEFAULT_MESSAGE_RANGE, extractText } from "../shared";
-import { serializeMessage, serializeStep } from "../mapping";
+import {
+  serializeMessage,
+  serializeNewMessagesInStep,
+  serializeStep,
+} from "../mapping";
 
 export type ContextOptions = {
   includeToolMessages?: boolean;
@@ -38,6 +42,8 @@ export type ContextOptions = {
   };
   searchOtherChats?: boolean;
 };
+
+type CoreMessageMaybeWithId = CoreMessage & { id?: string | undefined };
 
 export class Agent {
   constructor(
@@ -68,12 +74,7 @@ export class Agent {
        * The userId to associate with the chat. If not provided, the chat will be
        * anonymous.
        */
-      userId: string;
-      /**
-       * Whether the chat is private. If true, the chat will not be visible to
-       * other users.
-       */
-      private?: boolean;
+      userId?: string;
       /**
        * The parent chatIds to merge with.
        * If the chat is a continuation of one or many previous chats,
@@ -105,8 +106,7 @@ export class Agent {
   async startChat(
     ctx: RunMutationCtx,
     args: {
-      userId: string;
-      private?: boolean;
+      userId?: string;
       parentChatIds?: string[];
       title?: string;
       summary?: string;
@@ -118,7 +118,6 @@ export class Agent {
     ctx: RunActionCtx | RunMutationCtx,
     args: {
       userId: string;
-      private?: boolean;
       parentChatIds?: string[];
       title?: string;
       summary?: string;
@@ -132,6 +131,7 @@ export class Agent {
       userId: args.userId,
       title: args.title,
       summary: args.summary,
+      parentChatIds: args.parentChatIds,
     });
     if (!("runAction" in ctx)) {
       return { chatId: chatDoc._id };
@@ -214,34 +214,39 @@ export class Agent {
     ctx: RunMutationCtx,
     args: {
       chatId: string;
-      messages: CoreMessage[];
+      messages: CoreMessageMaybeWithId[];
       steps?: StepResult<ToolSet>[];
-      addPending: true;
+      createPending: true;
     }
   ): Promise<{
-    pendingId: string;
+    lastMessageId: string;
   }>;
   async saveMessages(
     ctx: RunMutationCtx,
     args: {
       chatId: string;
-      messages: CoreMessage[];
+      messages: CoreMessageMaybeWithId[];
       steps?: StepResult<ToolSet>[];
-      addPending?: boolean;
+      pending?: boolean;
     }
   ): Promise<{
-    pendingId?: string;
+    lastMessageId?: string;
   }> {
+    console.debug("saveMessages", args);
     const result = await ctx.runMutation(this.component.messages.addMessages, {
       chatId: args.chatId,
       agentName: this.options.name,
       model: this.options.chat.modelId,
-      messages: args.messages.map((m) => ({ message: serializeMessage(m) })),
+      messages: args.messages.map((m) => ({
+        id: m.id,
+        message: serializeMessage(m),
+        // TODO: add fileId if we save a file?
+      })),
       failPendingSteps: true,
-      addPending: args.addPending ?? false,
+      pending: args.pending ?? false,
     });
     return {
-      pendingId: result.pending?._id,
+      lastMessageId: result.messages.at(-1)?._id,
     };
   }
 
@@ -256,11 +261,13 @@ export class Agent {
     ctx: RunMutationCtx,
     args: { chatId: string; messageId: string; step: StepResult<TOOLS> }
   ): Promise<void> {
+    const step = serializeStep(args.step as StepResult<ToolSet>);
+    const messages = serializeNewMessagesInStep(args.step);
     await ctx.runMutation(this.component.messages.addSteps, {
       chatId: args.chatId,
       messageId: args.messageId,
-      steps: [{ step: serializeStep(args.step as StepResult<ToolSet>) }],
-      failPreviousSteps: true,
+      steps: [{ step, messages: messages }],
+      failPendingSteps: true,
     });
   }
 
@@ -273,17 +280,21 @@ export class Agent {
         | { kind: "error"; error: string }
         | {
             kind: "success";
-            value: { messages: CoreMessage[]; steps: StepResult<TOOLS>[] };
+            value: { steps: StepResult<TOOLS>[] };
           };
     }
   ): Promise<void> {
-    if (args.result.kind === "success") {
-      await ctx.runMutation(this.component.messages.updateMessage, {
+    const result = args.result;
+    if (result.kind === "success") {
+      await ctx.runMutation(this.component.messages.commitMessage, {
         messageId: args.messageId,
-        messages: args.result.value.messages.map((m) => ({
-          message: serializeMessage(m),
-        })),
-        steps: args.result.value.steps.map((s) => ({ step: serializeStep(s) })),
+      });
+    } else {
+      await ctx.runMutation(this.component.messages.addSteps, {
+        chatId: args.chatId,
+        messageId: args.messageId,
+        steps: [],
+        failPendingSteps: true,
       });
     }
   }
@@ -306,31 +317,32 @@ export class Agent {
     {
       userId,
       chatId,
-      ...searchArgs
     }: {
       userId?: string;
       chatId?: string;
-    } & ContextOptions,
+    },
     args: Partial<
       Parameters<typeof generateText<TOOLS, OUTPUT, OUTPUT_PARTIAL>>[0]
-    >
+    > &
+      ContextOptions
   ): Promise<GenerateTextResult<TOOLS, OUTPUT>> {
     const { prompt, messages: raw, ...rest } = args;
     const messages = promptOrMessagesToCoreMessages({ prompt, messages: raw });
     const contextMessages = await this.fetchContextMessages(ctx, {
+      ...args,
       userId,
       chatId,
       messages,
-      ...searchArgs,
     });
     let messageId: string | undefined;
     if (chatId) {
-      const { pendingId } = await this.saveMessages(ctx, {
+      const { lastMessageId } = await this.saveMessages(ctx, {
         chatId,
+        // TODO: only save the last message unless explicitly told to save all
         messages,
-        addPending: true,
+        createPending: true,
       });
-      messageId = pendingId;
+      messageId = lastMessageId;
     }
     const result = await generateText({
       model: this.options.chat,
@@ -355,10 +367,7 @@ export class Agent {
         chatId,
         result: {
           kind: "success",
-          value: {
-            messages: result.response.messages,
-            steps: result.steps,
-          },
+          value: { steps: result.steps },
         },
       });
     }
@@ -371,22 +380,19 @@ export class Agent {
     PARTIAL_OUTPUT = never,
   >(
     ctx: RunMutationCtx,
-    {
-      userId,
-      chatId,
-      ...searchArgs
-    }: { userId?: string; chatId?: string } & ContextOptions,
+    { userId, chatId }: { userId?: string; chatId?: string },
     args: Partial<
       Parameters<typeof streamText<TOOLS, OUTPUT, PARTIAL_OUTPUT>>[0]
-    >
+    > &
+      ContextOptions
   ): Promise<StreamTextResult<TOOLS, PARTIAL_OUTPUT>> {
     const { prompt, messages: raw, ...rest } = args;
     const messages = promptOrMessagesToCoreMessages({ prompt, messages: raw });
     const contextMessages = await this.fetchContextMessages(ctx, {
+      ...args,
       userId,
       chatId,
       messages,
-      ...searchArgs,
     });
     return streamText({
       model: this.options.chat,
@@ -417,22 +423,18 @@ export class Agent {
   // TODO: not sure why it needs to extend string
   async generateObject<OBJECT extends string>(
     ctx: RunActionCtx,
-    {
-      userId,
-      chatId,
-      ...searchArgs
-    }: { userId?: string; chatId?: string } & ContextOptions,
+    { userId, chatId }: { userId?: string; chatId?: string },
     args: Omit<Parameters<typeof generateObject<OBJECT>>[0], "model"> & {
       model?: LanguageModelV1;
-    }
+    } & ContextOptions
   ): Promise<GenerateObjectResult<OBJECT>> {
     const { prompt, messages: raw, ...rest } = args;
     const messages = promptOrMessagesToCoreMessages({ prompt, messages: raw });
     const contextMessages = await this.fetchContextMessages(ctx, {
+      ...args,
       userId,
       chatId,
       messages,
-      ...searchArgs,
     });
     return generateObject({
       model: this.options.chat,
@@ -443,22 +445,18 @@ export class Agent {
 
   async streamObject<T>(
     ctx: RunMutationCtx,
-    {
-      userId,
-      chatId,
-      ...searchArgs
-    }: { userId?: string; chatId?: string } & ContextOptions,
+    { userId, chatId }: { userId?: string; chatId?: string },
     args: Omit<Parameters<typeof streamObject<T>>[0], "model"> & {
       model?: LanguageModelV1;
-    }
+    } & ContextOptions
   ) {
     const { prompt, messages: raw, ...rest } = args;
     const messages = promptOrMessagesToCoreMessages({ prompt, messages: raw });
     const contextMessages = await this.fetchContextMessages(ctx, {
+      ...args,
       userId,
       chatId,
       messages,
-      ...searchArgs,
     });
     return streamObject<T>({
       model: this.options.chat,

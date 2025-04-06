@@ -1,13 +1,16 @@
 import type {
   AssistantContent,
+  CoreAssistantMessage,
   CoreMessage,
+  CoreToolMessage,
   DataContent,
+  GenerateTextResult,
   StepResult,
   ToolContent,
   ToolSet,
   UserContent,
 } from "ai";
-import { Message, Step } from "./validators";
+import { MessageWithFileAndId, Step } from "./validators";
 
 export type SerializeUrlsAndUint8Arrays<T> = T extends URL
   ? string
@@ -25,10 +28,26 @@ export type SerializedContent = SerializeUrlsAndUint8Arrays<Content>;
 
 export type SerializedMessage = SerializeUrlsAndUint8Arrays<CoreMessage>;
 
-export function serializeMessage(message: CoreMessage): SerializedMessage {
+export function serializeMessage(
+  messageWithId: CoreMessage & { id?: string }
+): SerializedMessage {
+  const { id: _, ...message } = messageWithId;
   const content = message.content;
+  return {
+    ...message,
+    content: serializeContent(content),
+  } as SerializedMessage;
+}
+
+export function serializeMessageWithId(
+  messageWithId: CoreMessage & { id?: string }
+): { message: SerializedMessage; id: string | undefined } {
+  return { message: serializeMessage(messageWithId), id: messageWithId.id };
+}
+
+export function serializeContent(content: Content): SerializedContent {
   if (typeof content === "string") {
-    return { ...message, content } as SerializedMessage;
+    return content;
   }
   const serialized = content.map((part) => {
     switch (part.type) {
@@ -40,20 +59,69 @@ export function serializeMessage(message: CoreMessage): SerializedMessage {
         return part;
     }
   });
-  return { ...message, content: serialized } as SerializedMessage;
+  return serialized as SerializedContent;
+}
+
+export function serializeResponse<TOOLS extends ToolSet, OUTPUT>(
+  response: GenerateTextResult<TOOLS, OUTPUT>["response"]
+): { message: SerializedMessage; id?: string }[] {
+  const { id, timestamp, modelId, headers, messages, body } = response;
+  // TODO: what to do about all the rest?
+  // Store body?
+  return messages.map((m) => serializeMessageWithId(m));
 }
 
 export function serializeStep<TOOLS extends ToolSet>(
   step: StepResult<TOOLS>
 ): Step {
   const content = step.response?.messages.map((message) => {
-    return serializeMessage(message);
+    return serializeMessageWithId(message);
   });
   const timestamp = step.response?.timestamp.getTime();
+  const response = {
+    ...step.response,
+    messages: content,
+    timestamp,
+    headers: {},
+  };
   return {
     ...step,
-    response: { ...step.response, messages: content, timestamp },
+    response,
   };
+}
+
+export function serializeNewMessagesInStep<TOOLS extends ToolSet>(
+  step: StepResult<TOOLS>
+): MessageWithFileAndId[] {
+  const messages: MessageWithFileAndId[] = [];
+  if (step.text) {
+    messages.push(
+      serializeMessageWithId({
+        id: step.response.id,
+        role: "assistant",
+        content: step.text,
+      })
+    );
+  }
+  if (step.toolCalls) {
+    messages.push(
+      serializeMessageWithId({
+        id: step.response.id,
+        role: "assistant",
+        content: step.toolCalls,
+      })
+    );
+  }
+  if (step.toolResults) {
+    messages.push(
+      serializeMessageWithId({
+        id: step.response.id,
+        role: "tool",
+        content: step.toolResults,
+      })
+    );
+  }
+  return messages;
 }
 
 export function deserializeContent(content: SerializedContent): Content {
