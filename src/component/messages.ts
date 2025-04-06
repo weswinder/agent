@@ -6,10 +6,10 @@ import { ObjectType } from "convex/values";
 import { DEFAULT_MESSAGE_RANGE, extractText, isTool } from "../shared.js";
 import {
   vChatStatus,
-  vMessage,
   vMessageStatus,
+  vMessageWithFile,
   vSearchOptions,
-  vStep,
+  vStepWithFile,
 } from "../validators.js";
 import { api, internal } from "./_generated/api.js";
 import { Doc, Id } from "./_generated/dataModel.js";
@@ -20,6 +20,7 @@ import {
   mutation,
   MutationCtx,
   query,
+  QueryCtx,
 } from "./_generated/server.js";
 import { schema, v } from "./schema.js";
 import {
@@ -88,10 +89,7 @@ export const createChat = mutation({
         )
         .order("desc")
     );
-    const latestChat = await mergedStream(streams, [
-      "order",
-      "stepOrder",
-    ]).first();
+    const latestChat = await mergedStream(streams, ["order"]).first();
     const order = (latestChat?.order ?? -1) + 1;
     const chatId = await ctx.db.insert("chats", {
       ...args,
@@ -373,153 +371,177 @@ export const messageStatuses = vMessageDoc.fields.status.members.map(
   (m) => m.value
 );
 
+const addMessagesArgs = {
+  chatId: v.id("chats"),
+  messages: v.array(vMessageWithFile),
+  model: v.optional(v.string()),
+  agentName: v.optional(v.string()),
+  addPending: v.optional(v.boolean()),
+  failPendingSteps: v.optional(v.boolean()),
+};
 export const addMessages = mutation({
-  args: {
-    chatId: v.id("chats"),
-    messages: v.array(
-      v.object({
-        message: vMessage,
-        fileId: v.optional(v.id("files")),
-      })
-    ),
-    model: v.optional(v.string()),
-    agentName: v.optional(v.string()),
-    addPending: v.optional(v.boolean()),
-    failPendingSteps: v.optional(v.boolean()),
-  },
-  handler: async (ctx, args) => {
-    const chat = await ctx.db.get(args.chatId);
-    assert(chat, `Chat ${args.chatId} not found`);
-    const { failPendingSteps, addPending, messages, ...rest } = args;
-    if (failPendingSteps) {
-      const pendingMessages = await ctx.db
-        .query("messages")
-        .withIndex("status_chatId_order", (q) =>
-          q.eq("status", "pending").eq("chatId", args.chatId)
-        )
-        .collect();
-      await Promise.all(
-        pendingMessages.map((m) => ctx.db.patch(m._id, { status: "failed" }))
-      );
-    }
-    let order: number | undefined;
-    const maxMessage = await stream(ctx.db, schema)
-      .query("messages")
-      .withIndex("chatId_status_tool_order", (q) =>
-        q.eq("chatId", args.chatId).eq("status", "success").eq("tool", false)
-      )
-      .order("desc")
-      .first();
-    order = maxMessage?.order ?? -1;
-    const toReturn: Doc<"messages">[] = [];
-    if (messages.length > 0) {
-      for (const { message, fileId } of messages) {
-        const tool = isTool(message);
-        if (!tool) {
-          order++;
-        }
-        const text = extractText(message);
-        const messageId = await ctx.db.insert("messages", {
-          ...rest,
-          userId: chat.userId,
-          order,
-          tool,
-          text,
-          fileId,
-          status: "success",
-        });
-        toReturn.push((await ctx.db.get(messageId))!);
-      }
-    }
-    // TODO: kick off batch embedding job
-    if (addPending) {
-      const pendingId = await ctx.db.insert("messages", {
-        ...rest,
-        userId: chat.userId,
-        order: order + 1,
-        tool: false,
-        status: "pending",
-      });
-      const pending = (await ctx.db.get(pendingId))!;
-      return { messages: toReturn, pending };
-    }
-    return { messages: toReturn };
-  },
+  args: addMessagesArgs,
+  handler: addMessagesHandler,
   returns: v.object({
     messages: v.array(v.doc("messages")),
     pending: v.optional(v.doc("messages")),
   }),
 });
-
-export const addSteps = mutation({
-  args: {
-    chatId: v.id("chats"),
-    messageId: v.id("messages"),
-    steps: v.array(
-      v.object({
-        step: vStep,
-        fileId: v.optional(v.id("files")),
-      })
-    ),
-    failPreviousSteps: v.optional(v.boolean()),
-  },
-  handler: async (ctx, args) => {
-    const parentMessage = await ctx.db.get(args.messageId);
-    assert(parentMessage, `Message ${args.messageId} not found`);
-    assert(
-      parentMessage.status === "success",
-      `${args.messageId} is not a success, it is ${parentMessage.status}`
-    );
-    assert(parentMessage.order !== undefined, `${args.messageId} has no order`);
-    const steps = await ctx.db
-      .query("steps")
-      .withIndex("chatId_messageId_stepOrder", (q) =>
-        q.eq("chatId", args.chatId).eq("messageId", args.messageId)
+async function addMessagesHandler(
+  ctx: MutationCtx,
+  args: ObjectType<typeof addMessagesArgs>
+) {
+  const chat = await ctx.db.get(args.chatId);
+  assert(chat, `Chat ${args.chatId} not found`);
+  const { failPendingSteps, addPending, messages, ...rest } = args;
+  if (failPendingSteps) {
+    const pendingMessages = await ctx.db
+      .query("messages")
+      .withIndex("status_chatId_order", (q) =>
+        q.eq("status", "pending").eq("chatId", args.chatId)
       )
       .collect();
-    let nextStepOrder;
-    if (args.failPreviousSteps) {
-      for (const step of steps) {
-        await ctx.db.patch(step._id, { status: "failed" });
+    await Promise.all(
+      pendingMessages.map((m) => ctx.db.patch(m._id, { status: "failed" }))
+    );
+  }
+  let order: number | undefined;
+  const maxMessage = await getMaxMessage(ctx, args.chatId);
+  order = maxMessage?.order ?? -1;
+  const toReturn: Doc<"messages">[] = [];
+  if (messages.length > 0) {
+    for (const { message, fileId } of messages) {
+      const tool = isTool(message);
+      if (!tool) {
+        order++;
       }
-      nextStepOrder = 0;
-    } else {
-      nextStepOrder = (steps.at(-1)?.stepOrder ?? -1) + 1;
-    }
-    const results: Doc<"steps">[] = [];
-    for (const { step, fileId } of args.steps) {
-      const stepId = await ctx.db.insert("steps", {
-        chatId: args.chatId,
-        messageId: args.messageId,
-        order: parentMessage.order,
-        stepOrder: nextStepOrder,
-        status: "success",
+      const text = extractText(message);
+      const messageId = await ctx.db.insert("messages", {
+        ...rest,
+        userId: chat.userId,
+        order,
+        tool,
+        text,
         fileId,
-        step,
+        status: "success",
       });
-      results.push((await ctx.db.get(stepId))!);
-      nextStepOrder++;
+      toReturn.push((await ctx.db.get(messageId))!);
     }
-    return results;
-  },
+  }
+  // TODO: kick off batch embedding job
+  if (addPending) {
+    const pendingId = await ctx.db.insert("messages", {
+      ...rest,
+      userId: chat.userId,
+      order: order + 1,
+      tool: false,
+      status: "pending",
+    });
+    const pending = (await ctx.db.get(pendingId))!;
+    return { messages: toReturn, pending };
+  }
+  return { messages: toReturn };
+}
+
+async function getMaxMessage(ctx: QueryCtx, chatId: Id<"chats">) {
+  return ctx.db
+    .query("messages")
+    .withIndex("chatId_status_tool_order", (q) =>
+      q.eq("chatId", chatId).eq("status", "success").eq("tool", false)
+    )
+    .order("desc")
+    .first();
+}
+
+const addStepsArgs = {
+  chatId: v.id("chats"),
+  messageId: v.id("messages"),
+  steps: v.array(vStepWithFile),
+  failPreviousSteps: v.optional(v.boolean()),
+};
+
+export const addSteps = mutation({
+  args: addStepsArgs,
   returns: v.array(v.doc("steps")),
+  handler: addStepsHandler,
 });
+async function addStepsHandler(
+  ctx: MutationCtx,
+  args: ObjectType<typeof addStepsArgs>
+) {
+  const parentMessage = await ctx.db.get(args.messageId);
+  assert(parentMessage, `Message ${args.messageId} not found`);
+  assert(
+    parentMessage.status === "success",
+    `${args.messageId} is not a success, it is ${parentMessage.status}`
+  );
+  assert(parentMessage.order !== undefined, `${args.messageId} has no order`);
+  const steps = await ctx.db
+    .query("steps")
+    .withIndex("chatId_messageId_stepOrder", (q) =>
+      q.eq("chatId", args.chatId).eq("messageId", args.messageId)
+    )
+    .collect();
+  let nextStepOrder;
+  if (args.failPreviousSteps) {
+    for (const step of steps) {
+      await ctx.db.patch(step._id, { status: "failed" });
+    }
+    nextStepOrder = 0;
+  } else {
+    nextStepOrder = (steps.at(-1)?.stepOrder ?? -1) + 1;
+  }
+  const results: Doc<"steps">[] = [];
+  for (const { step, fileId } of args.steps) {
+    const stepId = await ctx.db.insert("steps", {
+      chatId: args.chatId,
+      messageId: args.messageId,
+      order: parentMessage.order,
+      stepOrder: nextStepOrder,
+      status: "success",
+      fileId,
+      step,
+    });
+    results.push((await ctx.db.get(stepId))!);
+    nextStepOrder++;
+  }
+  return results;
+}
 
 export const updateMessage = mutation({
   args: {
     messageId: v.id("messages"),
-    message: vMessage,
+    messages: v.array(vMessageWithFile),
+    steps: v.array(vStepWithFile),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
     const message = await ctx.db.get(args.messageId);
     assert(message, `Message ${args.messageId} not found`);
-    await ctx.db.patch(args.messageId, {
-      message: args.message,
+    const { messages: added } = await addMessagesHandler(ctx, {
+      chatId: message.chatId,
+      messages: args.messages.slice(0, -1),
+      agentName: message.agentName,
+      addPending: false,
+      failPendingSteps: true,
+      model: message.model,
+    });
+    await addStepsHandler(ctx, {
+      chatId: message.chatId,
+      messageId: args.messageId,
+      steps: args.steps,
+      failPreviousSteps: true,
     });
     if (message.status === "pending") {
+      const lastMessage =
+        added.at(-1) || (await getMaxMessage(ctx, message.chatId));
       await ctx.db.patch(args.messageId, {
         status: "success",
+        message: args.messages.at(-1)!.message,
+        tool: isTool(args.messages.at(-1)!.message),
+        text: extractText(args.messages.at(-1)!.message),
+        fileId: args.messages.at(-1)!.fileId,
+        order: (lastMessage?.order ?? -1) + 1,
       });
     }
   },
@@ -560,10 +582,7 @@ export const getChatMessages = query({
               )
               .order(order)
           );
-    const messages = await mergedStream(streams, [
-      "order",
-      "stepOrder",
-    ]).paginate({
+    const messages = await mergedStream(streams, ["order"]).paginate({
       numItems: args.limit ?? 100,
       cursor: args.cursor ?? null,
     });

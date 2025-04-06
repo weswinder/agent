@@ -1,13 +1,13 @@
 import { api } from "../component/_generated/api";
 import { RunActionCtx, RunMutationCtx, RunQueryCtx, UseApi } from "./types";
 import type { EmbeddingModelV1, LanguageModelV1 } from "@ai-sdk/provider";
-import { MessageStatus, SearchOptions, Step } from "../validators";
+import { Message, MessageStatus, SearchOptions, Step } from "../validators";
 import type {
   StreamTextResult,
   Tool,
   ToolSet,
   StepResult,
-  Message,
+  Message as UIMessage,
   CoreMessage,
   GenerateObjectResult,
   StreamObjectResult,
@@ -25,6 +25,7 @@ import {
 // TODO: is this the only dependency that needs helpers in client?
 import { assert } from "convex-helpers";
 import { DEFAULT_MESSAGE_RANGE, extractText } from "../shared";
+import { serializeMessage, serializeStep } from "../mapping";
 
 export type ContextOptions = {
   includeToolMessages?: boolean;
@@ -50,19 +51,57 @@ export class Agent {
     }
   ) {}
 
+  /**
+   * Start a new chat with the agent. This will have a fresh history, though if
+   * you pass in a userId you can have it search across other chats for relevant
+   * messages as context for the LLM calls.
+   * @param ctx The context of the Convex function. From an action, you can chat
+   *   with the agent. From a mutation, you can start a chat and save the chatId
+   *   to pass to continueChat later.
+   * @param args The chat metadata.
+   * @returns The chatId of the new chat and the chat object.
+   */
   async startChat(
     ctx: RunActionCtx,
     args: {
+      /**
+       * The userId to associate with the chat. If not provided, the chat will be
+       * anonymous.
+       */
       userId: string;
+      /**
+       * Whether the chat is private. If true, the chat will not be visible to
+       * other users.
+       */
       private?: boolean;
+      /**
+       * The parent chatIds to merge with.
+       * If the chat is a continuation of one or many previous chats,
+       * you can pass in the chatIds of the parent chats to merge the histories.
+       */
       parentChatIds?: string[];
+      /**
+       * The title of the chat. Not currently used.
+       */
       title?: string;
+      /**
+       * The summary of the chat. Not currently used.
+       */
       summary?: string;
     }
   ): Promise<{
     chatId: string;
     chat: Chat;
   }>;
+  /**
+   * Start a new chat with the agent. This will have a fresh history, though if
+   * you pass in a userId you can have it search across other chats for relevant
+   * messages as context for the LLM calls.
+   * @param ctx The context of the Convex function. From a mutation, you can
+   * start a chat and save the chatId to pass to continueChat later.
+   * @param args The chat metadata.
+   * @returns The chatId of the new chat.
+   */
   async startChat(
     ctx: RunMutationCtx,
     args: {
@@ -173,9 +212,37 @@ export class Agent {
 
   async saveMessages(
     ctx: RunMutationCtx,
-    args: { chatId: string; messages: Message[] }
-  ): Promise<void> {
-    throw new Error("Not implemented");
+    args: {
+      chatId: string;
+      messages: CoreMessage[];
+      steps?: StepResult<ToolSet>[];
+      addPending: true;
+    }
+  ): Promise<{
+    pendingId: string;
+  }>;
+  async saveMessages(
+    ctx: RunMutationCtx,
+    args: {
+      chatId: string;
+      messages: CoreMessage[];
+      steps?: StepResult<ToolSet>[];
+      addPending?: boolean;
+    }
+  ): Promise<{
+    pendingId?: string;
+  }> {
+    const result = await ctx.runMutation(this.component.messages.addMessages, {
+      chatId: args.chatId,
+      agentName: this.options.name,
+      model: this.options.chat.modelId,
+      messages: args.messages.map((m) => ({ message: serializeMessage(m) })),
+      failPendingSteps: true,
+      addPending: args.addPending ?? false,
+    });
+    return {
+      pendingId: result.pending?._id,
+    };
   }
 
   async replaceMessages(
@@ -185,24 +252,40 @@ export class Agent {
     throw new Error("Not implemented");
   }
 
-  async saveStep(
+  async saveStep<TOOLS extends ToolSet>(
     ctx: RunMutationCtx,
-    args: { chatId: string; messageId: string; step: StepResult<ToolSet> }
+    args: { chatId: string; messageId: string; step: StepResult<TOOLS> }
   ): Promise<void> {
-    throw new Error("Not implemented");
+    await ctx.runMutation(this.component.messages.addSteps, {
+      chatId: args.chatId,
+      messageId: args.messageId,
+      steps: [{ step: serializeStep(args.step as StepResult<ToolSet>) }],
+      failPreviousSteps: true,
+    });
   }
 
-  async completeMessage(
+  async completeMessage<TOOLS extends ToolSet>(
     ctx: RunMutationCtx,
     args: {
       chatId: string;
       messageId: string;
       result:
         | { kind: "error"; error: string }
-        | { kind: "success"; result: Response };
+        | {
+            kind: "success";
+            value: { messages: CoreMessage[]; steps: StepResult<TOOLS>[] };
+          };
     }
   ): Promise<void> {
-    throw new Error("Not implemented");
+    if (args.result.kind === "success") {
+      await ctx.runMutation(this.component.messages.updateMessage, {
+        messageId: args.messageId,
+        messages: args.result.value.messages.map((m) => ({
+          message: serializeMessage(m),
+        })),
+        steps: args.result.value.steps.map((s) => ({ step: serializeStep(s) })),
+      });
+    }
   }
 
   /**
@@ -214,7 +297,11 @@ export class Agent {
    * @param args The arguments to the generateText function.
    * @returns The result of the generateText function.
    */
-  async generateText(
+  async generateText<
+    TOOLS extends ToolSet,
+    OUTPUT = never,
+    OUTPUT_PARTIAL = never,
+  >(
     ctx: RunActionCtx,
     {
       userId,
@@ -224,8 +311,10 @@ export class Agent {
       userId?: string;
       chatId?: string;
     } & ContextOptions,
-    args: Partial<Parameters<typeof generateText>[0]>
-  ): Promise<{ text: string }> {
+    args: Partial<
+      Parameters<typeof generateText<TOOLS, OUTPUT, OUTPUT_PARTIAL>>[0]
+    >
+  ): Promise<GenerateTextResult<TOOLS, OUTPUT>> {
     const { prompt, messages: raw, ...rest } = args;
     const messages = promptOrMessagesToCoreMessages({ prompt, messages: raw });
     const contextMessages = await this.fetchContextMessages(ctx, {
@@ -234,12 +323,46 @@ export class Agent {
       messages,
       ...searchArgs,
     });
-    return generateText({
+    let messageId: string | undefined;
+    if (chatId) {
+      const { pendingId } = await this.saveMessages(ctx, {
+        chatId,
+        messages,
+        addPending: true,
+      });
+      messageId = pendingId;
+    }
+    const result = await generateText({
       model: this.options.chat,
       messages: [...contextMessages, ...messages],
       system: this.options.defaultSystemPrompt,
       ...rest,
+      onStepFinish: async (step) => {
+        console.log("onStepFinish", step);
+        if (chatId && messageId) {
+          await this.saveStep(ctx, {
+            chatId,
+            messageId,
+            step,
+          });
+        }
+        return args.onStepFinish?.(step);
+      },
     });
+    if (messageId && chatId) {
+      await this.completeMessage(ctx, {
+        messageId,
+        chatId,
+        result: {
+          kind: "success",
+          value: {
+            messages: result.response.messages,
+            steps: result.steps,
+          },
+        },
+      });
+    }
+    return result;
   }
 
   async streamText<
@@ -387,11 +510,37 @@ export class Agent {
 
   async getChatMessages(
     ctx: RunQueryCtx,
-    args: { chatId: string; limit?: number; statuses?: MessageStatus[] }
+    args: {
+      chatId: string;
+      limit?: number;
+      statuses?: MessageStatus[];
+      cursor?: string;
+      includeToolMessages?: boolean;
+      order?: "asc" | "desc";
+    }
   ): Promise<{
-    messages: Message[];
+    messages: (Message & { id: string })[];
+    continueCursor?: string;
+    isDone: boolean;
   }> {
-    return { messages: [] };
+    const messages = await ctx.runQuery(
+      this.component.messages.getChatMessages,
+      {
+        chatId: args.chatId,
+        limit: args.limit,
+        statuses: args.statuses,
+        cursor: args.cursor,
+        isTool: args.includeToolMessages,
+        order: args.order,
+      }
+    );
+    return {
+      messages: messages.messages
+        .map((m) => m && { ...m.message, id: m._id })
+        .filter((m): m is Message & { id: string } => m !== undefined),
+      continueCursor: messages.continueCursor,
+      isDone: messages.isDone,
+    };
   }
 
   async getSteps(
@@ -427,7 +576,6 @@ interface Chat {
   ): Promise<StreamObjectResult<DeepPartial<T>, T, never>>;
 }
 
-
 // type ToolParameters = ZodTypeAny | Schema<unknown>; // TODO: support convex validator
 // type inferParameters<PARAMETERS extends ToolParameters> =
 //   PARAMETERS extends Schema<unknown>
@@ -462,7 +610,7 @@ interface Chat {
 export function promptOrMessagesToCoreMessages(args: {
   system?: string;
   prompt?: string;
-  messages?: CoreMessage[] | Omit<Message, "id">[];
+  messages?: CoreMessage[] | Omit<UIMessage, "id">[];
 }): CoreMessage[] {
   const messages: CoreMessage[] = [];
   if (args.system) {
@@ -482,7 +630,7 @@ export function promptOrMessagesToCoreMessages(args: {
           "experimental_attachments" in m)
     )
   ) {
-    messages.push(...convertToCoreMessages(args.messages as Message[]));
+    messages.push(...convertToCoreMessages(args.messages as UIMessage[]));
   } else {
     messages.push(...coreMessageSchema.array().parse(args.messages));
   }

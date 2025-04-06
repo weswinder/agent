@@ -4,7 +4,6 @@ import { openai } from "@ai-sdk/openai";
 import { weatherTool } from "./example";
 import { action, query } from "./_generated/server";
 import { v } from "convex/values";
-import * as ai from "ai";
 
 const supportAgent = new Agent(components.agent, {
   chat: openai.chat("gpt-4o-mini"),

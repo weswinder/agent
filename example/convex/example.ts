@@ -1,7 +1,7 @@
 import { action } from "./_generated/server";
 import { components } from "./_generated/api";
 import { Agent } from "@convex-dev/agent";
-import { embed, generateText, tool } from "ai";
+import { tool } from "ai";
 import { v } from "convex/values";
 import { openai } from "@ai-sdk/openai";
 import { z } from "zod";

@@ -1,4 +1,3 @@
-import { pretendRequired } from "convex-helpers/validators";
 import { Infer, v } from "convex/values";
 
 // const deprecated = v.optional(v.any()) as unknown as VNull<unknown, "optional">;
@@ -151,9 +150,18 @@ export const vMessage = v.union(
 );
 export type Message = Infer<typeof vMessage>;
 
+export const vMessageWithFile = v.object({
+  message: vMessage,
+  fileId: v.optional(v.id("files")),
+});
+export type MessageWithFile = Infer<typeof vMessageWithFile>;
+
 export const vSource = v.object({
-  type: v.literal("source"),
-  text: v.string(),
+  sourceType: v.literal("url"),
+  id: v.string(),
+  url: v.string(),
+  title: v.optional(v.string()),
+  providerMetadata: providerOptions,
 });
 
 export const vRequest = v.object({
@@ -169,13 +177,7 @@ export const vResponse = v.object({
   timestamp: v.number(),
   modelId: v.string(),
   headers: v.optional(v.record(v.string(), v.string())), // clear these?
-  messages: v.array(
-    v.object({
-      id: v.string(),
-      role: v.string(),
-      content: v.string(),
-    })
-  ),
+  messages: v.array(vMessage),
   body: v.optional(v.any()),
 });
 
@@ -214,8 +216,8 @@ export const vStep = v.object({
   isContinued: v.boolean(),
   text: v.string(),
   reasoning: v.optional(v.string()),
-  reasoningDetails: v.optional(v.array(v.string())),
-  files: v.optional(v.array(v.string())),
+  reasoningDetails: v.optional(v.array(v.any())),
+  files: v.optional(v.array(v.any())),
   sources: v.optional(v.array(vSource)),
   toolCalls: v.array(vToolCallPart),
   toolResults: v.array(vToolResultPart),
@@ -231,12 +233,17 @@ export const vStep = v.object({
   logprobs: v.optional(v.any()),
   request: v.optional(vRequest),
   response: v.optional(vResponse),
-  messages: v.array(vMessage),
   providerOptions,
   providerMetadata: providerOptions,
   experimental_providerMetadata,
 });
 export type Step = Infer<typeof vStep>;
+
+export const vStepWithFile = v.object({
+  step: vStep,
+  fileId: v.optional(v.id("files")),
+});
+export type StepWithFile = Infer<typeof vStepWithFile>;
 
 export const vSearchOptions = v.object({
   vector: v.optional(v.array(v.number())),

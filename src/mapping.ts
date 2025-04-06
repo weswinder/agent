@@ -2,10 +2,12 @@ import type {
   AssistantContent,
   CoreMessage,
   DataContent,
+  StepResult,
   ToolContent,
+  ToolSet,
   UserContent,
 } from "ai";
-import { Message } from "./validators";
+import { Message, Step } from "./validators";
 
 export type SerializeUrlsAndUint8Arrays<T> = T extends URL
   ? string
@@ -39,6 +41,19 @@ export function serializeMessage(message: CoreMessage): SerializedMessage {
     }
   });
   return { ...message, content: serialized } as SerializedMessage;
+}
+
+export function serializeStep<TOOLS extends ToolSet>(
+  step: StepResult<TOOLS>
+): Step {
+  const content = step.response?.messages.map((message) => {
+    return serializeMessage(message);
+  });
+  const timestamp = step.response?.timestamp.getTime();
+  return {
+    ...step,
+    response: { ...step.response, messages: content, timestamp },
+  };
 }
 
 export function deserializeContent(content: SerializedContent): Content {
