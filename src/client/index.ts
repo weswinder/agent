@@ -11,6 +11,9 @@ import type {
   Schema,
   Message,
   CoreMessage,
+  GenerateObjectResult,
+  StreamObjectResult,
+  DeepPartial,
 } from "ai";
 import { z, ZodTypeAny } from "zod";
 import {
@@ -21,8 +24,8 @@ import {
   convertToCoreMessages,
   coreMessageSchema,
 } from "ai";
+// TODO: is this the only dependency that needs helpers in client?
 import { assert } from "convex-helpers";
-import { omit } from "convex-helpers";
 import { DEFAULT_MESSAGE_RANGE, extractText } from "../shared";
 
 export type ContextOptions = {
@@ -123,6 +126,8 @@ export class Agent {
       chat: {
         generateText: this.generateText.bind(this, ctx, { userId, chatId }),
         streamText: this.streamText.bind(this, ctx, { userId, chatId }),
+        generateObject: this.generateObject.bind(this, ctx, { userId, chatId }),
+        streamObject: this.streamObject.bind(this, ctx, { userId, chatId }),
       } as Chat,
     };
   }
@@ -286,6 +291,66 @@ export class Agent {
         return args.onStepFinish?.(step);
       },
     });
+  }
+
+  // TODO: not sure why it needs to extend string
+  async generateObject<OBJECT extends string>(
+    ctx: RunActionCtx,
+    {
+      userId,
+      chatId,
+      ...searchArgs
+    }: { userId?: string; chatId?: string } & ContextOptions,
+    args: Omit<Parameters<typeof generateObject<OBJECT>>[0], "model"> & {
+      model?: LanguageModelV1;
+    }
+  ): Promise<GenerateObjectResult<OBJECT>> {
+    const { prompt, messages: raw, ...rest } = args;
+    const messages = promptOrMessagesToCoreMessages({ prompt, messages: raw });
+    const contextMessages = await this.fetchContextMessages(ctx, {
+      userId,
+      chatId,
+      messages,
+      ...searchArgs,
+    });
+    return generateObject({
+      model: this.options.chat,
+      messages: [...contextMessages, ...messages],
+      ...rest,
+    }) as Promise<GenerateObjectResult<OBJECT>>;
+  }
+
+  async streamObject<T>(
+    ctx: RunMutationCtx,
+    {
+      userId,
+      chatId,
+      ...searchArgs
+    }: { userId?: string; chatId?: string } & ContextOptions,
+    args: Omit<Parameters<typeof streamObject<T>>[0], "model"> & {
+      model?: LanguageModelV1;
+    }
+  ) {
+    const { prompt, messages: raw, ...rest } = args;
+    const messages = promptOrMessagesToCoreMessages({ prompt, messages: raw });
+    const contextMessages = await this.fetchContextMessages(ctx, {
+      userId,
+      chatId,
+      messages,
+      ...searchArgs,
+    });
+    return streamObject<T>({
+      model: this.options.chat,
+      messages: [...contextMessages, ...messages],
+      ...rest,
+      onError: async (error) => {
+        console.error("onError", error);
+        return args.onError?.(error);
+      },
+      onFinish: async (result) => {
+        console.log("onFinish", result);
+      },
+    }) as StreamObjectResult<DeepPartial<T>, T, never>;
   }
 
   async searchWithDefaults(
