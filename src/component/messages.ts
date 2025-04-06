@@ -192,6 +192,7 @@ type DeleteAllReturns = ObjectType<typeof deleteAllReturns>;
 export const _deleteAllForUserIdAsync = internalMutation({
   args: deleteAllArgs,
   handler: deleteAllFroUserIdAsyncHandler,
+  returns: v.boolean(),
 });
 
 async function deleteAllFroUserIdAsyncHandler(
@@ -234,17 +235,12 @@ async function deletePageForUserId(
   const messages = await chatStreams
     .flatMap(
       async (c) =>
-        mergedStream(
-          [true, false].map((tool) =>
-            stream(ctx.db, schema)
-              .query("messages")
-              .withIndex("chatId_status_tool_order", (q) =>
-                q.eq("chatId", c._id).eq("status", "success").eq("tool", tool)
-              )
+        stream(ctx.db, schema)
+          .query("messages")
+          .withIndex("chatId_status_tool_order", (q) =>
+            q.eq("chatId", c._id).eq("status", "success")
           ),
-          ["order"]
-        ),
-      ["order"]
+      ["tool", "order"]
     )
     .paginate({
       numItems: 100,
@@ -278,6 +274,72 @@ async function deleteMessage(ctx: MutationCtx, messageDoc: Doc<"messages">) {
       await ctx.db.patch(messageDoc.fileId, { refcount: file.refcount - 1 });
     }
   }
+}
+
+const deleteChatArgs = {
+  chatId: v.id("chats"),
+  cursor: v.optional(v.string()),
+  limit: v.optional(v.number()),
+};
+type DeleteChatArgs = ObjectType<typeof deleteChatArgs>;
+const deleteChatReturns = {
+  cursor: v.string(),
+  isDone: v.boolean(),
+};
+type DeleteChatReturns = ObjectType<typeof deleteChatReturns>;
+
+export const deleteAllForChatIdSync = action({
+  args: deleteChatArgs,
+  handler: async (ctx, args) => {
+    const result: DeleteChatReturns = await ctx.runMutation(
+      internal.messages._deletePageForChatId,
+      { chatId: args.chatId, cursor: args.cursor, limit: args.limit }
+    );
+    return result;
+  },
+  returns: deleteChatReturns,
+});
+
+export const deleteAllForChatIdAsync = mutation({
+  args: deleteChatArgs,
+  handler: async (ctx, args) => {
+    const result = await deletePageForChatIdHandler(ctx, args);
+    if (!result.isDone) {
+      await ctx.scheduler.runAfter(0, api.messages.deleteAllForChatIdAsync, {
+        chatId: args.chatId,
+        cursor: result.cursor,
+      });
+    }
+    return result;
+  },
+  returns: deleteChatReturns,
+});
+
+export const _deletePageForChatId = internalMutation({
+  args: deleteChatArgs,
+  handler: deletePageForChatIdHandler,
+  returns: deleteChatReturns,
+});
+
+async function deletePageForChatIdHandler(
+  ctx: MutationCtx,
+  args: DeleteChatArgs
+): Promise<DeleteChatReturns> {
+  const messages = await stream(ctx.db, schema)
+    .query("messages")
+    .withIndex("chatId_status_tool_order", (q) =>
+      q.eq("chatId", args.chatId).eq("status", "success")
+    )
+    .paginate({
+      numItems: args.limit ?? 100,
+      cursor: args.cursor ?? null,
+    });
+  await Promise.all(messages.page.map((m) => deleteMessage(ctx, m)));
+  await ctx.db.delete(args.chatId);
+  return {
+    cursor: messages.continueCursor,
+    isDone: messages.isDone,
+  };
 }
 
 export const getFilesToDelete = query({
@@ -448,6 +510,7 @@ export const updateMessage = mutation({
     messageId: v.id("messages"),
     message: vMessage,
   },
+  returns: v.null(),
   handler: async (ctx, args) => {
     const message = await ctx.db.get(args.messageId);
     assert(message, `Message ${args.messageId} not found`);

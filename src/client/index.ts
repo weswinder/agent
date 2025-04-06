@@ -7,15 +7,13 @@ import type {
   Tool,
   ToolSet,
   StepResult,
-  ToolExecutionOptions,
-  Schema,
   Message,
   CoreMessage,
   GenerateObjectResult,
   StreamObjectResult,
   DeepPartial,
+  GenerateTextResult,
 } from "ai";
-import { z, ZodTypeAny } from "zod";
 import {
   generateText,
   generateObject,
@@ -53,18 +51,6 @@ export class Agent {
   ) {}
 
   async startChat(
-    ctx: RunMutationCtx,
-    args: {
-      userId: string;
-      private?: boolean;
-      parentChatIds?: string[];
-      title?: string;
-      summary?: string;
-    }
-  ): Promise<{
-    chatId: string;
-  }>;
-  async startChat(
     ctx: RunActionCtx,
     args: {
       userId: string;
@@ -76,6 +62,18 @@ export class Agent {
   ): Promise<{
     chatId: string;
     chat: Chat;
+  }>;
+  async startChat(
+    ctx: RunMutationCtx,
+    args: {
+      userId: string;
+      private?: boolean;
+      parentChatIds?: string[];
+      title?: string;
+      summary?: string;
+    }
+  ): Promise<{
+    chatId: string;
   }>;
   async startChat(
     ctx: RunActionCtx | RunMutationCtx,
@@ -116,7 +114,7 @@ export class Agent {
       userId,
     }: {
       chatId: string;
-      userId: string;
+      userId?: string;
     }
   ): Promise<{
     chat: Chat;
@@ -407,15 +405,28 @@ export class Agent {
 }
 
 interface Chat {
-  generateText(args: Partial<Parameters<typeof generateText>[0]>): Promise<{
-    text: string;
-  }>;
+  generateText<TOOLS extends ToolSet, OUTPUT = never, OUTPUT_PARTIAL = never>(
+    args: Partial<
+      Parameters<typeof generateText<TOOLS, OUTPUT, OUTPUT_PARTIAL>>[0]
+    >
+  ): Promise<GenerateTextResult<TOOLS, OUTPUT>>;
   streamText<TOOLS extends ToolSet, OUTPUT = never, PARTIAL_OUTPUT = never>(
     args: Partial<
       Parameters<typeof streamText<TOOLS, OUTPUT, PARTIAL_OUTPUT>>[0]
     >
   ): Promise<StreamTextResult<TOOLS, PARTIAL_OUTPUT>>;
+  generateObject<OBJECT extends string>(
+    args: Omit<Parameters<typeof generateObject<OBJECT>>[0], "model"> & {
+      model?: LanguageModelV1;
+    }
+  ): Promise<GenerateObjectResult<OBJECT>>;
+  streamObject<T>(
+    args: Omit<Parameters<typeof streamObject<T>>[0], "model"> & {
+      model?: LanguageModelV1;
+    }
+  ): Promise<StreamObjectResult<DeepPartial<T>, T, never>>;
 }
+
 
 // type ToolParameters = ZodTypeAny | Schema<unknown>; // TODO: support convex validator
 // type inferParameters<PARAMETERS extends ToolParameters> =

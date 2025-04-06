@@ -67,7 +67,7 @@ export const vToolCallPart = v.object({
   type: v.literal("tool-call"),
   toolCallId: v.string(),
   toolName: v.string(),
-  args: pretendRequired(v.any()),
+  args: v.any(),
   providerOptions,
   experimental_providerMetadata,
 });
