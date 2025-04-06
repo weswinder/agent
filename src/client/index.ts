@@ -417,36 +417,36 @@ interface Chat {
   ): Promise<StreamTextResult<TOOLS, PARTIAL_OUTPUT>>;
 }
 
-type ToolParameters = ZodTypeAny | Schema<unknown>; // TODO: support convex validator
-type inferParameters<PARAMETERS extends ToolParameters> =
-  PARAMETERS extends Schema<unknown>
-    ? PARAMETERS["_type"]
-    : PARAMETERS extends z.ZodTypeAny
-      ? z.infer<PARAMETERS>
-      : never;
-/**
- * This is a wrapper around the ai.tool function that adds support for
- * userId and chatId to the tool, if they're called within a chat from an agent.
- * @param tool The AI tool. See https://sdk.vercel.ai/docs/ai-sdk-core/tools-and-tool-calling
- * @returns The same tool, but with userId and chatId args support added.
- */
-export function tool<PARAMETERS extends ToolParameters, RESULT>(
-  tool: Tool<PARAMETERS, RESULT> & {
-    execute: (
-      args: inferParameters<PARAMETERS> & { userId?: string; chatId?: string },
-      options: ToolExecutionOptions
-    ) => PromiseLike<RESULT>;
-  }
-): Tool<PARAMETERS, RESULT> & {
-  execute: (
-    args: inferParameters<PARAMETERS>,
-    options: ToolExecutionOptions
-  ) => PromiseLike<RESULT>;
-} {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  (tool as any).__acceptUserIdAndChatId = true;
-  return tool;
-}
+// type ToolParameters = ZodTypeAny | Schema<unknown>; // TODO: support convex validator
+// type inferParameters<PARAMETERS extends ToolParameters> =
+//   PARAMETERS extends Schema<unknown>
+//     ? PARAMETERS["_type"]
+//     : PARAMETERS extends z.ZodTypeAny
+//       ? z.infer<PARAMETERS>
+//       : never;
+// /**
+//  * This is a wrapper around the ai.tool function that adds support for
+//  * userId and chatId to the tool, if they're called within a chat from an agent.
+//  * @param tool The AI tool. See https://sdk.vercel.ai/docs/ai-sdk-core/tools-and-tool-calling
+//  * @returns The same tool, but with userId and chatId args support added.
+//  */
+// export function tool<PARAMETERS extends ToolParameters, RESULT>(
+//   tool: Tool<PARAMETERS, RESULT> & {
+//     execute: (
+//       args: inferParameters<PARAMETERS> & { userId?: string; chatId?: string },
+//       options: ToolExecutionOptions
+//     ) => PromiseLike<RESULT>;
+//   }
+// ): Tool<PARAMETERS, RESULT> & {
+//   execute: (
+//     args: inferParameters<PARAMETERS>,
+//     options: ToolExecutionOptions
+//   ) => PromiseLike<RESULT>;
+// } {
+//   // eslint-disable-next-line @typescript-eslint/no-explicit-any
+//   (tool as any).__acceptUserIdAndChatId = true;
+//   return tool;
+// }
 
 export function promptOrMessagesToCoreMessages(args: {
   system?: string;
