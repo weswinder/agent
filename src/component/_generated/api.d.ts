@@ -242,6 +242,7 @@ export type Mounts = {
               };
           order: number;
           status: "pending" | "success" | "failed";
+          tool: boolean;
         };
         pending?: {
           _creationTime: number;
@@ -347,6 +348,7 @@ export type Mounts = {
               };
           order: number;
           status: "pending" | "success" | "failed";
+          tool: boolean;
         };
       }
     >;
@@ -738,6 +740,7 @@ export type Mounts = {
               };
           order: number;
           status: "pending" | "success" | "failed";
+          tool: boolean;
         }>;
       }
     >;

@@ -16,16 +16,17 @@ export const schema = defineSchema({
   messages: defineTable({
     chatId: v.id("chats"),
     message: v.optional(vMessage),
-    order: v.number(), // Non-step messages only, will repeat for sub-steps.
+    tool: v.boolean(),
+    order: v.optional(v.number()), // Set when the message is finished
     fileId: v.optional(v.id("files")),
     status: vMessageStatus,
   })
     // Allows finding successful visible messages in order
     // Also surface pending messages separately to e.g. stream
-    .index("chatId_status_order", ["chatId", "status", "order"])
+    .index("chatId_status_tool_order", ["chatId", "status", "tool", "order"])
     // Allows finding all chat messages in order
     // Allows finding all failed messages to evaluate
-    .index("status_chatId_order", ["status", "chatId", "order"]),
+    .index("status_tool_chatId_order", ["status", "tool", "chatId", "order"]),
 
   steps: defineTable({
     chatId: v.id("chats"),

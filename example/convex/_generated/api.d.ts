@@ -252,6 +252,7 @@ export declare const components: {
                 };
             order: number;
             status: "pending" | "success" | "failed";
+            tool: boolean;
           };
           pending?: {
             _creationTime: number;
@@ -357,6 +358,7 @@ export declare const components: {
                 };
             order: number;
             status: "pending" | "success" | "failed";
+            tool: boolean;
           };
         }
       >;
@@ -752,6 +754,7 @@ export declare const components: {
                 };
             order: number;
             status: "pending" | "success" | "failed";
+            tool: boolean;
           }>;
         }
       >;
