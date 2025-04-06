@@ -2,6 +2,7 @@ import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 import { vChatStatus, vMessage, vMessageStatus, vStep } from "../validators";
 import { typedV } from "convex-helpers/validators";
+import vectorTables, { vVectorId } from "./vector/tables";
 
 export const schema = defineSchema({
   chats: defineTable({
@@ -16,6 +17,9 @@ export const schema = defineSchema({
   messages: defineTable({
     chatId: v.id("chats"),
     message: v.optional(vMessage),
+    model: v.optional(v.string()),
+    text: v.optional(v.string()),
+    embeddingId: v.optional(vVectorId),
     tool: v.boolean(),
     order: v.optional(v.number()), // Set when the message is finished
     fileId: v.optional(v.id("files")),
@@ -26,7 +30,12 @@ export const schema = defineSchema({
     .index("chatId_status_tool_order", ["chatId", "status", "tool", "order"])
     // Allows finding all chat messages in order
     // Allows finding all failed messages to evaluate
-    .index("status_tool_chatId_order", ["status", "tool", "chatId", "order"]),
+    .index("status_tool_chatId_order", ["status", "tool", "chatId", "order"])
+    // Allows text search on message content
+    .searchIndex("text_search", {
+      searchField: "text",
+      filterFields: ["userId", "chatId"],
+    }),
 
   steps: defineTable({
     chatId: v.id("chats"),
@@ -52,6 +61,7 @@ export const schema = defineSchema({
   })
     .index("hash", ["hash"])
     .index("refcount", ["refcount"]),
+  ...vectorTables,
 });
 
 export const vv = typedV(schema);
