@@ -1,5 +1,5 @@
 import { Infer } from "convex/values";
-import { expectTypeOf } from "vitest";
+import { expectTypeOf, test } from "vitest";
 import {
   vAssistantContent,
   vAssistantMessage,
@@ -97,3 +97,5 @@ expectTypeOf<CoreSystemMessage>().toExtend<Infer<typeof vSystemMessage>>();
 type OurMessage = SerializeUrlsAndUint8Arrays<CoreMessage>;
 expectTypeOf<OurMessage>().toExtend<Infer<typeof vMessage>>();
 expectTypeOf<Infer<typeof vMessage>>().toExtend<OurMessage>();
+
+test("noop", () => { });
