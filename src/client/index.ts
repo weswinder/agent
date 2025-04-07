@@ -21,13 +21,12 @@ import {
   streamObject,
   streamText,
 } from "ai";
-import type { ZodType } from "zod";
 import { api } from "../component/_generated/api";
 import { Message, MessageStatus, SearchOptions } from "../validators";
 import { RunActionCtx, RunMutationCtx, RunQueryCtx, UseApi } from "./types";
 // TODO: is this the only dependency that needs helpers in client?
 import { assert } from "convex-helpers";
-import { convexToZod } from "convex-helpers/server/zod";
+import { ConvexToZod, convexToZod } from "convex-helpers/server/zod";
 import { GenericActionCtx, GenericDataModel } from "convex/server";
 import { Infer, Validator } from "convex/values";
 import {
@@ -705,7 +704,7 @@ export function tool<V extends Validator<any, any, any>, RESULT>(convexTool: {
     userId?: string;
     chatId?: string;
   };
-}): Tool<ZodType<Infer<V>>, RESULT> {
+}): Tool<ConvexToZod<V>, RESULT> {
   const tool = {
     __acceptUserIdAndChatId: true,
     description: convexTool.description,
