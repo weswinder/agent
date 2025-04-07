@@ -278,9 +278,13 @@ export const vStorageOptions = v.object({
 
 export const vChatArgs = v.object({
   maxSteps: v.optional(v.number()),
+  prompt: v.optional(v.string()),
+  messages: v.optional(v.array(vMessage)),
 });
 
 export const vObjectArgs = v.object({
   output: v.optional(v.any()),
   mode: v.optional(v.literal("json")),
+  prompt: v.optional(v.string()),
+  messages: v.optional(v.array(vMessage)),
 });

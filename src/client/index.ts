@@ -15,26 +15,17 @@ import type {
 import { generateObject, generateText, streamObject, streamText } from "ai";
 import { api } from "../component/_generated/api";
 import {
-  Message,
-  MessageStatus,
   SearchOptions,
-  vMessage,
-  vContextOptions,
   vChatArgs,
+  vContextOptions,
   vObjectArgs,
   vStorageOptions,
 } from "../validators";
-import {
-  ChatDoc,
-  OpaqueIds,
-  RunActionCtx,
-  RunMutationCtx,
-  RunQueryCtx,
-  UseApi,
-} from "./types";
+import { RunActionCtx, RunMutationCtx, RunQueryCtx, UseApi } from "./types";
 // TODO: is this the only dependency that needs helpers in client?
 import { assert } from "convex-helpers";
 import { ConvexToZod, convexToZod } from "convex-helpers/server/zod";
+import { internalActionGeneric } from "convex/server";
 import { Infer, v, Validator } from "convex/values";
 import {
   promptOrMessagesToCoreMessages,
@@ -43,8 +34,6 @@ import {
   serializeStep,
 } from "../mapping";
 import { DEFAULT_MESSAGE_RANGE, extractText } from "../shared";
-import { Doc } from "../component/_generated/dataModel";
-import { actionGeneric } from "convex/server";
 
 export type ContextOptions = {
   /**
@@ -620,16 +609,28 @@ export class Agent<AgentTools extends ToolSet> {
    *
    */
   asAction(spec: { contextOptions?: ContextOptions; maxSteps?: number }) {
-    return actionGeneric({
+    return internalActionGeneric({
       args: {
         userId: v.optional(v.string()),
-        chatId: v.string(),
-        prompt: v.optional(v.string()),
-        messages: v.optional(v.array(vMessage)),
+        chatId: v.optional(v.string()),
         contextOptions: v.optional(vContextOptions),
         storageOptions: v.optional(vStorageOptions),
         maxRetries: v.optional(v.number()),
 
+        createChat: v.optional(
+          v.object({
+            userId: v.string(),
+            parentChatIds: v.optional(v.array(v.string())),
+            title: v.optional(v.string()),
+            summary: v.optional(v.string()),
+          })
+        ),
+        continueChat: v.optional(
+          v.object({
+            chatId: v.string(),
+            userId: v.optional(v.string()),
+          })
+        ),
         generateText: v.optional(vChatArgs),
         streamText: v.optional(vChatArgs),
         generateObject: v.optional(vObjectArgs),
@@ -637,77 +638,60 @@ export class Agent<AgentTools extends ToolSet> {
           v.object({ ...vObjectArgs.fields, schema: v.optional(v.any()) })
         ),
       },
-      handler: async (ctx, args) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      handler: async (ctx, args): Promise<any> => {
         const contextOptions =
           spec.contextOptions && this.mergedContextOptions(spec.contextOptions);
         const maxSteps = spec.maxSteps ?? this.options.maxSteps;
         const maxRetries = args.maxRetries;
-        if (args.generateText) {
-          return this.generateText(
-            ctx,
-            {
-              userId: args.userId,
-              chatId: args.chatId,
-              ...contextOptions,
-              ...args.storageOptions,
-            },
-            {
-              prompt: args.prompt,
-              messages: args.messages,
-              maxSteps: args.generateText.maxSteps ?? maxSteps,
-              maxRetries,
-            }
-          );
+        const commonArgs = {
+          userId: args.userId,
+          chatId: args.chatId,
+          ...contextOptions,
+          ...args.storageOptions,
+        };
+        if (args.createChat) {
+          return this.startChat(ctx, {
+            userId: args.createChat.userId,
+            parentChatIds: args.createChat.parentChatIds,
+            title: args.createChat.title,
+            summary: args.createChat.summary,
+          });
+        } else if (args.continueChat) {
+          return this.continueChat(ctx, {
+            chatId: args.continueChat.chatId,
+            userId: args.continueChat.userId,
+          });
+        } else if (args.generateText) {
+          return this.generateText(ctx, commonArgs, {
+            prompt: args.prompt,
+            messages: args.messages,
+            maxSteps: args.generateText.maxSteps ?? maxSteps,
+            maxRetries,
+          });
         } else if (args.streamText) {
-          return this.streamText(
-            ctx,
-            {
-              userId: args.userId,
-              chatId: args.chatId,
-              ...contextOptions,
-              ...args.storageOptions,
-            },
-            {
-              prompt: args.prompt,
-              messages: args.messages,
-              maxSteps: args.streamText.maxSteps ?? maxSteps,
-              maxRetries,
-            }
-          );
+          return this.streamText(ctx, commonArgs, {
+            prompt: args.prompt,
+            messages: args.messages,
+            maxSteps: args.streamText.maxSteps ?? maxSteps,
+            maxRetries,
+          });
         } else if (args.generateObject) {
-          return this.generateObject(
-            ctx,
-            {
-              userId: args.userId,
-              chatId: args.chatId,
-              ...contextOptions,
-              ...args.storageOptions,
-            },
-            {
-              prompt: args.prompt,
-              messages: args.messages,
-              output: args.generateObject.output,
-              maxRetries,
-              mode: args.generateObject.mode,
-            }
-          );
+          return this.generateObject(ctx, commonArgs, {
+            prompt: args.prompt,
+            messages: args.messages,
+            output: args.generateObject.output,
+            maxRetries,
+            mode: args.generateObject.mode,
+          });
         } else if (args.streamObject) {
-          return this.streamObject(
-            ctx,
-            {
-              userId: args.userId,
-              chatId: args.chatId,
-              ...contextOptions,
-              ...args.storageOptions,
-            },
-            {
-              prompt: args.prompt,
-              messages: args.messages,
-              output: args.streamObject.output,
-              mode: args.streamObject.mode,
-              schema: args.streamObject.schema,
-            }
-          );
+          return this.streamObject(ctx, commonArgs, {
+            prompt: args.prompt,
+            messages: args.messages,
+            output: args.streamObject.output,
+            mode: args.streamObject.mode,
+            schema: args.streamObject.schema,
+          });
         }
       },
     });
