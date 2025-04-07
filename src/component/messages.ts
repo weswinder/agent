@@ -5,7 +5,7 @@ import { nullable, partial } from "convex-helpers/validators";
 import { ObjectType } from "convex/values";
 import { DEFAULT_MESSAGE_RANGE, extractText, isTool } from "../shared.js";
 import {
-  vChatStatus,
+  vThreadStatus,
   vMessageStatus,
   vMessageWithFileAndId,
   vSearchOptions,
@@ -30,27 +30,27 @@ import {
   vVectorId,
 } from "./vector/tables.js";
 
-export const getChat = query({
-  args: { chatId: v.id("chats") },
+export const getThread = query({
+  args: { threadId: v.id("threads") },
   handler: async (ctx, args) => {
-    return ctx.db.get(args.chatId);
+    return ctx.db.get(args.threadId);
   },
-  returns: v.union(v.doc("chats"), v.null()),
+  returns: v.union(v.doc("threads"), v.null()),
 });
 
-export const getChatsByUserId = query({
+export const getThreadsByUserId = query({
   args: {
     userId: v.string(),
     // Note: the other arguments cannot change from when the cursor was created.
     cursor: v.optional(v.union(v.string(), v.null())),
     limit: v.optional(v.number()),
     offset: v.optional(v.number()),
-    statuses: v.optional(v.array(vChatStatus)),
+    statuses: v.optional(v.array(vThreadStatus)),
   },
   handler: async (ctx, args) => {
     const streams = (args.statuses ?? ["active"]).map((status) =>
       stream(ctx.db, schema)
-        .query("chats")
+        .query("threads")
         .withIndex("status_userId_order", (q) =>
           q
             .eq("status", status)
@@ -58,55 +58,55 @@ export const getChatsByUserId = query({
             .gte("order", args.offset ?? 0)
         )
     );
-    const chats = await mergedStream(streams, ["order"]).paginate({
+    const threads = await mergedStream(streams, ["order"]).paginate({
       numItems: args.limit ?? 100,
       cursor: args.cursor ?? null,
     });
     return {
-      chats: chats.page,
-      continueCursor: chats.continueCursor,
-      isDone: chats.isDone,
+      threads: threads.page,
+      continueCursor: threads.continueCursor,
+      isDone: threads.isDone,
     };
   },
   returns: v.object({
-    chats: v.array(v.doc("chats")),
+    threads: v.array(v.doc("threads")),
     continueCursor: v.string(),
     isDone: v.boolean(),
   }),
 });
 
-const vChat = schema.tables.chats.validator;
-const statuses = vChat.fields.status.members.map((m) => m.value);
+const vThread = schema.tables.threads.validator;
+const statuses = vThread.fields.status.members.map((m) => m.value);
 
-export const createChat = mutation({
-  args: omit(vChat.fields, ["order", "status"]),
+export const createThread = mutation({
+  args: omit(vThread.fields, ["order", "status"]),
   handler: async (ctx, args) => {
     const streams = statuses.map((status) =>
       stream(ctx.db, schema)
-        .query("chats")
+        .query("threads")
         .withIndex("status_userId_order", (q) =>
           q.eq("status", status).eq("userId", args.userId)
         )
         .order("desc")
     );
-    const latestChat = await mergedStream(streams, ["order"]).first();
-    const order = (latestChat?.order ?? -1) + 1;
-    const chatId = await ctx.db.insert("chats", {
+    const latestThread = await mergedStream(streams, ["order"]).first();
+    const order = (latestThread?.order ?? -1) + 1;
+    const threadId = await ctx.db.insert("threads", {
       ...args,
       order,
       status: "active",
     });
-    return (await ctx.db.get(chatId))!;
+    return (await ctx.db.get(threadId))!;
   },
-  returns: v.doc("chats"),
+  returns: v.doc("threads"),
 });
 
-export const updateChat = mutation({
+export const updateThread = mutation({
   args: {
-    chatId: v.id("chats"),
+    threadId: v.id("threads"),
     patch: v.object(
       partial(
-        pick(vChat.fields, [
+        pick(vThread.fields, [
           "title",
           "summary",
           "defaultSystemPrompt",
@@ -116,43 +116,43 @@ export const updateChat = mutation({
     ),
   },
   handler: async (ctx, args) => {
-    const chat = await ctx.db.get(args.chatId);
-    assert(chat, `Chat ${args.chatId} not found`);
-    await ctx.db.patch(args.chatId, args.patch);
-    return (await ctx.db.get(args.chatId))!;
+    const thread = await ctx.db.get(args.threadId);
+    assert(thread, `Thread ${args.threadId} not found`);
+    await ctx.db.patch(args.threadId, args.patch);
+    return (await ctx.db.get(args.threadId))!;
   },
-  returns: v.doc("chats"),
+  returns: v.doc("threads"),
 });
 
-export const archiveChat = mutation({
-  args: { chatId: v.id("chats") },
+export const archiveThread = mutation({
+  args: { threadId: v.id("threads") },
   handler: async (ctx, args) => {
-    const chat = await ctx.db.get(args.chatId);
-    assert(chat, `Chat ${args.chatId} not found`);
-    await ctx.db.patch(args.chatId, { status: "archived" });
-    return (await ctx.db.get(args.chatId))!;
+    const thread = await ctx.db.get(args.threadId);
+    assert(thread, `Thread ${args.threadId} not found`);
+    await ctx.db.patch(args.threadId, { status: "archived" });
+    return (await ctx.db.get(args.threadId))!;
   },
-  returns: v.doc("chats"),
+  returns: v.doc("threads"),
 });
 
 export const deleteAllForUserId = action({
   args: { userId: v.string() },
   handler: async (ctx, args) => {
     let messagesCursor = null;
-    let chatsCursor = null;
+    let threadsCursor = null;
     let isDone = false;
     while (!isDone) {
       const result: {
         messagesCursor: string;
-        chatsCursor: string | null;
+        threadsCursor: string | null;
         isDone: boolean;
       } = await ctx.runMutation(internal.messages._deletePageForUserId, {
         userId: args.userId,
         messagesCursor,
-        chatsCursor,
+        threadsCursor,
       });
       messagesCursor = result.messagesCursor;
-      chatsCursor = result.chatsCursor;
+      threadsCursor = result.threadsCursor;
       isDone = result.isDone;
     }
   },
@@ -167,7 +167,7 @@ export const deleteAllForUserIdAsync = mutation({
     const isDone = await deleteAllFroUserIdAsyncHandler(ctx, {
       userId: args.userId,
       messagesCursor: null,
-      chatsCursor: null,
+      threadsCursor: null,
     });
     return isDone;
   },
@@ -177,12 +177,12 @@ export const deleteAllForUserIdAsync = mutation({
 const deleteAllArgs = {
   userId: v.string(),
   messagesCursor: nullable(v.string()),
-  chatsCursor: nullable(v.string()),
+  threadsCursor: nullable(v.string()),
 };
 type DeleteAllArgs = ObjectType<typeof deleteAllArgs>;
 const deleteAllReturns = {
   messagesCursor: v.string(),
-  chatsCursor: nullable(v.string()),
+  threadsCursor: nullable(v.string()),
   isDone: v.boolean(),
 };
 type DeleteAllReturns = ObjectType<typeof deleteAllReturns>;
@@ -205,7 +205,7 @@ async function deleteAllFroUserIdAsyncHandler(
       {
         userId: args.userId,
         messagesCursor: result.messagesCursor,
-        chatsCursor: result.chatsCursor,
+        threadsCursor: result.threadsCursor,
       }
     );
   }
@@ -223,20 +223,20 @@ async function deletePageForUserId(
 ): Promise<DeleteAllReturns> {
   const streams = statuses.map((status) =>
     stream(ctx.db, schema)
-      .query("chats")
+      .query("threads")
       .withIndex("status_userId_order", (q) =>
         q.eq("status", status).eq("userId", args.userId)
       )
       .order("desc")
   );
-  const chatStreams = mergedStream(streams, ["order"]);
-  const messages = await chatStreams
+  const threadStreams = mergedStream(streams, ["order"]);
+  const messages = await threadStreams
     .flatMap(
       async (c) =>
         stream(ctx.db, schema)
           .query("messages")
-          .withIndex("chatId_status_tool_order_stepOrder", (q) =>
-            q.eq("chatId", c._id).eq("status", "success")
+          .withIndex("threadId_status_tool_order_stepOrder", (q) =>
+            q.eq("threadId", c._id).eq("status", "success")
           ),
       ["tool", "order", "stepOrder"]
     )
@@ -246,20 +246,20 @@ async function deletePageForUserId(
     });
   await Promise.all(messages.page.map((m) => deleteMessage(ctx, m)));
   if (messages.isDone) {
-    const chats = await chatStreams.paginate({
+    const threads = await threadStreams.paginate({
       numItems: 100,
-      cursor: args.chatsCursor ?? null,
+      cursor: args.threadsCursor ?? null,
     });
-    await Promise.all(chats.page.map((c) => ctx.db.delete(c._id)));
+    await Promise.all(threads.page.map((c) => ctx.db.delete(c._id)));
     return {
       messagesCursor: messages.continueCursor,
-      chatsCursor: chats.continueCursor,
-      isDone: chats.isDone,
+      threadsCursor: threads.continueCursor,
+      isDone: threads.isDone,
     };
   }
   return {
     messagesCursor: messages.continueCursor,
-    chatsCursor: null,
+    threadsCursor: null,
     isDone: messages.isDone,
   };
 }
@@ -274,66 +274,66 @@ async function deleteMessage(ctx: MutationCtx, messageDoc: Doc<"messages">) {
   }
 }
 
-const deleteChatArgs = {
-  chatId: v.id("chats"),
+const deleteThreadArgs = {
+  threadId: v.id("threads"),
   cursor: v.optional(v.string()),
   limit: v.optional(v.number()),
 };
-type DeleteChatArgs = ObjectType<typeof deleteChatArgs>;
-const deleteChatReturns = {
+type DeleteThreadArgs = ObjectType<typeof deleteThreadArgs>;
+const deleteThreadReturns = {
   cursor: v.string(),
   isDone: v.boolean(),
 };
-type DeleteChatReturns = ObjectType<typeof deleteChatReturns>;
+type DeleteThreadReturns = ObjectType<typeof deleteThreadReturns>;
 
-export const deleteAllForChatIdSync = action({
-  args: deleteChatArgs,
+export const deleteAllForThreadIdSync = action({
+  args: deleteThreadArgs,
   handler: async (ctx, args) => {
-    const result: DeleteChatReturns = await ctx.runMutation(
-      internal.messages._deletePageForChatId,
-      { chatId: args.chatId, cursor: args.cursor, limit: args.limit }
+    const result: DeleteThreadReturns = await ctx.runMutation(
+      internal.messages._deletePageForThreadId,
+      { threadId: args.threadId, cursor: args.cursor, limit: args.limit }
     );
     return result;
   },
-  returns: deleteChatReturns,
+  returns: deleteThreadReturns,
 });
 
-export const deleteAllForChatIdAsync = mutation({
-  args: deleteChatArgs,
+export const deleteAllForThreadIdAsync = mutation({
+  args: deleteThreadArgs,
   handler: async (ctx, args) => {
-    const result = await deletePageForChatIdHandler(ctx, args);
+    const result = await deletePageForThreadIdHandler(ctx, args);
     if (!result.isDone) {
-      await ctx.scheduler.runAfter(0, api.messages.deleteAllForChatIdAsync, {
-        chatId: args.chatId,
+      await ctx.scheduler.runAfter(0, api.messages.deleteAllForThreadIdAsync, {
+        threadId: args.threadId,
         cursor: result.cursor,
       });
     }
     return result;
   },
-  returns: deleteChatReturns,
+  returns: deleteThreadReturns,
 });
 
-export const _deletePageForChatId = internalMutation({
-  args: deleteChatArgs,
-  handler: deletePageForChatIdHandler,
-  returns: deleteChatReturns,
+export const _deletePageForThreadId = internalMutation({
+  args: deleteThreadArgs,
+  handler: deletePageForThreadIdHandler,
+  returns: deleteThreadReturns,
 });
 
-async function deletePageForChatIdHandler(
+async function deletePageForThreadIdHandler(
   ctx: MutationCtx,
-  args: DeleteChatArgs
-): Promise<DeleteChatReturns> {
+  args: DeleteThreadArgs
+): Promise<DeleteThreadReturns> {
   const messages = await stream(ctx.db, schema)
     .query("messages")
-    .withIndex("chatId_status_tool_order_stepOrder", (q) =>
-      q.eq("chatId", args.chatId).eq("status", "success")
+    .withIndex("threadId_status_tool_order_stepOrder", (q) =>
+      q.eq("threadId", args.threadId).eq("status", "success")
     )
     .paginate({
       numItems: args.limit ?? 100,
       cursor: args.cursor ?? null,
     });
   await Promise.all(messages.page.map((m) => deleteMessage(ctx, m)));
-  await ctx.db.delete(args.chatId);
+  await ctx.db.delete(args.threadId);
   return {
     cursor: messages.continueCursor,
     isDone: messages.isDone,
@@ -373,7 +373,7 @@ export const messageStatuses = vMessageDoc.fields.status.members.map(
 
 const addMessagesArgs = {
   userId: v.optional(v.string()),
-  chatId: v.optional(v.id("chats")),
+  threadId: v.optional(v.id("threads")),
   stepId: v.optional(v.id("steps")),
   parentMessageId: v.optional(v.id("messages")),
   messages: v.array(vMessageWithFileAndId),
@@ -395,21 +395,21 @@ async function addMessagesHandler(
   args: ObjectType<typeof addMessagesArgs>
 ) {
   let userId = args.userId;
-  const chatId = args.chatId;
-  if (!userId && args.chatId) {
-    const chat = await ctx.db.get(args.chatId);
-    assert(chat, `Chat ${args.chatId} not found`);
-    userId = chat._id;
+  const threadId = args.threadId;
+  if (!userId && args.threadId) {
+    const thread = await ctx.db.get(args.threadId);
+    assert(thread, `Thread ${args.threadId} not found`);
+    userId = thread._id;
   }
   const { failPendingSteps, pending, messages, parentMessageId, ...rest } =
     args;
   const parent = parentMessageId && (await ctx.db.get(parentMessageId));
   if (failPendingSteps && parent?.status !== "pending") {
-    assert(args.chatId, "chatId is required to fail pending steps");
+    assert(args.threadId, "threadId is required to fail pending steps");
     const pendingMessages = await ctx.db
       .query("messages")
-      .withIndex("chatId_status_tool_order_stepOrder", (q) =>
-        q.eq("chatId", chatId).eq("status", "pending")
+      .withIndex("threadId_status_tool_order_stepOrder", (q) =>
+        q.eq("threadId", threadId).eq("status", "pending")
       )
       .collect();
     await Promise.all(
@@ -418,13 +418,7 @@ async function addMessagesHandler(
       )
     );
   }
-  let threadId = parentMessageId;
-  const maxMessage = await getMaxMessage(ctx, chatId, userId);
-  // If the previous message isn't our parent, we make a new thread.
-  threadId =
-    parentMessageId && maxMessage?._id === parentMessageId
-      ? maxMessage.threadId ?? parentMessageId
-      : parentMessageId;
+  const maxMessage = await getMaxMessage(ctx, threadId, userId);
   let order = maxMessage?.order ?? -1;
   const toReturn: Doc<"messages">[] = [];
   if (messages.length > 0) {
@@ -436,7 +430,7 @@ async function addMessagesHandler(
       const text = extractText(message);
       const messageId = await ctx.db.insert("messages", {
         ...rest,
-        threadId,
+        parentMessageId,
         userId,
         message,
         id,
@@ -454,17 +448,17 @@ async function addMessagesHandler(
 
 async function getMaxMessage(
   ctx: QueryCtx,
-  chatId: Id<"chats"> | undefined,
+  threadId: Id<"threads"> | undefined,
   userId: string | undefined
 ) {
-  assert(chatId || userId, "One of chatId or userId is required");
-  if (chatId) {
+  assert(threadId || userId, "One of threadId or userId is required");
+  if (threadId) {
     return mergedStream(
       ["success" as const, "pending" as const].map((status) =>
         stream(ctx.db, schema)
           .query("messages")
-          .withIndex("chatId_status_tool_order_stepOrder", (q) =>
-            q.eq("chatId", chatId).eq("status", status).eq("tool", false)
+          .withIndex("threadId_status_tool_order_stepOrder", (q) =>
+            q.eq("threadId", threadId).eq("status", status).eq("tool", false)
           )
           .order("desc")
       ),
@@ -486,7 +480,7 @@ async function getMaxMessage(
 }
 
 const addStepsArgs = {
-  chatId: v.id("chats"),
+  threadId: v.id("threads"),
   messageId: v.id("messages"),
   steps: v.array(vStepWithMessagesWithFileAndId),
   failPendingSteps: v.optional(v.boolean()),
@@ -523,7 +517,7 @@ async function addStepsHandler(
   let nextStepOrder = (steps.at(-1)?.stepOrder ?? -1) + 1;
   for (const { step, messages } of args.steps) {
     const stepId = await ctx.db.insert("steps", {
-      chatId: args.chatId,
+      threadId: args.threadId,
       parentMessageId: args.messageId,
       order,
       stepOrder: nextStepOrder,
@@ -531,7 +525,7 @@ async function addStepsHandler(
       step,
     });
     await addMessagesHandler(ctx, {
-      chatId: args.chatId,
+      threadId: args.threadId,
       parentMessageId: args.messageId,
       stepId,
       messages,
@@ -596,9 +590,9 @@ async function commitMessageHandler(
     [true, false].map((tool) =>
       stream(ctx.db, schema)
         .query("messages")
-        .withIndex("chatId_status_tool_order_stepOrder", (q) =>
+        .withIndex("threadId_status_tool_order_stepOrder", (q) =>
           q
-            .eq("chatId", message.chatId)
+            .eq("threadId", message.threadId)
             .eq("status", "pending")
             .eq("tool", tool)
             .eq("order", order)
@@ -612,9 +606,9 @@ async function commitMessageHandler(
   }
 }
 
-export const getChatMessages = query({
+export const getThreadMessages = query({
   args: {
-    chatId: v.id("chats"),
+    threadId: v.id("threads"),
     isTool: v.optional(v.boolean()),
     order: v.optional(v.union(v.literal("asc"), v.literal("desc"))),
     limit: v.optional(v.number()),
@@ -634,9 +628,9 @@ export const getChatMessages = query({
       statuses.map((status) =>
         stream(ctx.db, schema)
           .query("messages")
-          .withIndex("chatId_status_tool_order_stepOrder", (q) => {
+          .withIndex("threadId_status_tool_order_stepOrder", (q) => {
             const qq = q
-              .eq("chatId", args.chatId)
+              .eq("threadId", args.threadId)
               .eq("status", status)
               .eq("tool", tool);
             if (parent) {
@@ -670,19 +664,19 @@ export const getChatMessages = query({
 export const searchMessages = action({
   args: {
     userId: v.optional(v.string()),
-    chatId: v.optional(v.id("chats")),
+    threadId: v.optional(v.id("threads")),
     parentMessageId: v.optional(v.id("messages")),
     ...vSearchOptions.fields,
   },
   returns: v.array(v.doc("messages")),
   handler: async (ctx, args): Promise<Doc<"messages">[]> => {
-    assert(args.userId || args.chatId, "Specify userId or chatId");
+    assert(args.userId || args.threadId, "Specify userId or threadId");
     const limit = args.limit;
     let textSearchMessages: Doc<"messages">[] | undefined;
     if (args.text) {
       textSearchMessages = await ctx.runQuery(api.messages.textSearch, {
         userId: args.userId,
-        chatId: args.chatId,
+        threadId: args.threadId,
         text: args.text,
         limit,
       });
@@ -699,8 +693,8 @@ export const searchMessages = action({
           vector: args.vector,
           filter: (q) =>
             args.userId
-              ? q.eq("model_kind_userId", [model, "chat", args.userId])
-              : q.eq("model_kind_chatId", [model, "chat", args.chatId!]),
+              ? q.eq("model_kind_userId", [model, "thread", args.userId])
+              : q.eq("model_kind_threadId", [model, "thread", args.threadId!]),
           limit,
         })
       ).filter((v) => v._score > 0.5);
@@ -721,7 +715,7 @@ export const searchMessages = action({
         internal.messages._fetchVectorMessages,
         {
           userId: args.userId,
-          chatId: args.chatId,
+          threadId: args.threadId,
           vectorIds,
           textSearchMessages: textSearchMessages?.filter(
             (m) => !vectorIds.includes(m.embeddingId!)
@@ -740,7 +734,7 @@ export const searchMessages = action({
 export const _fetchVectorMessages = internalQuery({
   args: {
     userId: v.optional(v.string()),
-    chatId: v.optional(v.id("chats")),
+    threadId: v.optional(v.id("threads")),
     vectorIds: v.array(vVectorId),
     textSearchMessages: v.optional(v.array(v.doc("messages"))),
     messageRange: v.object({ before: v.number(), after: v.number() }),
@@ -751,8 +745,8 @@ export const _fetchVectorMessages = internalQuery({
   handler: async (ctx, args): Promise<Doc<"messages">[]> => {
     const parent =
       args.parentMessageId && (await ctx.db.get(args.parentMessageId));
-    const { userId, chatId } = args;
-    assert(userId || chatId, "Specify userId or chatId to search");
+    const { userId, threadId } = args;
+    assert(userId || threadId, "Specify userId or threadId to search");
     let messages = (
       await Promise.all(
         args.vectorIds.map((embeddingId) =>
@@ -763,7 +757,7 @@ export const _fetchVectorMessages = internalQuery({
               userId
                 ? q.eq("userId", userId)
                 : // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                  q.eq("chatId", chatId as any)
+                  q.eq("threadId", threadId as any)
             )
             .first()
         )
@@ -777,12 +771,12 @@ export const _fetchVectorMessages = internalQuery({
     messages.sort((a, b) => a.order! - b.order!);
     messages = messages.slice(0, args.limit);
     // Fetch the surrounding messages
-    if (!chatId) {
+    if (!threadId) {
       return messages.sort((a, b) => a.order - b.order);
     }
     const included: Record<string, Set<number>> = {};
     for (const m of messages) {
-      const searchId = m.chatId ?? m.userId!;
+      const searchId = m.threadId ?? m.userId!;
       if (!included[searchId]) {
         included[searchId] = new Set();
       }
@@ -791,7 +785,7 @@ export const _fetchVectorMessages = internalQuery({
     const ranges: Record<string, Doc<"messages">[]> = {};
     const { before, after } = args.messageRange;
     for (const m of messages) {
-      const searchId = m.chatId ?? m.userId!;
+      const searchId = m.threadId ?? m.userId!;
       const order = m.order!;
       let earliest = order - before;
       let latest = order + after;
@@ -809,12 +803,12 @@ export const _fetchVectorMessages = internalQuery({
         included[searchId].add(i);
       }
       if (earliest !== latest) {
-        if (m.chatId) {
+        if (m.threadId) {
           const surrounding = await ctx.db
             .query("messages")
-            .withIndex("chatId_status_tool_order_stepOrder", (q) =>
+            .withIndex("threadId_status_tool_order_stepOrder", (q) =>
               q
-                .eq("chatId", m.chatId)
+                .eq("threadId", m.threadId)
                 .eq("status", "success")
                 .eq("tool", false)
                 .gt("order", earliest)
@@ -854,19 +848,19 @@ export const _fetchVectorMessages = internalQuery({
 // excluding duplicates in later ranges.
 export const textSearch = query({
   args: {
-    chatId: v.optional(v.id("chats")),
+    threadId: v.optional(v.id("threads")),
     userId: v.optional(v.string()),
     text: v.string(),
     limit: v.number(),
   },
   handler: async (ctx, args) => {
-    assert(args.userId || args.chatId, "Specify userId or chatId");
+    assert(args.userId || args.threadId, "Specify userId or threadId");
     const messages = await ctx.db
       .query("messages")
       .withSearchIndex("text_search", (q) =>
         args.userId
           ? q.search("text", args.text).eq("userId", args.userId)
-          : q.search("text", args.text).eq("chatId", args.chatId!)
+          : q.search("text", args.text).eq("threadId", args.threadId!)
       )
       .take(args.limit);
     return messages;
@@ -919,9 +913,9 @@ export const textSearch = query({
 
 // const DEFAULT_MESSAGES_LIMIT = 40; // What pg & upstash do too.
 
-// export const getChatMessagesPage = query({
+// export const getThreadMessagesPage = query({
 //   args: {
-//     threadId: v.string(),
+//     parentMessageId: v.string(),
 //     selectBy: v.optional(vSelectBy),
 //     // Unimplemented and as far I can tell no storage provider has either.
 //     // memoryConfig: v.optional(vMemoryConfig),
@@ -929,7 +923,7 @@ export const textSearch = query({
 //   handler: async (ctx, args): Promise<SerializedMessage[]> => {
 //     const messages = await ctx.db
 //       .query("messages")
-//       .withIndex("threadId", (q) => q.eq("threadId", args.threadId))
+//       .withIndex("parentMessageId", (q) => q.eq("parentMessageId", args.parentMessageId))
 //       .order("desc")
 //       .take(args.selectBy?.last ? args.selectBy.last : DEFAULT_MESSAGES_LIMIT);
 
@@ -983,9 +977,9 @@ export const textSearch = query({
 //         ranges.map(async (range) => {
 //           return await ctx.db
 //             .query("messages")
-//             .withIndex("threadId", (q) =>
+//             .withIndex("parentMessageId", (q) =>
 //               q
-//                 .eq("threadId", args.threadId)
+//                 .eq("parentMessageId", args.parentMessageId)
 //                 .gte("threadOrder", range.start)
 //                 .lte("threadOrder", range.end)
 //             )
@@ -1002,21 +996,21 @@ export const textSearch = query({
 // export const saveMessages = mutation({
 //   args: { messages: v.array(vSerializedMessage) },
 //   handler: async (ctx, args) => {
-//     const messagesByThreadId: Record<string, SerializedMessage[]> = {};
+//     const messagesByParentMessageId: Record<string, SerializedMessage[]> = {};
 //     for (const message of args.messages) {
-//       messagesByThreadId[message.threadId] = [
-//         ...(messagesByThreadId[message.threadId] ?? []),
+//       messagesByParentMessageId[message.parentMessageId] = [
+//         ...(messagesByParentMessageId[message.parentMessageId] ?? []),
 //         message,
 //       ];
 //     }
-//     for (const threadId in messagesByThreadId) {
+//     for (const parentMessageId in messagesByParentMessageId) {
 //       const lastMessage = await ctx.db
 //         .query("messages")
-//         .withIndex("threadId", (q) => q.eq("threadId", threadId))
+//         .withIndex("parentMessageId", (q) => q.eq("parentMessageId", parentMessageId))
 //         .order("desc")
 //         .first();
 //       let threadOrder = lastMessage?.threadOrder ?? 0;
-//       for (const message of messagesByThreadId[threadId]) {
+//       for (const message of messagesByParentMessageId[parentMessageId]) {
 //         threadOrder++;
 //         await ctx.db.insert("messages", {
 //           ...message,

@@ -9,7 +9,7 @@ import {
 import { GenericId } from "convex/values";
 import type { Doc } from "../component/_generated/dataModel";
 
-export type ChatDoc = OpaqueIds<Doc<"chats">>;
+export type ThreadDoc = OpaqueIds<Doc<"threads">>;
 export type MessageDoc = OpaqueIds<Doc<"messages">>;
 
 /* Type utils follow */

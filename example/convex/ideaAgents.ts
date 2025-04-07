@@ -77,7 +77,7 @@ export const attachEntryToIdea = createTool({
 
 const ideaManagerAgent = new Agent(components.agent, {
   name: "Idea Manager Agent",
-  chat: openai.chat("gpt-4o"), // Fancier model for discerning between ideas
+  thread: openai.chat("gpt-4o"), // Fancier model for discerning between ideas
   textEmbedding: openai.embedding("text-embedding-3-small"),
   instructions:
     "You are a helpful assistant that helps manage ideas. " +
@@ -91,14 +91,14 @@ const ideaManagerAgent = new Agent(components.agent, {
   tools: { ideaCreation, ideaUpdate, ideaMerge, ideaSearch },
   contextOptions: {
     recentMessages: 20,
-    searchOtherChats: true,
+    searchOtherThreads: true,
     includeToolCalls: true,
   },
 });
 
 const ideaDevelopmentAgent = new Agent(components.agent, {
   name: "Idea Development Agent",
-  chat: openai.chat("gpt-4o-mini"),
+  thread: openai.chat("gpt-4o-mini"),
   textEmbedding: openai.embedding("text-embedding-3-small"),
   instructions:
     "You are a helpful assistant that helps develop ideas. " +
@@ -109,7 +109,7 @@ const ideaDevelopmentAgent = new Agent(components.agent, {
   tools: { ideaUpdate },
   contextOptions: {
     recentMessages: 5,
-    searchOtherChats: false,
+    searchOtherThreads: false,
     searchOptions: {
       limit: 10,
       textSearch: true,
@@ -153,7 +153,7 @@ const ideaDeveloper = ideaDevelopmentAgent.asTool({
 
 const ideaTriageAgent = new Agent(components.agent, {
   name: "Idea Triage Agent",
-  chat: openai.chat("gpt-4o-mini"),
+  thread: openai.chat("gpt-4o-mini"),
   textEmbedding: openai.embedding("text-embedding-3-small"),
   instructions:
     "You are a helpful assistant that helps triage ideas. " +
@@ -165,7 +165,7 @@ const ideaTriageAgent = new Agent(components.agent, {
   tools: { ideaSearch, ideaManager, ideaDeveloper },
   contextOptions: {
     recentMessages: 5,
-    searchOtherChats: false,
+    searchOtherThreads: false,
   },
   maxSteps: 20,
 });
@@ -176,15 +176,15 @@ export const submitRandomThought = action({
     entry: v.string(),
   },
   handler: async (ctx, args): Promise<string> => {
-    // Get or create a chat
-    const { chat } = await getOrCreateChat(ctx, args.userId);
+    // Get or create a thread
+    const { thread } = await getOrCreateThread(ctx, args.userId);
 
     const entryId = await ctx.runMutation(api.ideas.createEntry, {
       content: args.entry,
       ideaId: null,
     });
 
-    const result = await chat.generateText({
+    const result = await thread.generateText({
       prompt: `
       I'm just had a random thought: ${args.entry}.
       The entryId for this is ${entryId}.
@@ -195,19 +195,22 @@ export const submitRandomThought = action({
   },
 });
 
-async function getOrCreateChat(ctx: ActionCtx, userId: string) {
-  const page = await ctx.runQuery(components.agent.messages.getChatsByUserId, {
-    userId,
-  });
-  const chatId = page.chats[0]?._id;
-  if (chatId) {
-    const { chat } = await ideaTriageAgent.continueChat(ctx, {
-      chatId,
+async function getOrCreateThread(ctx: ActionCtx, userId: string) {
+  const page = await ctx.runQuery(
+    components.agent.messages.getThreadsByUserId,
+    {
+      userId,
+    },
+  );
+  const threadId = page.threads[0]?._id;
+  if (threadId) {
+    const { thread } = await ideaTriageAgent.continueThread(ctx, {
+      threadId,
       userId,
     });
-    return { chat, chatId };
+    return { thread, threadId };
   }
-  return await ideaTriageAgent.createChat(ctx, { userId });
+  return await ideaTriageAgent.createThread(ctx, { userId });
 }
 
 export const inProgressMessages = query({
@@ -220,16 +223,16 @@ export const inProgressMessages = query({
     continueCursor: string;
     isDone: boolean;
   }> => {
-    const chatPager = await ctx.runQuery(
-      components.agent.messages.getChatsByUserId,
+    const threadPager = await ctx.runQuery(
+      components.agent.messages.getThreadsByUserId,
       { userId },
     );
-    const chatId = chatPager.chats[0]?._id;
-    if (!chatId) {
+    const threadId = threadPager.threads[0]?._id;
+    if (!threadId) {
       return { messages: [], continueCursor: "", isDone: false };
     }
-    return await ctx.runQuery(components.agent.messages.getChatMessages, {
-      chatId,
+    return await ctx.runQuery(components.agent.messages.getThreadMessages, {
+      threadId,
       statuses: ["pending"],
     });
   },

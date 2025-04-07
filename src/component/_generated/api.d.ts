@@ -40,7 +40,6 @@ export type Mounts = {
       "public",
       {
         agentName?: string;
-        chatId?: string;
         failPendingSteps?: boolean;
         messages: Array<{
           fileId?: string;
@@ -147,6 +146,7 @@ export type Mounts = {
         parentMessageId?: string;
         pending?: boolean;
         stepId?: string;
+        threadId?: string;
         userId?: string;
       },
       {
@@ -154,7 +154,6 @@ export type Mounts = {
           _creationTime: number;
           _id: string;
           agentName?: string;
-          chatId?: string;
           embeddingId?:
             | string
             | string
@@ -266,6 +265,7 @@ export type Mounts = {
               };
           model?: string;
           order: number;
+          parentMessageId?: string;
           status: "pending" | "success" | "failed";
           stepId?: string;
           stepOrder?: number;
@@ -278,7 +278,6 @@ export type Mounts = {
           _creationTime: number;
           _id: string;
           agentName?: string;
-          chatId?: string;
           embeddingId?:
             | string
             | string
@@ -390,6 +389,7 @@ export type Mounts = {
               };
           model?: string;
           order: number;
+          parentMessageId?: string;
           status: "pending" | "success" | "failed";
           stepId?: string;
           stepOrder?: number;
@@ -404,7 +404,6 @@ export type Mounts = {
       "mutation",
       "public",
       {
-        chatId: string;
         failPendingSteps?: boolean;
         messageId: string;
         steps: Array<{
@@ -711,11 +710,11 @@ export type Mounts = {
             >;
           };
         }>;
+        threadId: string;
       },
       Array<{
         _creationTime: number;
         _id: string;
-        chatId: string;
         order: number;
         parentMessageId: string;
         status: "pending" | "success" | "failed";
@@ -917,18 +916,19 @@ export type Mounts = {
           >;
         };
         stepOrder: number;
+        threadId: string;
       }>
     >;
-    archiveChat: FunctionReference<
+    archiveThread: FunctionReference<
       "mutation",
       "public",
-      { chatId: string },
+      { threadId: string },
       {
         _creationTime: number;
         _id: string;
         defaultSystemPrompt?: string;
         order?: number;
-        parentChatIds?: Array<string>;
+        parentThreadIds?: Array<string>;
         status: "active" | "archived";
         summary?: string;
         title?: string;
@@ -941,12 +941,12 @@ export type Mounts = {
       { messageId: string },
       null
     >;
-    createChat: FunctionReference<
+    createThread: FunctionReference<
       "mutation",
       "public",
       {
         defaultSystemPrompt?: string;
-        parentChatIds?: Array<string>;
+        parentThreadIds?: Array<string>;
         summary?: string;
         title?: string;
         userId?: string;
@@ -956,23 +956,23 @@ export type Mounts = {
         _id: string;
         defaultSystemPrompt?: string;
         order?: number;
-        parentChatIds?: Array<string>;
+        parentThreadIds?: Array<string>;
         status: "active" | "archived";
         summary?: string;
         title?: string;
         userId?: string;
       }
     >;
-    deleteAllForChatIdAsync: FunctionReference<
+    deleteAllForThreadIdAsync: FunctionReference<
       "mutation",
       "public",
-      { chatId: string; cursor?: string; limit?: number },
+      { cursor?: string; limit?: number; threadId: string },
       { cursor: string; isDone: boolean }
     >;
-    deleteAllForChatIdSync: FunctionReference<
+    deleteAllForThreadIdSync: FunctionReference<
       "action",
       "public",
-      { chatId: string; cursor?: string; limit?: number },
+      { cursor?: string; limit?: number; threadId: string },
       { cursor: string; isDone: boolean }
     >;
     deleteAllForUserId: FunctionReference<
@@ -987,33 +987,49 @@ export type Mounts = {
       { userId: string },
       boolean
     >;
-    getChat: FunctionReference<
+    getFilesToDelete: FunctionReference<
       "query",
       "public",
-      { chatId: string },
+      { cursor?: string; limit?: number },
+      {
+        continueCursor: string;
+        files: Array<{
+          _creationTime: number;
+          _id: string;
+          hash: string;
+          refcount: number;
+          storageId: string;
+        }>;
+        isDone: boolean;
+      }
+    >;
+    getThread: FunctionReference<
+      "query",
+      "public",
+      { threadId: string },
       {
         _creationTime: number;
         _id: string;
         defaultSystemPrompt?: string;
         order?: number;
-        parentChatIds?: Array<string>;
+        parentThreadIds?: Array<string>;
         status: "active" | "archived";
         summary?: string;
         title?: string;
         userId?: string;
       } | null
     >;
-    getChatMessages: FunctionReference<
+    getThreadMessages: FunctionReference<
       "query",
       "public",
       {
-        chatId: string;
         cursor?: string;
         isTool?: boolean;
         limit?: number;
         order?: "asc" | "desc";
         parentMessageId?: string;
         statuses?: Array<"pending" | "success" | "failed">;
+        threadId: string;
       },
       {
         continueCursor: string;
@@ -1022,7 +1038,6 @@ export type Mounts = {
           _creationTime: number;
           _id: string;
           agentName?: string;
-          chatId?: string;
           embeddingId?:
             | string
             | string
@@ -1134,6 +1149,7 @@ export type Mounts = {
               };
           model?: string;
           order: number;
+          parentMessageId?: string;
           status: "pending" | "success" | "failed";
           stepId?: string;
           stepOrder?: number;
@@ -1144,7 +1160,7 @@ export type Mounts = {
         }>;
       }
     >;
-    getChatsByUserId: FunctionReference<
+    getThreadsByUserId: FunctionReference<
       "query",
       "public",
       {
@@ -1155,35 +1171,19 @@ export type Mounts = {
         userId: string;
       },
       {
-        chats: Array<{
+        continueCursor: string;
+        isDone: boolean;
+        threads: Array<{
           _creationTime: number;
           _id: string;
           defaultSystemPrompt?: string;
           order?: number;
-          parentChatIds?: Array<string>;
+          parentThreadIds?: Array<string>;
           status: "active" | "archived";
           summary?: string;
           title?: string;
           userId?: string;
         }>;
-        continueCursor: string;
-        isDone: boolean;
-      }
-    >;
-    getFilesToDelete: FunctionReference<
-      "query",
-      "public",
-      { cursor?: string; limit?: number },
-      {
-        continueCursor: string;
-        files: Array<{
-          _creationTime: number;
-          _id: string;
-          hash: string;
-          refcount: number;
-          storageId: string;
-        }>;
-        isDone: boolean;
       }
     >;
     rollbackMessage: FunctionReference<
@@ -1196,11 +1196,11 @@ export type Mounts = {
       "action",
       "public",
       {
-        chatId?: string;
         limit: number;
         messageRange?: { after: number; before: number };
         parentMessageId?: string;
         text?: string;
+        threadId?: string;
         userId?: string;
         vector?: Array<number>;
         vectorModel?: string;
@@ -1209,7 +1209,6 @@ export type Mounts = {
         _creationTime: number;
         _id: string;
         agentName?: string;
-        chatId?: string;
         embeddingId?:
           | string
           | string
@@ -1321,6 +1320,7 @@ export type Mounts = {
             };
         model?: string;
         order: number;
+        parentMessageId?: string;
         status: "pending" | "success" | "failed";
         stepId?: string;
         stepOrder?: number;
@@ -1333,12 +1333,11 @@ export type Mounts = {
     textSearch: FunctionReference<
       "query",
       "public",
-      { chatId?: string; limit: number; text: string; userId?: string },
+      { limit: number; text: string; threadId?: string; userId?: string },
       Array<{
         _creationTime: number;
         _id: string;
         agentName?: string;
-        chatId?: string;
         embeddingId?:
           | string
           | string
@@ -1450,6 +1449,7 @@ export type Mounts = {
             };
         model?: string;
         order: number;
+        parentMessageId?: string;
         status: "pending" | "success" | "failed";
         stepId?: string;
         stepOrder?: number;
@@ -1459,24 +1459,24 @@ export type Mounts = {
         userId?: string;
       }>
     >;
-    updateChat: FunctionReference<
+    updateThread: FunctionReference<
       "mutation",
       "public",
       {
-        chatId: string;
         patch: {
           defaultSystemPrompt?: string;
           status?: "active" | "archived";
           summary?: string;
           title?: string;
         };
+        threadId: string;
       },
       {
         _creationTime: number;
         _id: string;
         defaultSystemPrompt?: string;
         order?: number;
-        parentChatIds?: Array<string>;
+        parentThreadIds?: Array<string>;
         status: "active" | "archived";
         summary?: string;
         title?: string;
@@ -1504,14 +1504,14 @@ export type Mounts = {
         },
         null
       >;
-      deleteBatchForChat: FunctionReference<
+      deleteBatchForThread: FunctionReference<
         "mutation",
         "public",
         {
-          chatId: string;
           cursor?: string;
           limit: number;
           model: string;
+          threadId: string;
           vectorDimension:
             | 128
             | 256
@@ -1540,9 +1540,9 @@ export type Mounts = {
             | 3072
             | 4096;
           vectors: Array<{
-            chatId?: string;
-            kind: "chat" | "memory";
+            kind: "thread" | "memory";
             model: string;
+            threadId?: string;
             userId?: string;
             vector: Array<number>;
           }>;

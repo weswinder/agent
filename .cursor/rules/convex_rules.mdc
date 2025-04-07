@@ -301,13 +301,13 @@ const messages = await ctx.db
 
 
 # Examples:
-## Example: chat-app
+## Example: thread-app
 
 ### Task
 ```
-Create a real-time chat application backend with AI responses. The app should:
+Create a real-time thread application backend with AI responses. The app should:
 - Allow creating users with names
-- Support multiple chat channels
+- Support multiple thread channels
 - Enable users to send messages to channels
 - Automatically generate AI responses to user messages
 - Show recent message history
@@ -325,7 +325,7 @@ and limit history display to the 10 most recent messages per channel.
 
 ### Analysis
 1. Task Requirements Summary:
-- Build a real-time chat backend with AI integration
+- Build a real-time thread backend with AI integration
 - Support user creation
 - Enable channel-based conversations
 - Store and retrieve messages with proper ordering
@@ -414,8 +414,8 @@ Internal Functions:
 #### package.json
 ```typescript
 {
-  "name": "chat-app",
-  "description": "This example shows how to build a chat app without authentication.",
+  "name": "thread-app",
+  "description": "This example shows how to build a thread app without authentication.",
   "version": "1.0.0",
   "dependencies": {
     "convex": "^1.17.4",
@@ -657,4 +657,3 @@ export default function App() {
   return <div>Hello World</div>;
 }
 ```
-

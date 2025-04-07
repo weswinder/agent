@@ -23,7 +23,7 @@ export const paginate = query({
     const vectors = await paginator(ctx.db, schema)
       .query(tableName)
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .withIndex("model_kind_chatId" as any, (q) =>
+      .withIndex("model_kind_threadId" as any, (q) =>
         q.eq("model", args.targetModel)
       )
       .paginate({
@@ -39,11 +39,11 @@ export const paginate = query({
   },
 });
 
-export const deleteBatchForChat = mutation({
+export const deleteBatchForThread = mutation({
   args: {
     vectorDimension: vVectorDimension,
     model: v.string(),
-    chatId: v.string(),
+    threadId: v.string(),
     cursor: v.optional(v.string()),
     limit: v.number(),
   },
@@ -54,18 +54,18 @@ export const deleteBatchForChat = mutation({
   handler: async (ctx, args) => {
     const tableName = getVectorTableName(args.vectorDimension);
     const vectors = await mergedStream(
-      ["chat", "memory"].map((kind) =>
+      ["thread", "memory"].map((kind) =>
         stream(ctx.db, schema)
           .query(tableName)
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          .withIndex("model_kind_chatId" as any, (q) =>
+          .withIndex("model_kind_threadId" as any, (q) =>
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             (q.eq("model", args.model) as any)
               .eq("kind", kind)
-              .eq("chatId", args.chatId)
+              .eq("threadId", args.threadId)
           )
       ),
-      ["chatId"]
+      ["threadId"]
     ).paginate({
       cursor: args.cursor ?? null,
       numItems: args.limit,
@@ -85,9 +85,9 @@ export const insertBatch = mutation({
     vectors: v.array(
       v.object({
         model: v.string(),
-        kind: v.union(v.literal("chat"), v.literal("memory")),
+        kind: v.union(v.literal("thread"), v.literal("memory")),
         userId: v.optional(v.string()),
-        chatId: v.optional(v.string()),
+        threadId: v.optional(v.string()),
         vector: v.array(v.number()),
       })
     ),
@@ -100,10 +100,12 @@ export const insertBatch = mutation({
           model: v.model,
           kind: v.kind,
           userId: v.userId,
-          chatId: v.chatId,
+          threadId: v.threadId,
           vector: v.vector,
           model_kind_userId: v.userId ? [v.model, v.kind, v.userId] : undefined,
-          model_kind_chatId: v.chatId ? [v.model, v.kind, v.chatId] : undefined,
+          model_kind_threadId: v.threadId
+            ? [v.model, v.kind, v.threadId]
+            : undefined,
         })
       )
     );

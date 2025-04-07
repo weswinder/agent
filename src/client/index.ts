@@ -16,7 +16,7 @@ import { generateObject, generateText, streamObject, streamText } from "ai";
 import { api } from "../component/_generated/api";
 import {
   SearchOptions,
-  vChatArgs,
+  vThreadArgs,
   vContextOptions,
   vObjectArgs,
   vStorageOptions,
@@ -69,16 +69,16 @@ export type ContextOptions = {
     messageRange?: { before: number; after: number };
   };
   /**
-   * Whether to search across other chats for relevant messages.
-   * By default, only the current chat is searched.
+   * Whether to search across other threads for relevant messages.
+   * By default, only the current thread is searched.
    */
-  searchOtherChats?: boolean;
+  searchOtherThreads?: boolean;
 };
 
 export type StorageOptions = {
   // Defaults to false, allowing you to pass in arbitrary context that will
   // be in addition to automatically fetched content.
-  // Pass true to have all input messages saved to the chat history.
+  // Pass true to have all input messages saved to the thread history.
   saveAllInputMessages?: boolean;
   // Defaults to true
   saveOutputMessages?: boolean;
@@ -93,7 +93,7 @@ export class Agent<AgentTools extends ToolSet> {
     public component: UseApi<typeof api>,
     public options: {
       name?: string;
-      chat: LanguageModelV1;
+      thread: LanguageModelV1;
       textEmbedding?: EmbeddingModelV1<string>;
       instructions?: string;
       tools?: AgentTools;
@@ -105,118 +105,124 @@ export class Agent<AgentTools extends ToolSet> {
   ) {}
 
   /**
-   * Start a new chat with the agent. This will have a fresh history, though if
-   * you pass in a userId you can have it search across other chats for relevant
+   * Start a new thread with the agent. This will have a fresh history, though if
+   * you pass in a userId you can have it search across other threads for relevant
    * messages as context for the LLM calls.
-   * @param ctx The context of the Convex function. From an action, you can chat
-   *   with the agent. From a mutation, you can start a chat and save the chatId
-   *   to pass to continueChat later.
-   * @param args The chat metadata.
-   * @returns The chatId of the new chat and the chat object.
+   * @param ctx The context of the Convex function. From an action, you can thread
+   *   with the agent. From a mutation, you can start a thread and save the threadId
+   *   to pass to continueThread later.
+   * @param args The thread metadata.
+   * @returns The threadId of the new thread and the thread object.
    */
-  async createChat(
+  async createThread(
     ctx: RunActionCtx,
     args: {
       /**
-       * The userId to associate with the chat. If not provided, the chat will be
+       * The userId to associate with the thread. If not provided, the thread will be
        * anonymous.
        */
       userId?: string;
       /**
-       * The parent chatIds to merge with.
-       * If the chat is a continuation of one or many previous chats,
-       * you can pass in the chatIds of the parent chats to merge the histories.
+       * The parent threadIds to merge with.
+       * If the thread is a continuation of one or many previous threads,
+       * you can pass in the threadIds of the parent threads to merge the histories.
        */
-      parentChatIds?: string[];
+      parentThreadIds?: string[];
       /**
-       * The title of the chat. Not currently used.
+       * The title of the thread. Not currently used.
        */
       title?: string;
       /**
-       * The summary of the chat. Not currently used.
+       * The summary of the thread. Not currently used.
        */
       summary?: string;
     }
   ): Promise<{
-    chatId: string;
-    chat: Chat<AgentTools>;
+    threadId: string;
+    thread: Thread<AgentTools>;
   }>;
   /**
-   * Start a new chat with the agent. This will have a fresh history, though if
-   * you pass in a userId you can have it search across other chats for relevant
+   * Start a new thread with the agent. This will have a fresh history, though if
+   * you pass in a userId you can have it search across other threads for relevant
    * messages as context for the LLM calls.
    * @param ctx The context of the Convex function. From a mutation, you can
-   * start a chat and save the chatId to pass to continueChat later.
-   * @param args The chat metadata.
-   * @returns The chatId of the new chat.
+   * start a thread and save the threadId to pass to continueThread later.
+   * @param args The thread metadata.
+   * @returns The threadId of the new thread.
    */
-  async createChat(
+  async createThread(
     ctx: RunMutationCtx,
     args: {
       userId?: string;
-      parentChatIds?: string[];
+      parentThreadIds?: string[];
       title?: string;
       summary?: string;
     }
   ): Promise<{
-    chatId: string;
+    threadId: string;
   }>;
-  async createChat(
+  async createThread(
     ctx: RunActionCtx | RunMutationCtx,
     args: {
       userId: string;
-      parentChatIds?: string[];
+      parentThreadIds?: string[];
       title?: string;
       summary?: string;
     }
   ): Promise<{
-    chatId: string;
-    chat?: Chat<AgentTools>;
+    threadId: string;
+    thread?: Thread<AgentTools>;
   }> {
-    const chatDoc = await ctx.runMutation(this.component.messages.createChat, {
-      defaultSystemPrompt: this.options.instructions,
-      userId: args.userId,
-      title: args.title,
-      summary: args.summary,
-      parentChatIds: args.parentChatIds,
-    });
+    const threadDoc = await ctx.runMutation(
+      this.component.messages.createThread,
+      {
+        defaultSystemPrompt: this.options.instructions,
+        userId: args.userId,
+        title: args.title,
+        summary: args.summary,
+        parentThreadIds: args.parentThreadIds,
+      }
+    );
     if (!("runAction" in ctx)) {
-      return { chatId: chatDoc._id };
+      return { threadId: threadDoc._id };
     }
-    const { chat } = await this.continueChat(ctx, {
-      chatId: chatDoc._id,
+    const { thread } = await this.continueThread(ctx, {
+      threadId: threadDoc._id,
       userId: args.userId,
     });
     return {
-      chatId: chatDoc._id,
-      chat,
+      threadId: threadDoc._id,
+      thread,
     };
   }
 
-  async continueChat(
+  async continueThread(
     ctx: RunActionCtx,
     {
-      chatId,
+      threadId,
       userId,
     }: {
-      chatId: string;
+      threadId: string;
       /**
-       * If supplied, the userId can be used to search across other chats for
+       * If supplied, the userId can be used to search across other threads for
        * relevant messages from the same user as context for the LLM calls.
        */
       userId?: string;
     }
   ): Promise<{
-    chat: Chat<AgentTools>;
+    thread: Thread<AgentTools>;
   }> {
-    // return this.component.continueChat(ctx, args);
+    // return this.component.continueThread(ctx, args);
     return {
-      chat: {
-        generateText: this.generateText.bind(this, ctx, { userId, chatId }),
-        streamText: this.streamText.bind(this, ctx, { userId, chatId }),
-        generateObject: this.generateObject.bind(this, ctx, { userId, chatId }),
-        streamObject: this.streamObject.bind(this, ctx, { userId, chatId }),
-      } as Chat<AgentTools>,
+      thread: {
+        generateText: this.generateText.bind(this, ctx, { userId, threadId }),
+        streamText: this.streamText.bind(this, ctx, { userId, threadId }),
+        generateObject: this.generateObject.bind(this, ctx, {
+          userId,
+          threadId,
+        }),
+        streamObject: this.streamObject.bind(this, ctx, { userId, threadId }),
+      } as Thread<AgentTools>,
     };
   }
 
@@ -224,13 +230,13 @@ export class Agent<AgentTools extends ToolSet> {
     ctx: RunQueryCtx | RunActionCtx,
     args: {
       userId?: string;
-      chatId?: string;
+      threadId?: string;
       messages: CoreMessage[];
       parentMessageId?: string;
     } & ContextOptions
   ): Promise<CoreMessage[]> {
-    assert(args.userId || args.chatId, "Specify userId or chatId");
-    // Fetch the latest messages from the chat
+    assert(args.userId || args.threadId, "Specify userId or threadId");
+    // Fetch the latest messages from the thread
     const contextMessages: CoreMessage[] = [];
     const opts = this.mergedContextOptions(args);
     if (opts.searchOptions?.textSearch || opts.searchOptions?.vectorSearch) {
@@ -240,8 +246,8 @@ export class Agent<AgentTools extends ToolSet> {
       const searchMessages = await ctx.runAction(
         this.component.messages.searchMessages,
         {
-          userId: args.searchOtherChats ? args.userId : undefined,
-          chatId: args.chatId,
+          userId: args.searchOtherThreads ? args.userId : undefined,
+          threadId: args.threadId,
           parentMessageId: args.parentMessageId,
           ...(await this.searchOptionsWithDefaults(opts, args.messages)),
         }
@@ -249,11 +255,11 @@ export class Agent<AgentTools extends ToolSet> {
       // TODO: track what messages we used for context
       contextMessages.push(...searchMessages.map((m) => m.message!));
     }
-    if (args.chatId) {
+    if (args.threadId) {
       const { messages } = await ctx.runQuery(
-        this.component.messages.getChatMessages,
+        this.component.messages.getThreadMessages,
         {
-          chatId: args.chatId,
+          threadId: args.threadId,
           isTool: args.includeToolCalls ?? false,
           limit: args.recentMessages,
           parentMessageId: args.parentMessageId,
@@ -269,7 +275,7 @@ export class Agent<AgentTools extends ToolSet> {
   async saveMessages(
     ctx: RunMutationCtx,
     args: {
-      chatId?: string;
+      threadId?: string;
       userId?: string;
       messages: CoreMessageMaybeWithId[];
       pending?: boolean;
@@ -281,10 +287,10 @@ export class Agent<AgentTools extends ToolSet> {
     messageIds: string[];
   }> {
     const result = await ctx.runMutation(this.component.messages.addMessages, {
-      chatId: args.chatId,
+      threadId: args.threadId,
       userId: args.userId,
       agentName: this.options.name,
-      model: this.options.chat.modelId,
+      model: this.options.thread.modelId,
       messages: args.messages.map(serializeMessageWithId),
       failPendingSteps: args.failPendingSteps ?? true,
       pending: args.pending ?? false,
@@ -298,12 +304,12 @@ export class Agent<AgentTools extends ToolSet> {
 
   async saveStep<TOOLS extends ToolSet>(
     ctx: RunMutationCtx,
-    args: { chatId: string; messageId: string; step: StepResult<TOOLS> }
+    args: { threadId: string; messageId: string; step: StepResult<TOOLS> }
   ): Promise<void> {
     const step = serializeStep(args.step as StepResult<ToolSet>);
     const messages = serializeNewMessagesInStep(args.step);
     await ctx.runMutation(this.component.messages.addSteps, {
-      chatId: args.chatId,
+      threadId: args.threadId,
       messageId: args.messageId,
       steps: [{ step, messages: messages }],
       failPendingSteps: false,
@@ -314,7 +320,7 @@ export class Agent<AgentTools extends ToolSet> {
   async completeMessage<TOOLS extends ToolSet>(
     ctx: RunMutationCtx,
     args: {
-      chatId: string;
+      threadId: string;
       messageId: string;
       result:
         | { kind: "error"; error: string }
@@ -328,7 +334,7 @@ export class Agent<AgentTools extends ToolSet> {
       });
     } else {
       await ctx.runMutation(this.component.messages.addSteps, {
-        chatId: args.chatId,
+        threadId: args.threadId,
         messageId: args.messageId,
         steps: [],
         failPendingSteps: true,
@@ -338,9 +344,9 @@ export class Agent<AgentTools extends ToolSet> {
 
   /**
    * This behaves like {@link generateText} except that it add context based on
-   * the userId and chatId. It saves the input and resulting messages to the
-   * chat, if specified.
-   * however. To do that, use {@link continueChat} or {@link saveMessages}.
+   * the userId and threadId. It saves the input and resulting messages to the
+   * thread, if specified.
+   * however. To do that, use {@link continueThread} or {@link saveMessages}.
    * @param ctx The context of the agent.
    * @param args The arguments to the generateText function.
    * @returns The result of the generateText function.
@@ -353,10 +359,10 @@ export class Agent<AgentTools extends ToolSet> {
     ctx: RunActionCtx,
     {
       userId,
-      chatId,
+      threadId,
     }: {
       userId?: string;
-      chatId?: string;
+      threadId?: string;
     },
     args: TextArgs<
       AgentTools,
@@ -371,21 +377,21 @@ export class Agent<AgentTools extends ToolSet> {
     const contextMessages = await this.fetchContextMessages(ctx, {
       ...args,
       userId,
-      chatId,
+      threadId,
       messages,
     });
     const { lastMessageId: messageId } = await this.saveMessages(ctx, {
-      chatId,
+      threadId,
       userId,
       messages: args.saveAllInputMessages ? messages : messages.slice(-1),
       pending: true,
       parentMessageId: args.parentMessageId,
     });
-    const toolCtx = { ...ctx, userId, chatId, messageId };
+    const toolCtx = { ...ctx, userId, threadId, messageId };
     const tools = wrapTools(toolCtx, this.options.tools, args.tools) as TOOLS;
     try {
       const result = await generateText({
-        model: this.options.chat,
+        model: this.options.thread,
         messages: [...contextMessages, ...messages],
         system: this.options.instructions,
         maxSteps: this.options.maxSteps,
@@ -394,10 +400,10 @@ export class Agent<AgentTools extends ToolSet> {
         ...rest,
         tools,
         onStepFinish: async (step) => {
-          if (chatId && messageId && args.saveOutputMessages) {
+          if (threadId && messageId && args.saveOutputMessages) {
             console.log("onStepFinish", step);
             await this.saveStep(ctx, {
-              chatId,
+              threadId,
               messageId,
               step,
             });
@@ -407,7 +413,7 @@ export class Agent<AgentTools extends ToolSet> {
       });
       return { ...result, messageId };
     } catch (error) {
-      if (chatId && messageId) {
+      if (threadId && messageId) {
         console.error("RollbackMessage", messageId);
         await ctx.runMutation(this.component.messages.rollbackMessage, {
           messageId,
@@ -424,7 +430,7 @@ export class Agent<AgentTools extends ToolSet> {
     PARTIAL_OUTPUT = never,
   >(
     ctx: RunActionCtx,
-    { userId, chatId }: { userId?: string; chatId?: string },
+    { userId, threadId }: { userId?: string; threadId?: string },
     args: TextArgs<
       AgentTools,
       TOOLS,
@@ -438,19 +444,19 @@ export class Agent<AgentTools extends ToolSet> {
     const contextMessages = await this.fetchContextMessages(ctx, {
       ...args,
       userId,
-      chatId,
+      threadId,
       messages,
     });
     const { lastMessageId: messageId } = await this.saveMessages(ctx, {
-      chatId,
+      threadId,
       messages: args.saveAllInputMessages ? messages : messages.slice(-1),
       pending: true,
       parentMessageId: args.parentMessageId,
     });
-    const toolCtx = { ...ctx, userId, chatId, messageId };
+    const toolCtx = { ...ctx, userId, threadId, messageId };
     const tools = wrapTools(toolCtx, this.options.tools, args.tools) as TOOLS;
     const result = streamText({
-      model: this.options.chat,
+      model: this.options.thread,
       messages: [...contextMessages, ...messages],
       system: this.options.instructions,
       maxSteps: this.options.maxSteps,
@@ -464,7 +470,7 @@ export class Agent<AgentTools extends ToolSet> {
       },
       onError: async (error) => {
         console.error("onError", error);
-        if (chatId && messageId) {
+        if (threadId && messageId) {
           await ctx.runMutation(this.component.messages.rollbackMessage, {
             messageId,
             error: (error.error as Error).message,
@@ -480,9 +486,9 @@ export class Agent<AgentTools extends ToolSet> {
       },
       onStepFinish: async (step) => {
         console.log("onStepFinish", step);
-        if (chatId && messageId) {
+        if (threadId && messageId) {
           await this.saveStep(ctx, {
-            chatId,
+            threadId,
             messageId,
             step,
           });
@@ -496,7 +502,7 @@ export class Agent<AgentTools extends ToolSet> {
   // TODO: add the crazy number of overloads to get types through
   async generateObject<T>(
     ctx: RunActionCtx,
-    { userId, chatId }: { userId?: string; chatId?: string },
+    { userId, threadId }: { userId?: string; threadId?: string },
     args: Omit<Parameters<typeof generateObject>[0], "model"> & {
       model?: LanguageModelV1;
     } & { parentMessageId?: string } & ContextOptions &
@@ -507,16 +513,16 @@ export class Agent<AgentTools extends ToolSet> {
     const contextMessages = await this.fetchContextMessages(ctx, {
       ...args,
       userId,
-      chatId,
+      threadId,
       messages,
     });
     const { lastMessageId: messageId } = await this.saveMessages(ctx, {
-      chatId,
+      threadId,
       messages: args.saveAllInputMessages ? messages : messages.slice(-1),
       pending: true,
     });
     const result = (await generateObject({
-      model: this.options.chat,
+      model: this.options.thread,
       messages: [...contextMessages, ...messages],
       ...rest,
     })) as GenerateObjectResult<T>;
@@ -525,7 +531,7 @@ export class Agent<AgentTools extends ToolSet> {
 
   async streamObject<T>(
     ctx: RunMutationCtx,
-    { userId, chatId }: { userId?: string; chatId?: string },
+    { userId, threadId }: { userId?: string; threadId?: string },
     args: Omit<Parameters<typeof streamObject<T>>[0], "model"> & {
       model?: LanguageModelV1;
     } & { parentMessageId?: string } & ContextOptions &
@@ -538,16 +544,16 @@ export class Agent<AgentTools extends ToolSet> {
     const contextMessages = await this.fetchContextMessages(ctx, {
       ...args,
       userId,
-      chatId,
+      threadId,
       messages,
     });
     const { lastMessageId: messageId } = await this.saveMessages(ctx, {
-      chatId,
+      threadId,
       messages: args.saveAllInputMessages ? messages : messages.slice(-1),
       pending: true,
     });
     const result = streamObject<T>({
-      model: this.options.chat,
+      model: this.options.thread,
       messages: [...contextMessages, ...messages],
       ...rest,
       onError: async (error) => {
@@ -616,27 +622,27 @@ export class Agent<AgentTools extends ToolSet> {
     return internalActionGeneric({
       args: {
         userId: v.optional(v.string()),
-        chatId: v.optional(v.string()),
+        threadId: v.optional(v.string()),
         contextOptions: v.optional(vContextOptions),
         storageOptions: v.optional(vStorageOptions),
         maxRetries: v.optional(v.number()),
 
-        createChat: v.optional(
+        createThread: v.optional(
           v.object({
             userId: v.string(),
-            parentChatIds: v.optional(v.array(v.string())),
+            parentThreadIds: v.optional(v.array(v.string())),
             title: v.optional(v.string()),
             summary: v.optional(v.string()),
           })
         ),
-        continueChat: v.optional(
+        continueThread: v.optional(
           v.object({
-            chatId: v.string(),
+            threadId: v.string(),
             userId: v.optional(v.string()),
           })
         ),
-        generateText: v.optional(vChatArgs),
-        streamText: v.optional(vChatArgs),
+        generateText: v.optional(vThreadArgs),
+        streamText: v.optional(vThreadArgs),
         generateObject: v.optional(vObjectArgs),
         streamObject: v.optional(
           v.object({ ...vObjectArgs.fields, schema: v.any() })
@@ -650,21 +656,21 @@ export class Agent<AgentTools extends ToolSet> {
         const maxRetries = args.maxRetries;
         const commonArgs = {
           userId: args.userId,
-          chatId: args.chatId,
+          threadId: args.threadId,
           ...contextOptions,
           ...args.storageOptions,
         };
-        if (args.createChat) {
-          return this.createChat(ctx, {
-            userId: args.createChat.userId,
-            parentChatIds: args.createChat.parentChatIds,
-            title: args.createChat.title,
-            summary: args.createChat.summary,
+        if (args.createThread) {
+          return this.createThread(ctx, {
+            userId: args.createThread.userId,
+            parentThreadIds: args.createThread.parentThreadIds,
+            title: args.createThread.title,
+            summary: args.createThread.summary,
           });
-        } else if (args.continueChat) {
-          return this.continueChat(ctx, {
-            chatId: args.continueChat.chatId,
-            userId: args.continueChat.userId,
+        } else if (args.continueThread) {
+          return this.continueThread(ctx, {
+            threadId: args.continueThread.threadId,
+            userId: args.continueThread.userId,
           });
         } else if (args.generateText) {
           return this.generateText(ctx, commonArgs, {
@@ -715,7 +721,7 @@ export class Agent<AgentTools extends ToolSet> {
           spec.contextOptions && this.mergedContextOptions(spec.contextOptions);
         const value = await this.generateText(
           ctx,
-          { userId: ctx.userId, chatId: ctx.chatId },
+          { userId: ctx.userId, threadId: ctx.threadId },
           {
             prompt: JSON.stringify(args),
             parentMessageId: ctx.messageId,
@@ -731,15 +737,15 @@ export class Agent<AgentTools extends ToolSet> {
 
 export type ToolCtx = RunActionCtx & {
   userId?: string;
-  chatId?: string;
+  threadId?: string;
   messageId?: string;
 };
 
 /**
  * This is a wrapper around the ai.tool function that adds support for
- * userId and chatId to the tool, if they're called within a chat from an agent.
+ * userId and threadId to the tool, if they're called within a thread from an agent.
  * @param tool The AI tool. See https://sdk.vercel.ai/docs/ai-sdk-core/tools-and-tool-calling
- * @returns The same tool, but with userId and chatId args support added.
+ * @returns The same tool, but with userId and threadId args support added.
  */
 export function createTool<
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -765,7 +771,7 @@ export function createTool<
         throw new Error(
           "To use a Convex tool, you must either provide the ctx" +
             " at definition time (dynamically in an action), or use the Agent to" +
-            " call it (which injects the ctx, userId and chatId)"
+            " call it (which injects the ctx, userId and threadId)"
         );
       }
       return convexTool.handler(this.ctx, args, options);
@@ -822,7 +828,7 @@ type ObjectArgs<
 } & ContextOptions &
   StorageOptions;
 
-interface Chat<AgentTools extends ToolSet> {
+interface Thread<AgentTools extends ToolSet> {
   generateText<TOOLS extends ToolSet, OUTPUT = never, OUTPUT_PARTIAL = never>(
     args: TextArgs<
       AgentTools,

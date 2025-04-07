@@ -1,29 +1,29 @@
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
-import { vChatStatus, vMessage, vMessageStatus, vStep } from "../validators";
+import { vThreadStatus, vMessage, vMessageStatus, vStep } from "../validators";
 import { typedV } from "convex-helpers/validators";
 import vectorTables, { vVectorId } from "./vector/tables";
 
 export const schema = defineSchema({
-  chats: defineTable({
+  threads: defineTable({
     userId: v.optional(v.string()), // Unset for anonymous
     order: v.optional(v.number()), // within a domain
     // TODO: is this bubbling up in continue?
     defaultSystemPrompt: v.optional(v.string()),
     title: v.optional(v.string()),
     summary: v.optional(v.string()),
-    status: vChatStatus,
-    // If this is a chat continuation, we can use this to find context from
-    // the parent chat(s). There are multiple if the chat is a merging of
-    // multiple chats.
-    parentChatIds: v.optional(v.array(v.id("chats"))),
+    status: vThreadStatus,
+    // If this is a thread continuation, we can use this to find context from
+    // the parent thread(s). There are multiple if the thread is a merging of
+    // multiple threads.
+    parentThreadIds: v.optional(v.array(v.id("threads"))),
   }).index("status_userId_order", ["status", "userId", "order"]),
   // TODO: text search on title/ summary
   messages: defineTable({
     id: v.optional(v.string()), // external id, e.g. from Vercel AI SDK
     userId: v.optional(v.string()), // useful for future indexes (text search)
-    chatId: v.optional(v.id("chats")),
-    threadId: v.optional(v.id("messages")),
+    threadId: v.optional(v.id("threads")),
+    parentMessageId: v.optional(v.id("messages")),
     stepId: v.optional(v.id("steps")),
     agentName: v.optional(v.string()),
     message: v.optional(vMessage),
@@ -33,7 +33,7 @@ export const schema = defineSchema({
     // TODO: add sub-messages back in? or be able to skip them?
     tool: v.boolean(),
     // Repeats until a non-tool message.
-    // Unset if it's not in a chat.
+    // Unset if it's not in a thread.
     order: v.number(),
     stepOrder: v.optional(v.number()),
     fileId: v.optional(v.id("files")),
@@ -41,8 +41,8 @@ export const schema = defineSchema({
   })
     // Allows finding successful visible messages in order
     // Also surface pending messages separately to e.g. stream
-    .index("chatId_status_tool_order_stepOrder", [
-      "chatId",
+    .index("threadId_status_tool_order_stepOrder", [
+      "threadId",
       "status",
       "tool",
       "order",
@@ -57,22 +57,22 @@ export const schema = defineSchema({
     ])
     // Allows finding all threaded messages in order
     // Allows finding all failed messages to evaluate
-    // .index("status_threadId_order_stepOrder", [
+    // .index("status_parentMessageId_order_stepOrder", [
     //   "status",
-    //   "threadId",
+    //   "parentMessageId",
     //   "order",
     //   "stepOrder",
     // ])
     // Allows text search on message content
     .searchIndex("text_search", {
       searchField: "text",
-      filterFields: ["userId", "chatId"],
+      filterFields: ["userId", "threadId"],
     })
     // Allows finding messages by vector embedding id
     .index("embeddingId", ["embeddingId"]),
 
   steps: defineTable({
-    chatId: v.id("chats"),
+    threadId: v.id("threads"),
     // Could be different from the order if we fail.
     parentMessageId: v.id("messages"),
     order: v.number(), // parent message order
@@ -80,9 +80,9 @@ export const schema = defineSchema({
     step: vStep,
     status: vMessageStatus,
   })
-    .index("status_chatId_order_stepOrder", [
+    .index("status_threadId_order_stepOrder", [
       "status",
-      "chatId",
+      "threadId",
       "order",
       "stepOrder",
     ])

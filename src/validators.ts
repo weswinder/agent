@@ -5,7 +5,10 @@ import { Infer, v } from "convex/values";
 const providerOptions = v.optional(v.record(v.string(), v.any()));
 const experimental_providerMetadata = providerOptions;
 
-export const vChatStatus = v.union(v.literal("active"), v.literal("archived"));
+export const vThreadStatus = v.union(
+  v.literal("active"),
+  v.literal("archived")
+);
 export const vMessageStatus = v.union(
   v.literal("pending"),
   v.literal("success"),
@@ -268,7 +271,7 @@ export const vContextOptions = v.object({
   includeToolCalls: v.optional(v.boolean()),
   recentMessages: v.optional(v.number()),
   searchOptions: v.optional(vContextOptionsSearchOptions),
-  searchOtherChats: v.optional(v.boolean()),
+  searchOtherThreads: v.optional(v.boolean()),
 });
 
 export const vStorageOptions = v.object({
@@ -276,7 +279,7 @@ export const vStorageOptions = v.object({
   saveAllOutputMessages: v.optional(v.boolean()),
 });
 
-export const vChatArgs = v.object({
+export const vThreadArgs = v.object({
   maxSteps: v.optional(v.number()),
   prompt: v.optional(v.string()),
   messages: v.optional(v.array(vMessage)),

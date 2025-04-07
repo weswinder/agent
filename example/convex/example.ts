@@ -7,27 +7,29 @@ import { v } from "convex/values";
 
 // Define an agent similarly to the AI SDK
 const supportAgent = new Agent(components.agent, {
-  chat: openai.chat("gpt-4o-mini"),
+  thread: openai.chat("gpt-4o-mini"),
   textEmbedding: openai.embedding("text-embedding-3-small"),
   instructions: "You are a helpful assistant.",
 });
 
 // Use the agent from within a normal action:
-export const createChatting = action({
+export const createThread = action({
   args: { prompt: v.string(), userId: v.string() },
   handler: async (ctx, { prompt, userId }) => {
-    const { chatId, chat } = await supportAgent.createChat(ctx, { userId });
-    const result = await chat.generateText({ prompt });
-    return { chatId, text: result.text };
+    const { threadId, thread } = await supportAgent.createThread(ctx, {
+      userId,
+    });
+    const result = await thread.generateText({ prompt });
+    return { threadId, text: result.text };
   },
 });
 
-export const continueChat = action({
-  args: { prompt: v.string(), chatId: v.string() },
-  handler: async (ctx, { prompt, chatId }) => {
-    // This includes previous message history from the chat automatically.
-    const { chat } = await supportAgent.continueChat(ctx, { chatId });
-    const result = await chat.generateText({ prompt });
+export const continueThread = action({
+  args: { prompt: v.string(), threadId: v.string() },
+  handler: async (ctx, { prompt, threadId }) => {
+    // This includes previous message history from the thread automatically.
+    const { thread } = await supportAgent.continueThread(ctx, { threadId });
+    const result = await thread.generateText({ prompt });
     return result.text;
   },
 });
@@ -41,11 +43,11 @@ const s = internal.example; // where steps are defined
 export const supportAgentWorkflow = workflow.define({
   args: { prompt: v.string(), userId: v.string() },
   handler: async (step, { prompt, userId }) => {
-    const { chatId } = await step.runAction(s.supportAgentStep, {
-      createChat: { userId },
+    const { threadId } = await step.runAction(s.supportAgentStep, {
+      createThread: { userId },
     });
     const result = await step.runAction(s.supportAgentStep, {
-      chatId,
+      threadId,
       generateText: { prompt },
     });
     console.log(result);
@@ -53,32 +55,34 @@ export const supportAgentWorkflow = workflow.define({
   },
 });
 
-export const getChatMessages = query({
-  args: { chatId: v.string() },
-  handler: async (ctx, { chatId }) => {
-    return await ctx.runQuery(components.agent.messages.getChatMessages, {
-      chatId,
+export const getThreadMessages = query({
+  args: { threadId: v.string() },
+  handler: async (ctx, { threadId }) => {
+    return await ctx.runQuery(components.agent.messages.getThreadMessages, {
+      threadId,
       limit: 100,
     });
   },
 });
 
 export const getInProgressMessages = query({
-  args: { chatId: v.string() },
-  handler: async (ctx, { chatId }) => {
+  args: { threadId: v.string() },
+  handler: async (ctx, { threadId }) => {
     const { messages } = await ctx.runQuery(
-      components.agent.messages.getChatMessages,
-      { chatId, statuses: ["pending"] },
+      components.agent.messages.getThreadMessages,
+      { threadId, statuses: ["pending"] },
     );
     return messages;
   },
 });
 
-export const streamChat = action({
+export const streamThread = action({
   args: { prompt: v.string(), userId: v.string() },
   handler: async (ctx, { prompt, userId }) => {
-    const { chatId, chat } = await supportAgent.createChat(ctx, { userId });
-    const result = await chat.streamText({ prompt });
-    return { chatId, text: result.text };
+    const { threadId, thread } = await supportAgent.createThread(ctx, {
+      userId,
+    });
+    const result = await thread.streamText({ prompt });
+    return { threadId, text: result.text };
   },
 });

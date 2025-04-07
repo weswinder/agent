@@ -10,12 +10,12 @@ import { QueryCtx } from "../_generated/server";
 // We only generate embeddings for non-tool, non-system messages
 const embeddings = {
   model: v.string(),
-  kind: v.union(v.literal("chat"), v.literal("memory")),
+  kind: v.union(v.literal("thread"), v.literal("memory")),
   userId: v.optional(v.string()),
-  chatId: v.optional(v.string()),
-  // not set for private chats
+  threadId: v.optional(v.string()),
+  // not set for private threads
   model_kind_userId: v.optional(v.array(v.string())),
-  model_kind_chatId: v.optional(v.array(v.string())),
+  model_kind_threadId: v.optional(v.array(v.string())),
   vector: v.array(v.number()),
 };
 
@@ -24,9 +24,9 @@ function table<D extends number>(dimensions: D): Table<D> {
     .vectorIndex("vector", {
       vectorField: "vector",
       dimensions,
-      filterFields: ["model_kind_userId", "model_kind_chatId"],
+      filterFields: ["model_kind_userId", "model_kind_threadId"],
     })
-    .index("model_kind_chatId", ["model", "kind", "chatId"]);
+    .index("model_kind_threadId", ["model", "kind", "threadId"]);
 }
 
 export const VectorDimensions = [
