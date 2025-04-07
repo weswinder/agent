@@ -9,7 +9,8 @@
  */
 
 import type * as example from "../example.js";
-import type * as simple from "../simple.js";
+import type * as ideaAgents from "../ideaAgents.js";
+import type * as ideas from "../ideas.js";
 
 import type {
   ApiFromModules,
@@ -27,7 +28,8 @@ import type {
  */
 declare const fullApi: ApiFromModules<{
   example: typeof example;
-  simple: typeof simple;
+  ideaAgents: typeof ideaAgents;
+  ideas: typeof ideas;
 }>;
 declare const fullApiWithMounts: typeof fullApi;
 
