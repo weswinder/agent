@@ -418,17 +418,14 @@ async function addMessagesHandler(
       )
     );
   }
-  let order: number | undefined;
   let threadId = parentMessageId;
-  if (chatId) {
-    const maxMessage = await getMaxMessage(ctx, chatId);
-    // If the previous message isn't our parent, we make a new thread.
-    threadId =
-      parentMessageId && maxMessage?._id === parentMessageId
-        ? maxMessage.threadId ?? parentMessageId
-        : parentMessageId;
-    order = maxMessage?.order ?? -1;
-  }
+  const maxMessage = await getMaxMessage(ctx, chatId, userId);
+  // If the previous message isn't our parent, we make a new thread.
+  threadId =
+    parentMessageId && maxMessage?._id === parentMessageId
+      ? maxMessage.threadId ?? parentMessageId
+      : parentMessageId;
+  let order = maxMessage?.order ?? -1;
   const toReturn: Doc<"messages">[] = [];
   if (messages.length > 0) {
     for (const { message, fileId, id } of messages) {
@@ -455,18 +452,37 @@ async function addMessagesHandler(
   return { messages: toReturn };
 }
 
-async function getMaxMessage(ctx: QueryCtx, chatId: Id<"chats">) {
-  return mergedStream(
-    ["success" as const, "pending" as const].map((status) =>
-      stream(ctx.db, schema)
-        .query("messages")
-        .withIndex("chatId_status_tool_order_stepOrder", (q) =>
-          q.eq("chatId", chatId).eq("status", status).eq("tool", false)
-        )
-        .order("desc")
-    ),
-    ["order", "stepOrder"]
-  ).first();
+async function getMaxMessage(
+  ctx: QueryCtx,
+  chatId: Id<"chats"> | undefined,
+  userId: string | undefined
+) {
+  assert(chatId || userId, "One of chatId or userId is required");
+  if (chatId) {
+    return mergedStream(
+      ["success" as const, "pending" as const].map((status) =>
+        stream(ctx.db, schema)
+          .query("messages")
+          .withIndex("chatId_status_tool_order_stepOrder", (q) =>
+            q.eq("chatId", chatId).eq("status", status).eq("tool", false)
+          )
+          .order("desc")
+      ),
+      ["order", "stepOrder"]
+    ).first();
+  } else {
+    return mergedStream(
+      ["success" as const, "pending" as const].map((status) =>
+        stream(ctx.db, schema)
+          .query("messages")
+          .withIndex("userId_status_tool_order_stepOrder", (q) =>
+            q.eq("userId", userId).eq("status", status).eq("tool", false)
+          )
+          .order("desc")
+      ),
+      ["order", "stepOrder"]
+    ).first();
+  }
 }
 
 const addStepsArgs = {
@@ -766,46 +782,66 @@ export const _fetchVectorMessages = internalQuery({
     }
     const included: Record<string, Set<number>> = {};
     for (const m of messages) {
-      if (!included[chatId]) {
-        included[chatId] = new Set();
+      const searchId = m.chatId ?? m.userId!;
+      if (!included[searchId]) {
+        included[searchId] = new Set();
       }
-      included[m.chatId].add(m.order!);
+      included[searchId].add(m.order!);
     }
-    const ranges: Record<Id<"chats">, Doc<"messages">[]> = {};
+    const ranges: Record<string, Doc<"messages">[]> = {};
     const { before, after } = args.messageRange;
     for (const m of messages) {
+      const searchId = m.chatId ?? m.userId!;
       const order = m.order!;
       let earliest = order - before;
       let latest = order + after;
       for (; earliest <= latest; earliest++) {
-        if (!included[m.chatId!].has(earliest)) {
+        if (!included[searchId].has(earliest)) {
           break;
         }
       }
       for (; latest >= earliest; latest--) {
-        if (!included[m.chatId!].has(latest)) {
+        if (!included[searchId].has(latest)) {
           break;
         }
       }
       for (let i = earliest; i <= latest; i++) {
-        included[m.chatId!].add(i);
+        included[searchId].add(i);
       }
       if (earliest !== latest) {
-        const surrounding = await ctx.db
-          .query("messages")
-          .withIndex("chatId_status_tool_order_stepOrder", (q) =>
-            q
-              .eq("chatId", m.chatId)
-              .eq("status", "success")
-              .eq("tool", false)
-              .gt("order", earliest)
-              .lt("order", latest)
-          )
-          .collect();
-        if (!ranges[m.chatId!]) {
-          ranges[m.chatId!] = [];
+        if (m.chatId) {
+          const surrounding = await ctx.db
+            .query("messages")
+            .withIndex("chatId_status_tool_order_stepOrder", (q) =>
+              q
+                .eq("chatId", m.chatId)
+                .eq("status", "success")
+                .eq("tool", false)
+                .gt("order", earliest)
+                .lt("order", latest)
+            )
+            .collect();
+          if (!ranges[searchId]) {
+            ranges[searchId] = [];
+          }
+          ranges[searchId].push(...surrounding);
+        } else {
+          const surrounding = await ctx.db
+            .query("messages")
+            .withIndex("userId_status_tool_order_stepOrder", (q) =>
+              q
+                .eq("userId", m.userId!)
+                .eq("status", "success")
+                .eq("tool", false)
+                .gt("order", earliest)
+                .lt("order", latest)
+            )
+            .collect();
+          if (!ranges[searchId]) {
+            ranges[searchId] = [];
+          }
+          ranges[searchId].push(...surrounding);
         }
-        ranges[m.chatId!].push(...surrounding);
       }
     }
     return Object.values(ranges)
