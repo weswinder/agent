@@ -260,6 +260,12 @@ const messages = await ctx.runQuery(components.agent.messages.getChatMessages, {
 });
 ```
 
+### Generating text for a user without an associated chat
+
+```ts
+const result = await supportAgent.generateText(ctx, { userId }, { prompt });
+```
+
 ### Manually managing messages
 
 ```ts
