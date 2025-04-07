@@ -313,7 +313,9 @@ export class Agent<AgentTools extends ToolSet> {
       TOOLS,
       Parameters<typeof generateText<TOOLS, OUTPUT, OUTPUT_PARTIAL>>[0]
     >
-  ): Promise<GenerateTextResult<TOOLS, OUTPUT> & GenerationOutputMetadata> {
+  ): Promise<
+    GenerateTextResult<TOOLS & AgentTools, OUTPUT> & GenerationOutputMetadata
+  > {
     const { prompt, messages: raw, ...rest } = args;
     const messages = promptOrMessagesToCoreMessages({ prompt, messages: raw });
     const contextMessages = await this.fetchContextMessages(ctx, {
@@ -580,9 +582,7 @@ type TextArgs<
   AgentTools extends ToolSet,
   TOOLS extends ToolSet,
   T extends {
-    toolChoice?: ToolChoice<{
-      [key in keyof TOOLS | keyof AgentTools]: unknown;
-    }>;
+    toolChoice?: ToolChoice<TOOLS & AgentTools>;
     tools?: TOOLS;
     model: LanguageModelV1;
   },
@@ -610,7 +610,9 @@ interface Chat<AgentTools extends ToolSet> {
       TOOLS,
       Parameters<typeof generateText<TOOLS, OUTPUT, OUTPUT_PARTIAL>>[0]
     >
-  ): Promise<GenerateTextResult<TOOLS, OUTPUT> & GenerationOutputMetadata>;
+  ): Promise<
+    GenerateTextResult<TOOLS & AgentTools, OUTPUT> & GenerationOutputMetadata
+  >;
 
   streamText<TOOLS extends ToolSet, OUTPUT = never, PARTIAL_OUTPUT = never>(
     args: TextArgs<
@@ -619,7 +621,8 @@ interface Chat<AgentTools extends ToolSet> {
       Parameters<typeof streamText<TOOLS, OUTPUT, PARTIAL_OUTPUT>>[0]
     >
   ): Promise<
-    StreamTextResult<TOOLS, PARTIAL_OUTPUT> & GenerationOutputMetadata
+    StreamTextResult<TOOLS & AgentTools, PARTIAL_OUTPUT> &
+      GenerationOutputMetadata
   >;
   // TODO: add all the overloads
   generateObject<T>(
