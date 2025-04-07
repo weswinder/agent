@@ -1517,5 +1517,106 @@ export declare const components: {
         }
       >;
     };
+    vector: {
+      index: {
+        deleteBatch: FunctionReference<
+          "mutation",
+          "internal",
+          {
+            ids: Array<
+              | string
+              | string
+              | string
+              | string
+              | string
+              | string
+              | string
+              | string
+              | string
+            >;
+          },
+          null
+        >;
+        insertBatch: FunctionReference<
+          "mutation",
+          "internal",
+          {
+            vectorDimension:
+              | 128
+              | 256
+              | 512
+              | 768
+              | 1024
+              | 1536
+              | 2048
+              | 3072
+              | 4096;
+            vectors: Array<{
+              chatId?: string;
+              kind: "chat" | "memory";
+              model: string;
+              userId?: string;
+              vector: Array<number>;
+            }>;
+          },
+          null
+        >;
+        paginate: FunctionReference<
+          "query",
+          "internal",
+          {
+            cursor?: string;
+            limit: number;
+            targetModel: string;
+            vectorDimension:
+              | 128
+              | 256
+              | 512
+              | 768
+              | 1024
+              | 1536
+              | 2048
+              | 3072
+              | 4096;
+          },
+          {
+            continueCursor: string;
+            ids: Array<
+              | string
+              | string
+              | string
+              | string
+              | string
+              | string
+              | string
+              | string
+              | string
+            >;
+            isDone: boolean;
+          }
+        >;
+        updateBatch: FunctionReference<
+          "mutation",
+          "internal",
+          {
+            vectors: Array<{
+              id:
+                | string
+                | string
+                | string
+                | string
+                | string
+                | string
+                | string
+                | string
+                | string;
+              model: string;
+              vector: Array<number>;
+            }>;
+          },
+          null
+        >;
+      };
+    };
   };
 };

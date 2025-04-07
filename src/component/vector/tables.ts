@@ -20,11 +20,13 @@ const embeddings = {
 };
 
 function table<D extends number>(dimensions: D): Table<D> {
-  return defineTable(embeddings).vectorIndex("vector", {
-    vectorField: "vector",
-    dimensions,
-    filterFields: ["model_kind_userId", "model_kind_chatId"],
-  });
+  return defineTable(embeddings)
+    .vectorIndex("vector", {
+      vectorField: "vector",
+      dimensions,
+      filterFields: ["model_kind_userId", "model_kind_chatId"],
+    })
+    .index("model_kind_chatId", ["model", "kind", "chatId"]);
 }
 
 export const VectorDimensions = [

@@ -10,6 +10,7 @@
 
 import type * as lib from "../lib.js";
 import type * as messages from "../messages.js";
+import type * as vector_index from "../vector/index.js";
 import type * as vector_tables from "../vector/tables.js";
 
 import type {
@@ -29,6 +30,7 @@ import type {
 declare const fullApi: ApiFromModules<{
   lib: typeof lib;
   messages: typeof messages;
+  "vector/index": typeof vector_index;
   "vector/tables": typeof vector_tables;
 }>;
 export type Mounts = {
@@ -1478,6 +1480,107 @@ export type Mounts = {
         userId?: string;
       }
     >;
+  };
+  vector: {
+    index: {
+      deleteBatch: FunctionReference<
+        "mutation",
+        "public",
+        {
+          ids: Array<
+            | string
+            | string
+            | string
+            | string
+            | string
+            | string
+            | string
+            | string
+            | string
+          >;
+        },
+        null
+      >;
+      insertBatch: FunctionReference<
+        "mutation",
+        "public",
+        {
+          vectorDimension:
+            | 128
+            | 256
+            | 512
+            | 768
+            | 1024
+            | 1536
+            | 2048
+            | 3072
+            | 4096;
+          vectors: Array<{
+            chatId?: string;
+            kind: "chat" | "memory";
+            model: string;
+            userId?: string;
+            vector: Array<number>;
+          }>;
+        },
+        null
+      >;
+      paginate: FunctionReference<
+        "query",
+        "public",
+        {
+          cursor?: string;
+          limit: number;
+          targetModel: string;
+          vectorDimension:
+            | 128
+            | 256
+            | 512
+            | 768
+            | 1024
+            | 1536
+            | 2048
+            | 3072
+            | 4096;
+        },
+        {
+          continueCursor: string;
+          ids: Array<
+            | string
+            | string
+            | string
+            | string
+            | string
+            | string
+            | string
+            | string
+            | string
+          >;
+          isDone: boolean;
+        }
+      >;
+      updateBatch: FunctionReference<
+        "mutation",
+        "public",
+        {
+          vectors: Array<{
+            id:
+              | string
+              | string
+              | string
+              | string
+              | string
+              | string
+              | string
+              | string
+              | string;
+            model: string;
+            vector: Array<number>;
+          }>;
+        },
+        null
+      >;
+    };
   };
 };
 // For now fullApiWithMounts is only fullApi which provides
