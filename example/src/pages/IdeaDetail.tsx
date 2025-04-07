@@ -43,7 +43,7 @@ export function IdeaDetail() {
             {idea.related.map((related) => (
               <Link
                 key={related._id}
-                to={`/ideas/${related._id}`}
+                to={`/${related._id}`}
                 className="p-4 rounded-lg border hover:border-indigo-500"
               >
                 <h3 className="font-semibold">{related.title}</h3>
@@ -61,7 +61,6 @@ export function IdeaDetail() {
         <div className="space-y-4">
           {entries.results.map((entry) => (
             <div key={entry._id} className="p-4 rounded-lg border">
-              <h3 className="font-semibold mb-2">{entry.title}</h3>
               <div className="prose">
                 <ReactMarkdown>{entry.content}</ReactMarkdown>
               </div>

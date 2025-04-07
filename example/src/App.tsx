@@ -1,6 +1,5 @@
 import { BrowserRouter, Routes, Route, Link } from "react-router-dom";
 import { Home } from "./pages/Home";
-import { Ideas } from "./pages/Ideas";
 import { IdeaDetail } from "./pages/IdeaDetail";
 import { Toaster } from "./components/ui/toaster";
 
@@ -14,16 +13,12 @@ export default function App() {
             <Link to="/" className="hover:text-indigo-600">
               Home
             </Link>
-            <Link to="/ideas" className="hover:text-indigo-600">
-              Ideas
-            </Link>
           </nav>
         </header>
         <main className="flex-1 p-8">
           <Routes>
             <Route path="/" element={<Home />} />
-            <Route path="/ideas" element={<Ideas />} />
-            <Route path="/ideas/:id" element={<IdeaDetail />} />
+            <Route path="/:id" element={<IdeaDetail />} />
           </Routes>
         </main>
         <Toaster />

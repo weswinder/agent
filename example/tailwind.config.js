@@ -1,9 +1,10 @@
 const { fontFamily } = require('tailwindcss/defaultTheme');
 
 module.exports = {
-  mode: 'jit',
-  purge: ['./index.html', './src/**/*.{vue,js,ts,jsx,tsx}'],
-  variants: {
+  mode: "jit",
+  content: ["./index.html", "./src/**/*.{vue,js,ts,jsx,tsx}"],
+  theme: {
     extend: {},
   },
+  plugins: [require("@tailwindcss/typography")],
 };

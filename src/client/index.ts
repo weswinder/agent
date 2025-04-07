@@ -299,6 +299,7 @@ export class Agent<AgentTools extends ToolSet> {
   ): Promise<void> {
     const step = serializeStep(args.step as StepResult<ToolSet>);
     const messages = serializeNewMessagesInStep(args.step);
+    console.log("saveStep", args.step);
     await ctx.runMutation(this.component.messages.addSteps, {
       chatId: args.chatId,
       messageId: args.messageId,
@@ -624,7 +625,7 @@ export class Agent<AgentTools extends ToolSet> {
     }
   ): Promise<{
     messages: (Message & { id: string })[];
-    continueCursor?: string;
+    continueCursor: string;
     isDone: boolean;
   }> {
     const messages = await ctx.runQuery(

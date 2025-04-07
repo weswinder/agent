@@ -1,4 +1,4 @@
-import { action, ActionCtx, mutation } from "./_generated/server";
+import { action, ActionCtx, query } from "./_generated/server";
 import { api, components } from "./_generated/api";
 import { Agent } from "@convex-dev/agent";
 import { v } from "convex/values";
@@ -6,6 +6,7 @@ import { openai } from "@ai-sdk/openai";
 
 import { createTool } from "@convex-dev/agent";
 import { Doc, Id } from "./_generated/dataModel";
+import { Message } from "../../src/validators";
 
 /**
  * TOOLS
@@ -204,3 +205,25 @@ async function getOrCreateChat(ctx: ActionCtx, userId: string) {
   }
   return await ideaTriageAgent.startChat(ctx, { userId });
 }
+
+export const inProgressMessages = query({
+  args: { userId: v.string() },
+  handler: async (
+    ctx,
+    { userId },
+  ): Promise<{
+    messages: (Message & { id: string })[];
+    continueCursor: string;
+    isDone: boolean;
+  }> => {
+    const chatPager = await ideaTriageAgent.getChats(ctx, { userId });
+    const chatId = chatPager.chats[0]?._id;
+    if (!chatId) {
+      return { messages: [], continueCursor: "", isDone: false };
+    }
+    return await ideaTriageAgent.getChatMessages(ctx, {
+      chatId,
+      statuses: ["pending"],
+    });
+  },
+});
