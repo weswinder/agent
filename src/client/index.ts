@@ -12,6 +12,7 @@ import type {
   StreamObjectResult,
   DeepPartial,
   GenerateTextResult,
+  ToolChoice,
 } from "ai";
 import {
   generateText,
@@ -102,7 +103,7 @@ export class Agent<AgentTools extends ToolSet> {
     }
   ): Promise<{
     chatId: string;
-    chat: Chat;
+    chat: Chat<AgentTools>;
   }>;
   /**
    * Start a new chat with the agent. This will have a fresh history, though if
@@ -134,7 +135,7 @@ export class Agent<AgentTools extends ToolSet> {
     }
   ): Promise<{
     chatId: string;
-    chat?: Chat;
+    chat?: Chat<AgentTools>;
   }> {
     const chatDoc = await ctx.runMutation(this.component.messages.createChat, {
       defaultSystemPrompt: this.options.defaultSystemPrompt,
@@ -166,7 +167,7 @@ export class Agent<AgentTools extends ToolSet> {
       userId?: string;
     }
   ): Promise<{
-    chat: Chat;
+    chat: Chat<AgentTools>;
   }> {
     // return this.component.continueChat(ctx, args);
     return {
@@ -175,7 +176,7 @@ export class Agent<AgentTools extends ToolSet> {
         streamText: this.streamText.bind(this, ctx, { userId, chatId }),
         generateObject: this.generateObject.bind(this, ctx, { userId, chatId }),
         streamObject: this.streamObject.bind(this, ctx, { userId, chatId }),
-      } as Chat,
+      } as Chat<AgentTools>,
     };
   }
 
@@ -314,11 +315,9 @@ export class Agent<AgentTools extends ToolSet> {
       userId?: string;
       chatId: string;
     },
-    args: Partial<
+    args: TextArgs<AgentTools, TOOLS,
       Parameters<typeof generateText<TOOLS, OUTPUT, OUTPUT_PARTIAL>>[0]
-    > &
-      ContextOptions &
-      StorageOptions
+    >
   ): Promise<GenerateTextResult<TOOLS, OUTPUT> & GenerationOutputMetadata> {
     const { prompt, messages: raw, ...rest } = args;
     const messages = promptOrMessagesToCoreMessages({ prompt, messages: raw });
@@ -333,11 +332,16 @@ export class Agent<AgentTools extends ToolSet> {
       messages: args.saveAllInputMessages ? messages : messages.slice(-1),
       pending: true,
     });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const tools: any  = this.options.tools ? { ...this.options.tools, ...args.tools  } : args.tools;
     try {
       const result = await generateText({
         model: this.options.chat,
         messages: [...contextMessages, ...messages],
         system: this.options.defaultSystemPrompt,
+        tools,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        toolChoice: args.toolChoice as any,
         ...rest,
         onStepFinish: async (step) => {
           if (chatId && messageId && args.saveOutputMessages) {
@@ -390,10 +394,15 @@ export class Agent<AgentTools extends ToolSet> {
       messages: args.saveAllInputMessages ? messages : messages.slice(-1),
       pending: true,
     });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const tools: any  = this.options.tools ? { ...this.options.tools, ...args.tools  } : args.tools;
     const result = streamText({
       model: this.options.chat,
       messages: [...contextMessages, ...messages],
       system: this.options.defaultSystemPrompt,
+      tools,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      toolChoice: args.toolChoice as any,
       ...rest,
       onChunk: async (chunk) => {
         console.log("onChunk", chunk);
@@ -577,29 +586,50 @@ export class Agent<AgentTools extends ToolSet> {
   }
 }
 
-interface Chat {
+type TextArgs<
+  AgentTools extends ToolSet,
+  TOOLS extends ToolSet,
+  T extends {
+    toolChoice?: ToolChoice<{ [key in keyof TOOLS | keyof AgentTools]: unknown }>;
+    tools?: TOOLS;
+    model: LanguageModelV1;
+  },
+> = Omit<T, "toolChoice" | "tools" | "model"> & {
+     model?: LanguageModelV1 } & (
+        {
+            tools?: TOOLS;
+            toolChoice?: ToolChoice<{ [key in keyof TOOLS | keyof AgentTools]: unknown }>;
+          }
+      ) & ContextOptions & StorageOptions
+  ;
+
+  type ObjectArgs<T extends {
+    model: LanguageModelV1;
+  },
+> = Omit<T, "model"> & {
+  model?: LanguageModelV1;
+} & ContextOptions & StorageOptions;
+
+interface Chat<AgentTools extends ToolSet> {
   generateText<TOOLS extends ToolSet, OUTPUT = never, OUTPUT_PARTIAL = never>(
-    args: Partial<
-      Parameters<typeof generateText<TOOLS, OUTPUT, OUTPUT_PARTIAL>>[0]
-    > & ContextOptions & StorageOptions
+    args: TextArgs<AgentTools, TOOLS,
+      Parameters<(typeof generateText<TOOLS, OUTPUT, OUTPUT_PARTIAL>)>[0]
+    >
   ): Promise<GenerateTextResult<TOOLS, OUTPUT> & GenerationOutputMetadata>;
 
   streamText<TOOLS extends ToolSet, OUTPUT = never, PARTIAL_OUTPUT = never>(
-    args: Partial<
-      Parameters<typeof streamText<TOOLS, OUTPUT, PARTIAL_OUTPUT>>[0]
-    > & ContextOptions & StorageOptions
+    args: TextArgs<AgentTools, TOOLS,
+      Parameters<(typeof streamText<TOOLS, OUTPUT, PARTIAL_OUTPUT>)>[0]
+    >
   ): Promise<
     StreamTextResult<TOOLS, PARTIAL_OUTPUT> & GenerationOutputMetadata
   >;
+  // TODO: add all the overloads
   generateObject<T>(
-    args: Omit<Parameters<typeof generateObject>[0], "model"> & {
-      model?: LanguageModelV1;
-    } & ContextOptions & StorageOptions
+    args:  ObjectArgs<Parameters<typeof generateObject>[0]>
   ): Promise<GenerateObjectResult<T> & GenerationOutputMetadata>;
   streamObject<T>(
-    args: Omit<Parameters<typeof streamObject<T>>[0], "model"> & {
-      model?: LanguageModelV1;
-    } & ContextOptions
+    args:  ObjectArgs<Parameters<typeof streamObject<T>>[0]>
   ): Promise<
     StreamObjectResult<DeepPartial<T>, T, never> & GenerationOutputMetadata
   >;
