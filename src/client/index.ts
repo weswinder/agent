@@ -14,7 +14,16 @@ import type {
 } from "ai";
 import { generateObject, generateText, streamObject, streamText } from "ai";
 import { api } from "../component/_generated/api";
-import { Message, MessageStatus, SearchOptions } from "../validators";
+import {
+  Message,
+  MessageStatus,
+  SearchOptions,
+  vMessage,
+  vContextOptions,
+  vChatArgs,
+  vObjectArgs,
+  vStorageOptions,
+} from "../validators";
 import {
   ChatDoc,
   OpaqueIds,
@@ -26,7 +35,7 @@ import {
 // TODO: is this the only dependency that needs helpers in client?
 import { assert } from "convex-helpers";
 import { ConvexToZod, convexToZod } from "convex-helpers/server/zod";
-import { Infer, Validator } from "convex/values";
+import { Infer, v, Validator } from "convex/values";
 import {
   promptOrMessagesToCoreMessages,
   serializeMessageWithId,
@@ -35,6 +44,7 @@ import {
 } from "../mapping";
 import { DEFAULT_MESSAGE_RANGE, extractText } from "../shared";
 import { Doc } from "../component/_generated/dataModel";
+import { actionGeneric } from "convex/server";
 
 export type ContextOptions = {
   /**
@@ -100,6 +110,7 @@ export class Agent<AgentTools extends ToolSet> {
       tools?: AgentTools;
       contextOptions?: ContextOptions;
       maxSteps?: number;
+      // TODO: maxRetries?: number;
     }
   ) {}
 
@@ -299,7 +310,6 @@ export class Agent<AgentTools extends ToolSet> {
   ): Promise<void> {
     const step = serializeStep(args.step as StepResult<ToolSet>);
     const messages = serializeNewMessagesInStep(args.step);
-    console.log("saveStep", args.step);
     await ctx.runMutation(this.component.messages.addSteps, {
       chatId: args.chatId,
       messageId: args.messageId,
@@ -392,6 +402,7 @@ export class Agent<AgentTools extends ToolSet> {
         tools,
         onStepFinish: async (step) => {
           if (chatId && messageId && args.saveOutputMessages) {
+            console.log("onStepFinish", step);
             await this.saveStep(ctx, {
               chatId,
               messageId,
@@ -404,6 +415,7 @@ export class Agent<AgentTools extends ToolSet> {
       return { ...result, messageId };
     } catch (error) {
       if (chatId && messageId) {
+        console.error("RollbackMessage", messageId);
         await ctx.runMutation(this.component.messages.rollbackMessage, {
           messageId,
           error: (error as Error).message,
@@ -604,48 +616,101 @@ export class Agent<AgentTools extends ToolSet> {
     return search;
   }
 
-  async getChats(
-    ctx: RunQueryCtx,
-    args: { userId: string }
-  ): Promise<{ chats: ChatDoc[]; continueCursor: string; isDone: boolean }> {
-    return await ctx.runQuery(this.component.messages.getChatsByUserId, {
-      userId: args.userId,
-    });
-  }
+  /**
+   *
+   */
+  asAction(spec: { contextOptions?: ContextOptions; maxSteps?: number }) {
+    return actionGeneric({
+      args: {
+        userId: v.optional(v.string()),
+        chatId: v.string(),
+        prompt: v.optional(v.string()),
+        messages: v.optional(v.array(vMessage)),
+        contextOptions: v.optional(vContextOptions),
+        storageOptions: v.optional(vStorageOptions),
+        maxRetries: v.optional(v.number()),
 
-  async getChatMessages(
-    ctx: RunQueryCtx,
-    args: {
-      chatId: string;
-      limit?: number;
-      statuses?: MessageStatus[];
-      cursor?: string;
-      includeToolCalls?: boolean;
-      order?: "asc" | "desc";
-    }
-  ): Promise<{
-    messages: (Message & { id: string })[];
-    continueCursor: string;
-    isDone: boolean;
-  }> {
-    const messages = await ctx.runQuery(
-      this.component.messages.getChatMessages,
-      {
-        chatId: args.chatId,
-        limit: args.limit,
-        statuses: args.statuses,
-        cursor: args.cursor,
-        isTool: args.includeToolCalls,
-        order: args.order,
-      }
-    );
-    return {
-      messages: messages.messages
-        .map((m) => m && { ...m.message, id: m._id })
-        .filter((m): m is Message & { id: string } => m !== undefined),
-      continueCursor: messages.continueCursor,
-      isDone: messages.isDone,
-    };
+        generateText: v.optional(vChatArgs),
+        streamText: v.optional(vChatArgs),
+        generateObject: v.optional(vObjectArgs),
+        streamObject: v.optional(
+          v.object({ ...vObjectArgs.fields, schema: v.optional(v.any()) })
+        ),
+      },
+      handler: async (ctx, args) => {
+        const contextOptions =
+          spec.contextOptions && this.mergedContextOptions(spec.contextOptions);
+        const maxSteps = spec.maxSteps ?? this.options.maxSteps;
+        const maxRetries = args.maxRetries;
+        if (args.generateText) {
+          return this.generateText(
+            ctx,
+            {
+              userId: args.userId,
+              chatId: args.chatId,
+              ...contextOptions,
+              ...args.storageOptions,
+            },
+            {
+              prompt: args.prompt,
+              messages: args.messages,
+              maxSteps: args.generateText.maxSteps ?? maxSteps,
+              maxRetries,
+            }
+          );
+        } else if (args.streamText) {
+          return this.streamText(
+            ctx,
+            {
+              userId: args.userId,
+              chatId: args.chatId,
+              ...contextOptions,
+              ...args.storageOptions,
+            },
+            {
+              prompt: args.prompt,
+              messages: args.messages,
+              maxSteps: args.streamText.maxSteps ?? maxSteps,
+              maxRetries,
+            }
+          );
+        } else if (args.generateObject) {
+          return this.generateObject(
+            ctx,
+            {
+              userId: args.userId,
+              chatId: args.chatId,
+              ...contextOptions,
+              ...args.storageOptions,
+            },
+            {
+              prompt: args.prompt,
+              messages: args.messages,
+              output: args.generateObject.output,
+              maxRetries,
+              mode: args.generateObject.mode,
+            }
+          );
+        } else if (args.streamObject) {
+          return this.streamObject(
+            ctx,
+            {
+              userId: args.userId,
+              chatId: args.chatId,
+              ...contextOptions,
+              ...args.storageOptions,
+            },
+            {
+              prompt: args.prompt,
+              messages: args.messages,
+              output: args.streamObject.output,
+              mode: args.streamObject.mode,
+              schema: args.streamObject.schema,
+            }
+          );
+        }
+      },
+    });
   }
 
   /**
@@ -654,7 +719,7 @@ export class Agent<AgentTools extends ToolSet> {
    *   They will be encoded as JSON and passed to the agent.
    * @returns The agent as a tool that can be passed to other agents.
    */
-  createTool(spec: {
+  asTool(spec: {
     description: string;
     args: Validator<unknown, "required", string>;
     contextOptions?: ContextOptions;

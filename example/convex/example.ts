@@ -31,17 +31,20 @@ export const continueChat = action({
 export const getChatMessages = query({
   args: { chatId: v.string() },
   handler: async (ctx, { chatId }) => {
-    return await supportAgent.getChatMessages(ctx, { chatId, limit: 100 });
+    return await ctx.runQuery(components.agent.messages.getChatMessages, {
+      chatId,
+      limit: 100,
+    });
   },
 });
 
 export const getInProgressMessages = query({
   args: { chatId: v.string() },
   handler: async (ctx, { chatId }) => {
-    const { messages } = await supportAgent.getChatMessages(ctx, {
-      chatId,
-      statuses: ["pending"],
-    });
+    const { messages } = await ctx.runQuery(
+      components.agent.messages.getChatMessages,
+      { chatId, statuses: ["pending"] },
+    );
     return messages;
   },
 });

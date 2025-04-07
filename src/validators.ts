@@ -256,3 +256,31 @@ export const vSearchOptions = v.object({
   messageRange: v.optional(v.object({ before: v.number(), after: v.number() })),
 });
 export type SearchOptions = Infer<typeof vSearchOptions>;
+
+export const vContextOptionsSearchOptions = v.object({
+  limit: v.number(),
+  textSearch: v.optional(v.boolean()),
+  vectorSearch: v.optional(v.boolean()),
+  messageRange: v.optional(v.object({ before: v.number(), after: v.number() })),
+});
+
+export const vContextOptions = v.object({
+  includeToolCalls: v.optional(v.boolean()),
+  recentMessages: v.optional(v.number()),
+  searchOptions: v.optional(vContextOptionsSearchOptions),
+  searchOtherChats: v.optional(v.boolean()),
+});
+
+export const vStorageOptions = v.object({
+  saveAllInputMessages: v.optional(v.boolean()),
+  saveAllOutputMessages: v.optional(v.boolean()),
+});
+
+export const vChatArgs = v.object({
+  maxSteps: v.optional(v.number()),
+});
+
+export const vObjectArgs = v.object({
+  output: v.optional(v.any()),
+  mode: v.optional(v.literal("json")),
+});

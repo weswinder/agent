@@ -3,11 +3,13 @@ import { expectTypeOf, test } from "vitest";
 import {
   vAssistantContent,
   vAssistantMessage,
+  vContextOptions,
   vFilePart,
   vImagePart,
   vMessage,
   vReasoningPart,
   vRedactedReasoningPart,
+  vStorageOptions,
   vSystemMessage,
   vTextPart,
   vToolCallPart,
@@ -31,6 +33,7 @@ import {
   UserContent,
 } from "ai";
 import { SerializeUrlsAndUint8Arrays } from "./mapping";
+import { ContextOptions, StorageOptions } from "./client";
 
 // type assertion
 type OurUserContent = SerializeUrlsAndUint8Arrays<UserContent>;
@@ -97,5 +100,11 @@ expectTypeOf<CoreSystemMessage>().toExtend<Infer<typeof vSystemMessage>>();
 type OurMessage = SerializeUrlsAndUint8Arrays<CoreMessage>;
 expectTypeOf<OurMessage>().toExtend<Infer<typeof vMessage>>();
 expectTypeOf<Infer<typeof vMessage>>().toExtend<OurMessage>();
+
+expectTypeOf<Infer<typeof vContextOptions>>().toExtend<ContextOptions>();
+expectTypeOf<ContextOptions>().toExtend<Infer<typeof vContextOptions>>();
+
+expectTypeOf<Infer<typeof vStorageOptions>>().toExtend<StorageOptions>();
+expectTypeOf<StorageOptions>().toExtend<Infer<typeof vStorageOptions>>();
 
 test("noop", () => { });

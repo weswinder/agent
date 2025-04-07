@@ -1,3 +1,4 @@
+import { vMessageDoc } from "./../../src/component/messages";
 import { action, ActionCtx, query } from "./_generated/server";
 import { api, components } from "./_generated/api";
 import { Agent } from "@convex-dev/agent";
@@ -7,6 +8,7 @@ import { openai } from "@ai-sdk/openai";
 import { createTool } from "@convex-dev/agent";
 import { Doc, Id } from "./_generated/dataModel";
 import { Message } from "../../src/validators";
+import { MessageDoc } from "../../src/client/types";
 
 /**
  * TOOLS
@@ -120,7 +122,7 @@ const ideaDevelopmentAgent = new Agent(components.agent, {
  * AGENTS AS TOOLS TO OTHER AGENTS
  */
 
-const ideaManager = ideaManagerAgent.createTool({
+const ideaManager = ideaManagerAgent.asTool({
   description:
     "Call on me to organize and create ideas. " +
     "Tell me the what you need, and I'll tell you what I did. " +
@@ -133,7 +135,7 @@ const ideaManager = ideaManagerAgent.createTool({
   maxSteps: 10,
 });
 
-const ideaDeveloper = ideaDevelopmentAgent.createTool({
+const ideaDeveloper = ideaDevelopmentAgent.asTool({
   description:
     "Call on me to develop ideas. " +
     "Tell me what the idea's ID is, and I'll tell you what I did. " +
@@ -194,7 +196,9 @@ export const submitRandomThought = action({
 });
 
 async function getOrCreateChat(ctx: ActionCtx, userId: string) {
-  const page = await ideaTriageAgent.getChats(ctx, { userId });
+  const page = await ctx.runQuery(components.agent.messages.getChatsByUserId, {
+    userId,
+  });
   const chatId = page.chats[0]?._id;
   if (chatId) {
     const { chat } = await ideaTriageAgent.continueChat(ctx, {
@@ -212,16 +216,19 @@ export const inProgressMessages = query({
     ctx,
     { userId },
   ): Promise<{
-    messages: (Message & { id: string })[];
+    messages: MessageDoc[];
     continueCursor: string;
     isDone: boolean;
   }> => {
-    const chatPager = await ideaTriageAgent.getChats(ctx, { userId });
+    const chatPager = await ctx.runQuery(
+      components.agent.messages.getChatsByUserId,
+      { userId },
+    );
     const chatId = chatPager.chats[0]?._id;
     if (!chatId) {
       return { messages: [], continueCursor: "", isDone: false };
     }
-    return await ideaTriageAgent.getChatMessages(ctx, {
+    return await ctx.runQuery(components.agent.messages.getChatMessages, {
       chatId,
       statuses: ["pending"],
     });
