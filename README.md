@@ -6,8 +6,8 @@
 
 AI Agent framework built on Convex.
 
-- Automatic storage of thread history, per-user or per-thread.
-- RAG for thread context, via hybrid text & vector search, with configuration options.
+- Automatic storage of chat history, per-user or per-thread.
+- RAG for chat context, via hybrid text & vector search, with configuration options.
   Or use the API to query the history yourself and do it your way.
 - Opt-in search for messages from other threads (for the same specifieduser).
 - Tool calls via the AI SDK, along with Convex-specific helpers.
@@ -180,6 +180,8 @@ const supportAgent = new Agent(components.agent, {
 You can start a thread from either an action or a mutation.
 If it's in an action, you can also start sending messages.
 The threadId allows you to resume later and maintain message history.
+If you specify a userId, the thread will be associated with that user and messages will be saved to the user's history.
+You can also search the user's history for relevant messages in this thread.
 
 ```ts
 // Use the agent from within a normal action:
@@ -195,6 +197,9 @@ export const createThread = action({
 ```
 
 ### Continuing a thread
+
+If you specify a userId too, you can search the user's history for relevant messages
+to include in the prompt context.
 
 ```ts
 // Pick up where you left off:
@@ -217,8 +222,8 @@ export const supportAgentStep = supportAgent.asAction({ maxSteps: 10 });
 // Then from within another action:
 export const callSupportAgent = action({
   args: { prompt: v.string(), userId: v.string(), threadId: v.string() },
-  handler: async (step, { prompt, userId, threadId }) => {
-    const suggestion = await step.runAction(s.supportAgentStep, {
+  handler: async (ctx, { prompt, userId, threadId }) => {
+    const suggestion = await ctx.runAction(s.supportAgentStep, {
       threadId, userId, generateText: { prompt },
     });
   },
@@ -240,12 +245,10 @@ export const supportAgentWorkflow = workflow.define({
   args: { prompt: v.string(), userId: v.string(), threadId: v.string() },
   handler: async (step, { prompt, userId, threadId }) => {
     const suggestion = await step.runAction(s.supportAgentStep, {
-      threadId,
-      generateText: { prompt },
+      threadId, userId, generateText: { prompt },
     });
     const polished = await step.runAction(s.adaptSuggestionForUser, {
-      userId,
-      generateText: { prompt: suggestion },
+      threadId, userId, generateText: { prompt: suggestion },
     });
     await step.runMutation(s.sendUserMessage, { userId, message: polished.message });
   },
@@ -255,9 +258,10 @@ export const supportAgentWorkflow = workflow.define({
 ### Fetching thread history
 
 ```ts
-const messages = await ctx.runQuery(components.agent.messages.getThreadMessages, {
-  threadId,
-});
+const messages = await ctx.runQuery(
+  components.agent.messages.getThreadMessages,
+  { threadId }
+);
 ```
 
 ### Generating text for a user without an associated thread
@@ -269,10 +273,10 @@ const result = await supportAgent.generateText(ctx, { userId }, { prompt });
 ### Manually managing messages
 
 ```ts
-const messages = await ctx.runQuery(components.agent.messages.getThreadMessages, {
-  threadId,
-  {...searchOptions}
-});
+const messages = await ctx.runQuery(
+  components.agent.messages.getThreadMessages,
+  { threadId, ...searchOptions }
+);
 ```
 
 ```ts
@@ -291,54 +295,41 @@ const messages = await agent.completeMessage(ctx, { threadId, userId, messageId 
 ### Manage embeddings
 
 ```ts
-const messages = await ctx.runQuery(components.agent.embeddings.paginate, {
-  vectorDimension: 1536,
-  targetModel: "gpt-4o-mini",
-  cursor: null,
-  limit: 10,
-});
+const messages = await ctx.runQuery(
+  components.agent.embeddings.paginate,
+  { vectorDimension: 1536, cursor: null, limit: 10 }
+);
 ```
 
 ```ts
-const messages = await ctx.runQuery(components.agent.embeddings.deleteBatchForThread, {
-  vectorDimension: 1536,
-  targetModel: "gpt-4o-mini",
-  threadId: "123",
-  cursor: null,
-  limit: 10,
-});
+const messages = await ctx.runQuery(
+  components.agent.embeddings.deleteBatchForThread,
+  { vectorDimension: 1536, targetModel: "gpt-4o-mini", threadId: "123", cursor: null, limit: 10 }
+);
 ```
 
 ```ts
-const messages = await ctx.runQuery(components.agent.embeddings.insertBatch, {
-  vectorDimension: 1536,
-  vectors: [
-    {
-      model: "gpt-4o-mini",
-      kind: "thread",
-      userId: "123",
-      threadId: "123",
-      vector: embedding,
-    },
-  ],
-});
+const messages = await ctx.runQuery(
+  components.agent.embeddings.insertBatch, {
+    vectorDimension: 1536,
+    vectors: [
+      { model: "gpt-4o-mini", kind: "thread", userId: "123", threadId: "123", vector: embedding, },
+    ],
+  }
+);
 ```
 
 ```ts
 const messages = await ctx.runQuery(components.agent.embeddings.updateBatch, {
   vectors: [
-    {
-      model: "gpt-4o-mini",
-      id: "123", // message's embeddingId
-      vector: embedding,
-    },
+    { model: "gpt-4o-mini", vector: embedding, id: msg.embeddingId },
   ],
 });
 ```
 
 ```ts
 const messages = await ctx.runQuery(components.agent.embeddings.deleteBatch, {
-  ids: ["123", "456"],
+  ids: [embeddingId1, embeddingId2],
 });
 ```
 

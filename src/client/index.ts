@@ -629,7 +629,7 @@ export class Agent<AgentTools extends ToolSet> {
 
         createThread: v.optional(
           v.object({
-            userId: v.string(),
+            userId: v.optional(v.string()),
             parentThreadIds: v.optional(v.array(v.string())),
             title: v.optional(v.string()),
             summary: v.optional(v.string()),

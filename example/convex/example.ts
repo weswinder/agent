@@ -14,11 +14,9 @@ const supportAgent = new Agent(components.agent, {
 
 // Use the agent from within a normal action:
 export const createThread = action({
-  args: { prompt: v.string(), userId: v.string() },
-  handler: async (ctx, { prompt, userId }) => {
-    const { threadId, thread } = await supportAgent.createThread(ctx, {
-      userId,
-    });
+  args: { prompt: v.string() },
+  handler: async (ctx, { prompt }) => {
+    const { threadId, thread } = await supportAgent.createThread(ctx, {});
     const result = await thread.generateText({ prompt });
     return { threadId, text: result.text };
   },
@@ -41,10 +39,10 @@ const workflow = new WorkflowManager(components.workflow);
 const s = internal.example; // where steps are defined
 
 export const supportAgentWorkflow = workflow.define({
-  args: { prompt: v.string(), userId: v.string() },
-  handler: async (step, { prompt, userId }) => {
+  args: { prompt: v.string() },
+  handler: async (step, { prompt }) => {
     const { threadId } = await step.runAction(s.supportAgentStep, {
-      createThread: { userId },
+      createThread: {},
     });
     const result = await step.runAction(s.supportAgentStep, {
       threadId,
@@ -77,11 +75,9 @@ export const getInProgressMessages = query({
 });
 
 export const streamThread = action({
-  args: { prompt: v.string(), userId: v.string() },
-  handler: async (ctx, { prompt, userId }) => {
-    const { threadId, thread } = await supportAgent.createThread(ctx, {
-      userId,
-    });
+  args: { prompt: v.string() },
+  handler: async (ctx, { prompt }) => {
+    const { threadId, thread } = await supportAgent.createThread(ctx, {});
     const result = await thread.streamText({ prompt });
     return { threadId, text: result.text };
   },
