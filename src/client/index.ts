@@ -11,23 +11,14 @@ import type {
   ToolChoice,
   ToolExecutionOptions,
   ToolSet,
-  Message as UIMessage,
 } from "ai";
-import {
-  convertToCoreMessages,
-  coreMessageSchema,
-  generateObject,
-  generateText,
-  streamObject,
-  streamText,
-} from "ai";
+import { generateObject, generateText, streamObject, streamText } from "ai";
 import { api } from "../component/_generated/api";
 import { Message, MessageStatus, SearchOptions } from "../validators";
 import { RunActionCtx, RunMutationCtx, RunQueryCtx, UseApi } from "./types";
 // TODO: is this the only dependency that needs helpers in client?
 import { assert } from "convex-helpers";
 import { ConvexToZod, convexToZod } from "convex-helpers/server/zod";
-import { GenericActionCtx, GenericDataModel } from "convex/server";
 import { Infer, Validator } from "convex/values";
 import {
   serializeMessageWithId,
@@ -37,15 +28,42 @@ import {
 import { DEFAULT_MESSAGE_RANGE, extractText } from "../shared";
 
 export type ContextOptions = {
-  parentMessageId?: string;
-  includeToolMessages?: boolean;
+  /**
+   * Whether to include tool messages in the context.
+   */
+  includeToolCalls?: boolean;
+  /**
+   * How many recent messages to include. These are added after the search
+   * messages, and do not count against the search limit.
+   */
   recentMessages?: number;
+  /**
+   * Options for searching messages.
+   */
   searchOptions?: {
+    /**
+     * The maximum number of messages to fetch.
+     */
     limit: number;
+    /**
+     * Whether to use text search to find messages.
+     */
     textSearch?: boolean;
+    /**
+     * Whether to use vector search to find messages.
+     */
     vectorSearch?: boolean;
-    messageRange: { before: number; after: number };
+    /**
+     * Note, this is after the limit is applied.
+     * By default this will quadruple the number of messages fetched.
+     * (two before, and one after each message found in the search)
+     */
+    messageRange?: { before: number; after: number };
   };
+  /**
+   * Whether to search across other chats for relevant messages.
+   * By default, only the current chat is searched.
+   */
   searchOtherChats?: boolean;
 };
 
@@ -69,8 +87,9 @@ export class Agent<AgentTools extends ToolSet> {
       name?: string;
       chat: LanguageModelV1;
       textEmbedding?: EmbeddingModelV1<string>;
-      defaultSystemPrompt?: string;
+      instructions?: string;
       tools?: AgentTools;
+      contextOptions?: ContextOptions;
     }
   ) {}
 
@@ -144,7 +163,7 @@ export class Agent<AgentTools extends ToolSet> {
     chat?: Chat<AgentTools>;
   }> {
     const chatDoc = await ctx.runMutation(this.component.messages.createChat, {
-      defaultSystemPrompt: this.options.defaultSystemPrompt,
+      defaultSystemPrompt: this.options.instructions,
       userId: args.userId,
       title: args.title,
       summary: args.summary,
@@ -192,12 +211,14 @@ export class Agent<AgentTools extends ToolSet> {
       userId?: string;
       chatId?: string;
       messages: CoreMessage[];
+      parentMessageId?: string;
     } & ContextOptions
   ): Promise<CoreMessage[]> {
     assert(args.userId || args.chatId, "Specify userId or chatId");
     // Fetch the latest messages from the chat
     const contextMessages: CoreMessage[] = [];
-    if (args.searchOptions?.textSearch || args.searchOptions?.vectorSearch) {
+    const opts = this.mergedContextOptions(args);
+    if (opts.searchOptions?.textSearch || opts.searchOptions?.vectorSearch) {
       if (!("runAction" in ctx)) {
         throw new Error("searchUserMessages only works in an action");
       }
@@ -207,7 +228,7 @@ export class Agent<AgentTools extends ToolSet> {
           userId: args.searchOtherChats ? args.userId : undefined,
           chatId: args.chatId,
           parentMessageId: args.parentMessageId,
-          ...(await this.searchOptionsWithDefaults(args, args.messages)),
+          ...(await this.searchOptionsWithDefaults(opts, args.messages)),
         }
       );
       // TODO: track what messages we used for context
@@ -218,7 +239,7 @@ export class Agent<AgentTools extends ToolSet> {
         this.component.messages.getChatMessages,
         {
           chatId: args.chatId,
-          isTool: args.includeToolMessages ?? false,
+          isTool: args.includeToolCalls ?? false,
           limit: args.recentMessages,
           parentMessageId: args.parentMessageId,
           order: "desc",
@@ -237,6 +258,7 @@ export class Agent<AgentTools extends ToolSet> {
       messages: CoreMessageMaybeWithId[];
       pending?: boolean;
       parentMessageId?: string;
+      failPendingSteps?: boolean;
     }
   ): Promise<{
     lastMessageId: string;
@@ -247,7 +269,7 @@ export class Agent<AgentTools extends ToolSet> {
       agentName: this.options.name,
       model: this.options.chat.modelId,
       messages: args.messages.map(serializeMessageWithId),
-      failPendingSteps: true,
+      failPendingSteps: args.failPendingSteps ?? true,
       pending: args.pending ?? false,
       parentMessageId: args.parentMessageId,
     });
@@ -341,13 +363,13 @@ export class Agent<AgentTools extends ToolSet> {
       pending: true,
       parentMessageId: args.parentMessageId,
     });
-    const defaults = this.options.tools;
-    const tools = wrapTools(ctx, chatId, userId, defaults, args.tools) as TOOLS;
+    const toolCtx = { ...ctx, userId, chatId, messageId };
+    const tools = wrapTools(toolCtx, this.options.tools, args.tools) as TOOLS;
     try {
       const result = await generateText({
         model: this.options.chat,
         messages: [...contextMessages, ...messages],
-        system: this.options.defaultSystemPrompt,
+        system: this.options.instructions,
         tools,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         toolChoice: args.toolChoice as any,
@@ -382,11 +404,11 @@ export class Agent<AgentTools extends ToolSet> {
   >(
     ctx: RunActionCtx,
     { userId, chatId }: { userId?: string; chatId: string },
-    args: Partial<
+    args: TextArgs<
+      AgentTools,
+      TOOLS,
       Parameters<typeof streamText<TOOLS, OUTPUT, PARTIAL_OUTPUT>>[0]
-    > &
-      ContextOptions &
-      StorageOptions
+    >
   ): Promise<
     StreamTextResult<TOOLS, PARTIAL_OUTPUT> & GenerationOutputMetadata
   > {
@@ -404,12 +426,12 @@ export class Agent<AgentTools extends ToolSet> {
       pending: true,
       parentMessageId: args.parentMessageId,
     });
-    const defaults = this.options.tools;
-    const tools = wrapTools(ctx, chatId, userId, defaults, args.tools) as TOOLS;
+    const toolCtx = { ...ctx, userId, chatId, messageId };
+    const tools = wrapTools(toolCtx, this.options.tools, args.tools) as TOOLS;
     const result = streamText({
       model: this.options.chat,
       messages: [...contextMessages, ...messages],
-      system: this.options.defaultSystemPrompt,
+      system: this.options.instructions,
       tools,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       toolChoice: args.toolChoice as any,
@@ -455,7 +477,7 @@ export class Agent<AgentTools extends ToolSet> {
     { userId, chatId }: { userId?: string; chatId: string },
     args: Omit<Parameters<typeof generateObject>[0], "model"> & {
       model?: LanguageModelV1;
-    } & ContextOptions &
+    } & { parentMessageId?: string } & ContextOptions &
       StorageOptions
   ): Promise<GenerateObjectResult<T> & GenerationOutputMetadata> {
     const { prompt, messages: raw, ...rest } = args;
@@ -484,7 +506,7 @@ export class Agent<AgentTools extends ToolSet> {
     { userId, chatId }: { userId?: string; chatId: string },
     args: Omit<Parameters<typeof streamObject<T>>[0], "model"> & {
       model?: LanguageModelV1;
-    } & ContextOptions &
+    } & { parentMessageId?: string } & ContextOptions &
       StorageOptions
   ): Promise<
     StreamObjectResult<DeepPartial<T>, T, never> & GenerationOutputMetadata
@@ -517,27 +539,41 @@ export class Agent<AgentTools extends ToolSet> {
     return { ...result, messageId };
   }
 
+  mergedContextOptions(opts: ContextOptions): ContextOptions {
+    const searchOptions = {
+      ...this.options.contextOptions?.searchOptions,
+      ...opts.searchOptions,
+    };
+    return {
+      ...this.options.contextOptions,
+      ...opts,
+      searchOptions: searchOptions.limit
+        ? (searchOptions as SearchOptions)
+        : undefined,
+    };
+  }
+
   async searchOptionsWithDefaults(
-    searchArgs: ContextOptions,
+    contextOptions: ContextOptions,
     messages: CoreMessage[]
   ): Promise<SearchOptions> {
     assert(
-      searchArgs.searchOptions?.textSearch ||
-        searchArgs.searchOptions?.vectorSearch,
+      contextOptions.searchOptions?.textSearch ||
+        contextOptions.searchOptions?.vectorSearch,
       "searchOptions is required"
     );
     assert(messages.length > 0, "Core messages cannot be empty");
     const text = extractText(messages.at(-1)!);
     const search: SearchOptions = {
-      limit: searchArgs.searchOptions?.limit ?? 10,
+      limit: contextOptions.searchOptions?.limit ?? 10,
       messageRange: {
         ...DEFAULT_MESSAGE_RANGE,
-        ...searchArgs.searchOptions?.messageRange,
+        ...contextOptions.searchOptions?.messageRange,
       },
       text: extractText(messages.at(-1)!),
     };
     if (
-      searchArgs.searchOptions?.vectorSearch &&
+      contextOptions.searchOptions?.vectorSearch &&
       text &&
       this.options.textEmbedding
     ) {
@@ -558,7 +594,7 @@ export class Agent<AgentTools extends ToolSet> {
       limit?: number;
       statuses?: MessageStatus[];
       cursor?: string;
-      includeToolMessages?: boolean;
+      includeToolCalls?: boolean;
       order?: "asc" | "desc";
     }
   ): Promise<{
@@ -573,7 +609,7 @@ export class Agent<AgentTools extends ToolSet> {
         limit: args.limit,
         statuses: args.statuses,
         cursor: args.cursor,
-        isTool: args.includeToolMessages,
+        isTool: args.includeToolCalls,
         order: args.order,
       }
     );
@@ -584,6 +620,30 @@ export class Agent<AgentTools extends ToolSet> {
       continueCursor: messages.continueCursor,
       isDone: messages.isDone,
     };
+  }
+
+  /**
+   * Create a tool that can call this agent.
+   * @param spec The specification for the arguments to this agent.
+   *   They will be encoded as JSON and passed to the agent.
+   * @returns The agent as a tool that can be passed to other agents.
+   */
+  createTool(spec: {
+    description: string;
+    args: Validator<unknown, "required", string>;
+    contextOptions?: ContextOptions;
+  }) {
+    return createTool({
+      ...spec,
+      handler: async (ctx, args) => {
+        const value = await this.generateText(
+          ctx,
+          { userId: ctx.userId, chatId: ctx.chatId },
+          { prompt: JSON.stringify(args), parentMessageId: ctx.messageId }
+        );
+        return value.text;
+      },
+    });
   }
 }
 
@@ -628,6 +688,7 @@ type TextArgs<
   },
 > = Omit<T, "toolChoice" | "tools" | "model"> & {
   model?: LanguageModelV1;
+  parentMessageId?: string;
 } & {
   tools?: TOOLS;
   toolChoice?: ToolChoice<{ [key in keyof TOOLS | keyof AgentTools]: unknown }>;
@@ -682,28 +743,30 @@ interface Chat<AgentTools extends ToolSet> {
 //     : PARAMETERS extends z.ZodTypeAny
 //       ? z.infer<PARAMETERS>
 //       : never;
+export type ToolCtx = RunActionCtx & {
+  userId?: string;
+  chatId: string;
+  messageId?: string;
+};
 /**
  * This is a wrapper around the ai.tool function that adds support for
  * userId and chatId to the tool, if they're called within a chat from an agent.
  * @param tool The AI tool. See https://sdk.vercel.ai/docs/ai-sdk-core/tools-and-tool-calling
  * @returns The same tool, but with userId and chatId args support added.
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function tool<V extends Validator<any, any, any>, RESULT>(convexTool: {
+export function createTool<
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  V extends Validator<any, any, any>,
+  RESULT,
+>(convexTool: {
   args: V;
   description?: string;
   handler: (
-    ctx: GenericActionCtx<GenericDataModel> & {
-      userId?: string;
-      chatId?: string;
-    },
+    ctx: ToolCtx,
     args: Infer<V>,
     options: ToolExecutionOptions
   ) => PromiseLike<RESULT>;
-  ctx?: GenericActionCtx<GenericDataModel> & {
-    userId?: string;
-    chatId?: string;
-  };
+  ctx?: ToolCtx;
 }): Tool<ConvexToZod<V>, RESULT> {
   const tool = {
     __acceptUserIdAndChatId: true,
@@ -723,13 +786,10 @@ export function tool<V extends Validator<any, any, any>, RESULT>(convexTool: {
   return tool;
 }
 
-export function wrapTools(
-  actionCtx: RunActionCtx,
-  chatId: string,
-  userId?: string,
+function wrapTools(
+  ctx: ToolCtx,
   ...toolSets: (ToolSet | undefined)[]
 ): ToolSet {
-  const ctx = { ...actionCtx, chatId, userId };
   const output = {} as ToolSet;
   for (const toolSet of toolSets) {
     if (!toolSet) {

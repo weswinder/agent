@@ -402,7 +402,8 @@ async function addMessagesHandler(
   assert(chat, `Chat ${args.chatId} not found`);
   const { failPendingSteps, pending, messages, parentMessageId, ...rest } =
     args;
-  if (failPendingSteps) {
+  const parent = parentMessageId && (await ctx.db.get(parentMessageId));
+  if (failPendingSteps && parent?.status !== "pending") {
     const pendingMessages = await ctx.db
       .query("messages")
       .withIndex("chatId_status_tool_order_stepOrder", (q) =>
