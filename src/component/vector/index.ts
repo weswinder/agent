@@ -1,15 +1,10 @@
 import { paginator } from "convex-helpers/server/pagination";
 import { v } from "convex/values";
-import {
-  action,
-  internalAction,
-  internalMutation,
-  internalQuery,
-  mutation,
-  query,
-} from "../_generated/server";
+import { mutation, query } from "../_generated/server";
 import { getVectorTableName, vVectorDimension, vVectorId } from "./tables";
 import schema from "../schema";
+import { mergedStream } from "convex-helpers/server/stream";
+import { stream } from "convex-helpers/server/stream";
 
 export const paginate = query({
   args: {
@@ -38,6 +33,46 @@ export const paginate = query({
       });
     return {
       ids: vectors.page.map((v) => v._id),
+      isDone: vectors.isDone,
+      continueCursor: vectors.continueCursor,
+    };
+  },
+});
+
+export const deleteBatchForChat = mutation({
+  args: {
+    vectorDimension: vVectorDimension,
+    model: v.string(),
+    chatId: v.string(),
+    cursor: v.optional(v.string()),
+    limit: v.number(),
+  },
+  returns: v.object({
+    isDone: v.boolean(),
+    continueCursor: v.string(),
+  }),
+  handler: async (ctx, args) => {
+    const tableName = getVectorTableName(args.vectorDimension);
+    const vectors = await mergedStream(
+      ["chat", "memory"].map((kind) =>
+        stream(ctx.db, schema)
+          .query(tableName)
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          .withIndex("model_kind_chatId" as any, (q) =>
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (q.eq("model", args.model) as any)
+              .eq("kind", kind)
+              .eq("chatId", args.chatId)
+          )
+      ),
+      ["chatId"]
+    ).paginate({
+      cursor: args.cursor ?? null,
+      numItems: args.limit,
+      maximumRowsRead: 300,
+    });
+    await Promise.all(vectors.page.map((v) => ctx.db.delete(v._id)));
+    return {
       isDone: vectors.isDone,
       continueCursor: vectors.continueCursor,
     };

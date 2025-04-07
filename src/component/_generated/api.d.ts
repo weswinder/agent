@@ -1501,6 +1501,27 @@ export type Mounts = {
         },
         null
       >;
+      deleteBatchForChat: FunctionReference<
+        "mutation",
+        "public",
+        {
+          chatId: string;
+          cursor?: string;
+          limit: number;
+          model: string;
+          vectorDimension:
+            | 128
+            | 256
+            | 512
+            | 768
+            | 1024
+            | 1536
+            | 2048
+            | 3072
+            | 4096;
+        },
+        { continueCursor: string; isDone: boolean }
+      >;
       insertBatch: FunctionReference<
         "mutation",
         "public",
