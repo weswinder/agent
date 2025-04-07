@@ -597,9 +597,12 @@ export const getChatMessages = query({
     // Note: the other arguments cannot change from when the cursor was created.
     cursor: v.optional(v.string()),
     statuses: v.optional(v.array(vMessageStatus)),
+    parentMessageId: v.optional(v.id("messages")),
   },
   handler: async (ctx, args) => {
     const statuses = args.statuses ?? ["success"];
+    const parent =
+      args.parentMessageId && (await ctx.db.get(args.parentMessageId));
     const toolOptions =
       args.isTool === undefined ? [true, false] : [args.isTool];
     const order = args.order ?? "desc";
@@ -607,9 +610,16 @@ export const getChatMessages = query({
       statuses.map((status) =>
         stream(ctx.db, schema)
           .query("messages")
-          .withIndex("chatId_status_tool_order_stepOrder", (q) =>
-            q.eq("chatId", args.chatId).eq("status", status).eq("tool", tool)
-          )
+          .withIndex("chatId_status_tool_order_stepOrder", (q) => {
+            const qq = q
+              .eq("chatId", args.chatId)
+              .eq("status", status)
+              .eq("tool", tool);
+            if (parent) {
+              return qq.lte("order", parent.order);
+            }
+            return qq;
+          })
           .order(order)
       )
     );
@@ -637,6 +647,7 @@ export const searchMessages = action({
   args: {
     userId: v.optional(v.string()),
     chatId: v.optional(v.id("chats")),
+    parentMessageId: v.optional(v.id("messages")),
     ...vSearchOptions.fields,
   },
   returns: v.array(v.doc("messages")),
@@ -688,10 +699,12 @@ export const searchMessages = action({
           userId: args.userId,
           chatId: args.chatId,
           vectorIds,
-          textSearchMessages: textSearchMessages
-            ?.filter((m) => !vectorIds.includes(m.embeddingId!))
-            .slice(0, limit - vectorIds.length),
+          textSearchMessages: textSearchMessages?.filter(
+            (m) => !vectorIds.includes(m.embeddingId!)
+          ),
           messageRange: args.messageRange ?? DEFAULT_MESSAGE_RANGE,
+          parentMessageId: args.parentMessageId,
+          limit,
         }
       );
       return messages;
@@ -707,10 +720,14 @@ export const _fetchVectorMessages = internalQuery({
     vectorIds: v.array(vVectorId),
     textSearchMessages: v.optional(v.array(v.doc("messages"))),
     messageRange: v.object({ before: v.number(), after: v.number() }),
+    parentMessageId: v.optional(v.id("messages")),
+    limit: v.number(),
   },
   returns: v.array(v.doc("messages")),
   handler: async (ctx, args): Promise<Doc<"messages">[]> => {
-    const messages = (
+    const parent =
+      args.parentMessageId && (await ctx.db.get(args.parentMessageId));
+    let messages = (
       await Promise.all(
         args.vectorIds.map((embeddingId) =>
           ctx.db
@@ -726,9 +743,14 @@ export const _fetchVectorMessages = internalQuery({
             .first()
         )
       )
-    ).filter((m): m is Doc<"messages"> => m !== undefined);
+    ).filter(
+      (m): m is Doc<"messages"> =>
+        m !== undefined && m !== null && (!parent || m.order <= parent.order)
+    );
     messages.push(...(args.textSearchMessages ?? []));
+    // TODO: prioritize more recent messages
     messages.sort((a, b) => a.order! - b.order!);
+    messages = messages.slice(0, args.limit);
     // Fetch the surrounding messages
     const included: Record<Id<"chats">, Set<number>> = {};
     for (const m of messages) {

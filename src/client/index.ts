@@ -1,7 +1,7 @@
 import { api } from "../component/_generated/api";
 import { RunActionCtx, RunMutationCtx, RunQueryCtx, UseApi } from "./types";
 import type { EmbeddingModelV1, LanguageModelV1 } from "@ai-sdk/provider";
-import { Message, MessageStatus, SearchOptions, Step } from "../validators";
+import { Message, MessageStatus, SearchOptions } from "../validators";
 import type {
   StreamTextResult,
   ToolSet,
@@ -32,6 +32,7 @@ import {
 } from "../mapping";
 
 export type ContextOptions = {
+  parentMessageId?: string;
   includeToolMessages?: boolean;
   recentMessages?: number;
   searchOptions?: {
@@ -200,9 +201,11 @@ export class Agent<AgentTools extends ToolSet> {
         {
           userId: args.searchOtherChats ? args.userId : undefined,
           chatId: args.chatId,
+          parentMessageId: args.parentMessageId,
           ...(await this.searchOptionsWithDefaults(args, args.messages)),
         }
       );
+      // TODO: track what messages we used for context
       contextMessages.push(...searchMessages.map((m) => m.message!));
     }
     if (args.chatId) {
@@ -212,6 +215,7 @@ export class Agent<AgentTools extends ToolSet> {
           chatId: args.chatId,
           isTool: args.includeToolMessages ?? false,
           limit: args.recentMessages,
+          parentMessageId: args.parentMessageId,
           order: "desc",
           statuses: ["success"],
         }
@@ -227,6 +231,7 @@ export class Agent<AgentTools extends ToolSet> {
       chatId: string;
       messages: CoreMessageMaybeWithId[];
       pending?: boolean;
+      parentMessageId?: string;
     }
   ): Promise<{
     lastMessageId: string;
@@ -239,6 +244,7 @@ export class Agent<AgentTools extends ToolSet> {
       messages: args.messages.map(serializeMessageWithId),
       failPendingSteps: true,
       pending: args.pending ?? false,
+      parentMessageId: args.parentMessageId,
     });
     return {
       lastMessageId: result.messages.at(-1)!._id,
@@ -328,6 +334,7 @@ export class Agent<AgentTools extends ToolSet> {
       chatId,
       messages: args.saveAllInputMessages ? messages : messages.slice(-1),
       pending: true,
+      parentMessageId: args.parentMessageId,
     });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const tools: any = this.options.tools
@@ -392,6 +399,7 @@ export class Agent<AgentTools extends ToolSet> {
       chatId,
       messages: args.saveAllInputMessages ? messages : messages.slice(-1),
       pending: true,
+      parentMessageId: args.parentMessageId,
     });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const tools: any = this.options.tools

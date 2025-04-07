@@ -264,7 +264,7 @@ export type Mounts = {
                 role: "system";
               };
           model?: string;
-          order?: number;
+          order: number;
           status: "pending" | "success" | "failed";
           stepId?: string;
           stepOrder?: number;
@@ -388,7 +388,7 @@ export type Mounts = {
                 role: "system";
               };
           model?: string;
-          order?: number;
+          order: number;
           status: "pending" | "success" | "failed";
           stepId?: string;
           stepOrder?: number;
@@ -1011,6 +1011,7 @@ export type Mounts = {
         isTool?: boolean;
         limit?: number;
         order?: "asc" | "desc";
+        parentMessageId?: string;
         statuses?: Array<"pending" | "success" | "failed">;
       },
       {
@@ -1131,7 +1132,7 @@ export type Mounts = {
                 role: "system";
               };
           model?: string;
-          order?: number;
+          order: number;
           status: "pending" | "success" | "failed";
           stepId?: string;
           stepOrder?: number;
@@ -1197,6 +1198,7 @@ export type Mounts = {
         chatId?: string;
         limit: number;
         messageRange?: { after: number; before: number };
+        parentMessageId?: string;
         text?: string;
         userId?: string;
         vector?: Array<number>;
@@ -1317,7 +1319,7 @@ export type Mounts = {
               role: "system";
             };
         model?: string;
-        order?: number;
+        order: number;
         status: "pending" | "success" | "failed";
         stepId?: string;
         stepOrder?: number;
@@ -1446,7 +1448,7 @@ export type Mounts = {
               role: "system";
             };
         model?: string;
-        order?: number;
+        order: number;
         status: "pending" | "success" | "failed";
         stepId?: string;
         stepOrder?: number;
