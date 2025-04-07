@@ -1,16 +1,20 @@
-import type {
-  AssistantContent,
-  CoreAssistantMessage,
-  CoreMessage,
-  CoreToolMessage,
-  DataContent,
-  GenerateTextResult,
-  StepResult,
-  ToolContent,
-  ToolSet,
-  UserContent,
+import {
+  convertToCoreMessages,
+  coreMessageSchema,
+  type AssistantContent,
+  type CoreAssistantMessage,
+  type CoreMessage,
+  type CoreToolMessage,
+  type DataContent,
+  type GenerateTextResult,
+  type StepResult,
+  type ToolContent,
+  type ToolSet,
+  type Message as UIMessage,
+  type UserContent,
 } from "ai";
 import { MessageWithFileAndId, Step } from "./validators";
+import { assert } from "convex-helpers";
 
 export type SerializeUrlsAndUint8Arrays<T> = T extends URL
   ? string
@@ -157,4 +161,35 @@ function deserializeUrl(urlOrString: string | ArrayBuffer): URL | DataContent {
     return urlOrString;
   }
   return urlOrString;
+}
+
+export function promptOrMessagesToCoreMessages(args: {
+  system?: string;
+  prompt?: string;
+  messages?: CoreMessage[] | Omit<UIMessage, "id">[];
+}): CoreMessage[] {
+  const messages: CoreMessage[] = [];
+  if (args.system) {
+    messages.push({ role: "system", content: args.system });
+  }
+  if (!args.messages) {
+    assert(args.prompt, "messages or prompt is required");
+    messages.push({ role: "user", content: args.prompt });
+  } else if (
+    args.messages.some(
+      (m) =>
+        typeof m === "object" &&
+        m !== null &&
+        (m.role === "data" || // UI-only role
+          "toolInvocations" in m || // UI-specific field
+          "parts" in m || // UI-specific field
+          "experimental_attachments" in m)
+    )
+  ) {
+    messages.push(...convertToCoreMessages(args.messages as UIMessage[]));
+  } else {
+    messages.push(...coreMessageSchema.array().parse(args.messages));
+  }
+  assert(messages.length > 0, "Messages must contain at least one message");
+  return messages;
 }

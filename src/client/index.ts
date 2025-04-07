@@ -21,6 +21,7 @@ import { assert } from "convex-helpers";
 import { ConvexToZod, convexToZod } from "convex-helpers/server/zod";
 import { Infer, Validator } from "convex/values";
 import {
+  promptOrMessagesToCoreMessages,
   serializeMessageWithId,
   serializeNewMessagesInStep,
   serializeStep,
@@ -647,107 +648,12 @@ export class Agent<AgentTools extends ToolSet> {
   }
 }
 
-export function promptOrMessagesToCoreMessages(args: {
-  system?: string;
-  prompt?: string;
-  messages?: CoreMessage[] | Omit<UIMessage, "id">[];
-}): CoreMessage[] {
-  const messages: CoreMessage[] = [];
-  if (args.system) {
-    messages.push({ role: "system", content: args.system });
-  }
-  if (!args.messages) {
-    assert(args.prompt, "messages or prompt is required");
-    messages.push({ role: "user", content: args.prompt });
-  } else if (
-    args.messages.some(
-      (m) =>
-        typeof m === "object" &&
-        m !== null &&
-        (m.role === "data" || // UI-only role
-          "toolInvocations" in m || // UI-specific field
-          "parts" in m || // UI-specific field
-          "experimental_attachments" in m)
-    )
-  ) {
-    messages.push(...convertToCoreMessages(args.messages as UIMessage[]));
-  } else {
-    messages.push(...coreMessageSchema.array().parse(args.messages));
-  }
-  assert(messages.length > 0, "Messages must contain at least one message");
-  return messages;
-}
-
-type TextArgs<
-  AgentTools extends ToolSet,
-  TOOLS extends ToolSet,
-  T extends {
-    toolChoice?: ToolChoice<TOOLS & AgentTools>;
-    tools?: TOOLS;
-    model: LanguageModelV1;
-  },
-> = Omit<T, "toolChoice" | "tools" | "model"> & {
-  model?: LanguageModelV1;
-  parentMessageId?: string;
-} & {
-  tools?: TOOLS;
-  toolChoice?: ToolChoice<{ [key in keyof TOOLS | keyof AgentTools]: unknown }>;
-} & ContextOptions &
-  StorageOptions;
-
-type ObjectArgs<
-  T extends {
-    model: LanguageModelV1;
-  },
-> = Omit<T, "model"> & {
-  model?: LanguageModelV1;
-} & ContextOptions &
-  StorageOptions;
-
-interface Chat<AgentTools extends ToolSet> {
-  generateText<TOOLS extends ToolSet, OUTPUT = never, OUTPUT_PARTIAL = never>(
-    args: TextArgs<
-      AgentTools,
-      TOOLS,
-      Parameters<typeof generateText<TOOLS, OUTPUT, OUTPUT_PARTIAL>>[0]
-    >
-  ): Promise<
-    GenerateTextResult<TOOLS & AgentTools, OUTPUT> & GenerationOutputMetadata
-  >;
-
-  streamText<TOOLS extends ToolSet, OUTPUT = never, PARTIAL_OUTPUT = never>(
-    args: TextArgs<
-      AgentTools,
-      TOOLS,
-      Parameters<typeof streamText<TOOLS, OUTPUT, PARTIAL_OUTPUT>>[0]
-    >
-  ): Promise<
-    StreamTextResult<TOOLS & AgentTools, PARTIAL_OUTPUT> &
-      GenerationOutputMetadata
-  >;
-  // TODO: add all the overloads
-  generateObject<T>(
-    args: ObjectArgs<Parameters<typeof generateObject>[0]>
-  ): Promise<GenerateObjectResult<T> & GenerationOutputMetadata>;
-  streamObject<T>(
-    args: ObjectArgs<Parameters<typeof streamObject<T>>[0]>
-  ): Promise<
-    StreamObjectResult<DeepPartial<T>, T, never> & GenerationOutputMetadata
-  >;
-}
-
-// type ToolParameters = ZodTypeAny | Schema<unknown>; // TODO: support convex validator
-// type inferParameters<PARAMETERS extends ToolParameters> =
-//   PARAMETERS extends Schema<unknown>
-//     ? PARAMETERS["_type"]
-//     : PARAMETERS extends z.ZodTypeAny
-//       ? z.infer<PARAMETERS>
-//       : never;
 export type ToolCtx = RunActionCtx & {
   userId?: string;
   chatId: string;
   messageId?: string;
 };
+
 /**
  * This is a wrapper around the ai.tool function that adds support for
  * userId and chatId to the tool, if they're called within a chat from an agent.
@@ -807,6 +713,61 @@ function wrapTools(
   }
   return output;
 }
-// export function convexValidatorSchema<T>(validator: Validator<unknown>)  {
-//   return ai.jsonSchema(convexToJsonSchema(validator));
-// }
+
+type TextArgs<
+  AgentTools extends ToolSet,
+  TOOLS extends ToolSet,
+  T extends {
+    toolChoice?: ToolChoice<TOOLS & AgentTools>;
+    tools?: TOOLS;
+    model: LanguageModelV1;
+  },
+> = Omit<T, "toolChoice" | "tools" | "model"> & {
+  model?: LanguageModelV1;
+  parentMessageId?: string;
+} & {
+  tools?: TOOLS;
+  toolChoice?: ToolChoice<{ [key in keyof TOOLS | keyof AgentTools]: unknown }>;
+} & ContextOptions &
+  StorageOptions;
+
+type ObjectArgs<
+  T extends {
+    model: LanguageModelV1;
+  },
+> = Omit<T, "model"> & {
+  model?: LanguageModelV1;
+} & ContextOptions &
+  StorageOptions;
+
+interface Chat<AgentTools extends ToolSet> {
+  generateText<TOOLS extends ToolSet, OUTPUT = never, OUTPUT_PARTIAL = never>(
+    args: TextArgs<
+      AgentTools,
+      TOOLS,
+      Parameters<typeof generateText<TOOLS, OUTPUT, OUTPUT_PARTIAL>>[0]
+    >
+  ): Promise<
+    GenerateTextResult<TOOLS & AgentTools, OUTPUT> & GenerationOutputMetadata
+  >;
+
+  streamText<TOOLS extends ToolSet, OUTPUT = never, PARTIAL_OUTPUT = never>(
+    args: TextArgs<
+      AgentTools,
+      TOOLS,
+      Parameters<typeof streamText<TOOLS, OUTPUT, PARTIAL_OUTPUT>>[0]
+    >
+  ): Promise<
+    StreamTextResult<TOOLS & AgentTools, PARTIAL_OUTPUT> &
+      GenerationOutputMetadata
+  >;
+  // TODO: add all the overloads
+  generateObject<T>(
+    args: ObjectArgs<Parameters<typeof generateObject>[0]>
+  ): Promise<GenerateObjectResult<T> & GenerationOutputMetadata>;
+  streamObject<T>(
+    args: ObjectArgs<Parameters<typeof streamObject<T>>[0]>
+  ): Promise<
+    StreamObjectResult<DeepPartial<T>, T, never> & GenerationOutputMetadata
+  >;
+}
