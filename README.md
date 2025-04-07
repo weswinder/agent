@@ -29,19 +29,18 @@ const supportAgent = new Agent(components.agent, {
 
 // Use the agent from within a normal action:
 export const createThread = action({
-  args: { prompt: v.string(), userId: v.string() },
-  handler: async (ctx, { prompt, userId }): Promise<{ threadId: string; initialResponse: string }> => {
-    // Start a new thread for the user.
-    const { threadId, thread } = await supportAgent.createThread(ctx, { userId });
+  args: { prompt: v.string() },
+  handler: async (ctx, { prompt }) => {
+    const { threadId, thread } = await supportAgent.createThread(ctx, {});
     const result = await thread.generateText({ prompt });
-    return { threadId, initialResponse: result.text };
+    return { threadId, text: result.text };
   },
 });
 
 // Pick up where you left off:
 export const continueThread = action({
   args: { prompt: v.string(), threadId: v.string() },
-  handler: async (ctx, { prompt, threadId }): Promise<string> => {
+  handler: async (ctx, { prompt, threadId }) => {
     // This includes previous message history from the thread automatically.
     const { thread } = await supportAgent.continueThread(ctx, { threadId });
     const result = await thread.generateText({ prompt });
@@ -49,7 +48,7 @@ export const continueThread = action({
   },
 });
 
-// Or use it within a workflow:
+// Or use it within a workflow, specific to a user:
 export const supportAgentStep = supportAgent.asAction({ maxSteps: 10 });
 
 const workflow = new WorkflowManager(components.workflow);
