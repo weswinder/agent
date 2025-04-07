@@ -4,7 +4,6 @@ import type { EmbeddingModelV1, LanguageModelV1 } from "@ai-sdk/provider";
 import { Message, MessageStatus, SearchOptions, Step } from "../validators";
 import type {
   StreamTextResult,
-  Tool,
   ToolSet,
   StepResult,
   Message as UIMessage,
@@ -26,7 +25,6 @@ import {
 import { assert } from "convex-helpers";
 import { DEFAULT_MESSAGE_RANGE, extractText } from "../shared";
 import {
-  serializeMessage,
   serializeMessageWithId,
   serializeNewMessagesInStep,
   serializeStep,
@@ -44,9 +42,20 @@ export type ContextOptions = {
   searchOtherChats?: boolean;
 };
 
+export type StorageOptions = {
+  // Defaults to false, allowing you to pass in arbitrary context that will
+  // be in addition to automatically fetched content.
+  // Pass true to have all input messages saved to the chat history.
+  saveAllInputMessages?: boolean;
+  // Defaults to true
+  saveOutputMessages?: boolean;
+};
+
+export type GenerationOutputMetadata = { messageId: string };
+
 type CoreMessageMaybeWithId = CoreMessage & { id?: string | undefined };
 
-export class Agent {
+export class Agent<AgentTools extends ToolSet> {
   constructor(
     public component: UseApi<typeof api>,
     public options: {
@@ -54,7 +63,7 @@ export class Agent {
       chat: LanguageModelV1;
       textEmbedding?: EmbeddingModelV1<string>;
       defaultSystemPrompt?: string;
-      tools?: Record<string, Tool>;
+      tools?: AgentTools;
     }
   ) {}
 
@@ -190,7 +199,7 @@ export class Agent {
         {
           userId: args.searchOtherChats ? args.userId : undefined,
           chatId: args.chatId,
-          ...(await this.searchWithDefaults(args, args.messages)),
+          ...(await this.searchOptionsWithDefaults(args, args.messages)),
         }
       );
       contextMessages.push(...searchMessages.map((m) => m.message!));
@@ -216,22 +225,11 @@ export class Agent {
     args: {
       chatId: string;
       messages: CoreMessageMaybeWithId[];
-      steps?: StepResult<ToolSet>[];
       pending?: boolean;
     }
   ): Promise<{
     lastMessageId: string;
-  }>;
-  async saveMessages(
-    ctx: RunMutationCtx,
-    args: {
-      chatId: string;
-      messages: CoreMessageMaybeWithId[];
-      steps?: StepResult<ToolSet>[];
-      pending?: boolean;
-    }
-  ): Promise<{
-    lastMessageId?: string;
+    messageIds: string[];
   }> {
     const result = await ctx.runMutation(this.component.messages.addMessages, {
       chatId: args.chatId,
@@ -242,7 +240,8 @@ export class Agent {
       pending: args.pending ?? false,
     });
     return {
-      lastMessageId: result.messages.at(-1)?._id,
+      lastMessageId: result.messages.at(-1)!._id,
+      messageIds: result.messages.map((m) => m._id),
     };
   }
 
@@ -267,6 +266,7 @@ export class Agent {
     });
   }
 
+  // If you manually create a message, call this to either commit or reset it.
   async completeMessage<TOOLS extends ToolSet>(
     ctx: RunMutationCtx,
     args: {
@@ -274,10 +274,7 @@ export class Agent {
       messageId: string;
       result:
         | { kind: "error"; error: string }
-        | {
-            kind: "success";
-            value: { steps: StepResult<TOOLS>[] };
-          };
+        | { kind: "success"; value: { steps: StepResult<TOOLS>[] } };
     }
   ): Promise<void> {
     const result = args.result;
@@ -315,13 +312,14 @@ export class Agent {
       chatId,
     }: {
       userId?: string;
-      chatId?: string;
+      chatId: string;
     },
     args: Partial<
       Parameters<typeof generateText<TOOLS, OUTPUT, OUTPUT_PARTIAL>>[0]
     > &
-      ContextOptions
-  ): Promise<GenerateTextResult<TOOLS, OUTPUT>> {
+      ContextOptions &
+      StorageOptions
+  ): Promise<GenerateTextResult<TOOLS, OUTPUT> & GenerationOutputMetadata> {
     const { prompt, messages: raw, ...rest } = args;
     const messages = promptOrMessagesToCoreMessages({ prompt, messages: raw });
     const contextMessages = await this.fetchContextMessages(ctx, {
@@ -330,16 +328,11 @@ export class Agent {
       chatId,
       messages,
     });
-    let messageId: string | undefined;
-    if (chatId) {
-      const { lastMessageId } = await this.saveMessages(ctx, {
-        chatId,
-        // TODO: only save the last message unless explicitly told to save all
-        messages,
-        pending: true,
-      });
-      messageId = lastMessageId;
-    }
+    const { lastMessageId: messageId } = await this.saveMessages(ctx, {
+      chatId,
+      messages: args.saveAllInputMessages ? messages : messages.slice(-1),
+      pending: true,
+    });
     try {
       const result = await generateText({
         model: this.options.chat,
@@ -347,7 +340,7 @@ export class Agent {
         system: this.options.defaultSystemPrompt,
         ...rest,
         onStepFinish: async (step) => {
-          if (chatId && messageId) {
+          if (chatId && messageId && args.saveOutputMessages) {
             await this.saveStep(ctx, {
               chatId,
               messageId,
@@ -357,7 +350,7 @@ export class Agent {
           return args.onStepFinish?.(step);
         },
       });
-      return result;
+      return { ...result, messageId };
     } catch (error) {
       if (chatId && messageId) {
         await ctx.runMutation(this.component.messages.rollbackMessage, {
@@ -375,12 +368,15 @@ export class Agent {
     PARTIAL_OUTPUT = never,
   >(
     ctx: RunMutationCtx,
-    { userId, chatId }: { userId?: string; chatId?: string },
+    { userId, chatId }: { userId?: string; chatId: string },
     args: Partial<
       Parameters<typeof streamText<TOOLS, OUTPUT, PARTIAL_OUTPUT>>[0]
     > &
-      ContextOptions
-  ): Promise<StreamTextResult<TOOLS, PARTIAL_OUTPUT>> {
+      ContextOptions &
+      StorageOptions
+  ): Promise<
+    StreamTextResult<TOOLS, PARTIAL_OUTPUT> & GenerationOutputMetadata
+  > {
     const { prompt, messages: raw, ...rest } = args;
     const messages = promptOrMessagesToCoreMessages({ prompt, messages: raw });
     const contextMessages = await this.fetchContextMessages(ctx, {
@@ -389,17 +385,12 @@ export class Agent {
       chatId,
       messages,
     });
-    let messageId: string | undefined;
-    if (chatId) {
-      const { lastMessageId } = await this.saveMessages(ctx, {
-        chatId,
-        // TODO: only save the last message unless explicitly told to save all
-        messages,
-        pending: true,
-      });
-      messageId = lastMessageId;
-    }
-    return streamText({
+    const { lastMessageId: messageId } = await this.saveMessages(ctx, {
+      chatId,
+      messages: args.saveAllInputMessages ? messages : messages.slice(-1),
+      pending: true,
+    });
+    const result = streamText({
       model: this.options.chat,
       messages: [...contextMessages, ...messages],
       system: this.options.defaultSystemPrompt,
@@ -436,16 +427,18 @@ export class Agent {
         return args.onStepFinish?.(step);
       },
     });
+    return { ...result, messageId };
   }
 
-  // TODO: not sure why it needs to extend string
-  async generateObject<OBJECT extends string>(
+  // TODO: add the crazy number of overloads to get types through
+  async generateObject<T>(
     ctx: RunActionCtx,
-    { userId, chatId }: { userId?: string; chatId?: string },
-    args: Omit<Parameters<typeof generateObject<OBJECT>>[0], "model"> & {
+    { userId, chatId }: { userId?: string; chatId: string },
+    args: Omit<Parameters<typeof generateObject>[0], "model"> & {
       model?: LanguageModelV1;
-    } & ContextOptions
-  ): Promise<GenerateObjectResult<OBJECT>> {
+    } & ContextOptions &
+      StorageOptions
+  ): Promise<GenerateObjectResult<T> & GenerationOutputMetadata> {
     const { prompt, messages: raw, ...rest } = args;
     const messages = promptOrMessagesToCoreMessages({ prompt, messages: raw });
     const contextMessages = await this.fetchContextMessages(ctx, {
@@ -454,20 +447,29 @@ export class Agent {
       chatId,
       messages,
     });
-    return generateObject({
+    const { lastMessageId: messageId } = await this.saveMessages(ctx, {
+      chatId,
+      messages: args.saveAllInputMessages ? messages : messages.slice(-1),
+      pending: true,
+    });
+    const result = (await generateObject({
       model: this.options.chat,
       messages: [...contextMessages, ...messages],
       ...rest,
-    }) as Promise<GenerateObjectResult<OBJECT>>;
+    })) as GenerateObjectResult<T>;
+    return { ...result, messageId };
   }
 
   async streamObject<T>(
     ctx: RunMutationCtx,
-    { userId, chatId }: { userId?: string; chatId?: string },
+    { userId, chatId }: { userId?: string; chatId: string },
     args: Omit<Parameters<typeof streamObject<T>>[0], "model"> & {
       model?: LanguageModelV1;
-    } & ContextOptions
-  ) {
+    } & ContextOptions &
+      StorageOptions
+  ): Promise<
+    StreamObjectResult<DeepPartial<T>, T, never> & GenerationOutputMetadata
+  > {
     const { prompt, messages: raw, ...rest } = args;
     const messages = promptOrMessagesToCoreMessages({ prompt, messages: raw });
     const contextMessages = await this.fetchContextMessages(ctx, {
@@ -476,7 +478,12 @@ export class Agent {
       chatId,
       messages,
     });
-    return streamObject<T>({
+    const { lastMessageId: messageId } = await this.saveMessages(ctx, {
+      chatId,
+      messages: args.saveAllInputMessages ? messages : messages.slice(-1),
+      pending: true,
+    });
+    const result = streamObject<T>({
       model: this.options.chat,
       messages: [...contextMessages, ...messages],
       ...rest,
@@ -488,9 +495,10 @@ export class Agent {
         console.log("onFinish", result);
       },
     }) as StreamObjectResult<DeepPartial<T>, T, never>;
+    return { ...result, messageId };
   }
 
-  async searchWithDefaults(
+  async searchOptionsWithDefaults(
     searchArgs: ContextOptions,
     messages: CoreMessage[]
   ): Promise<SearchOptions> {
@@ -573,23 +581,28 @@ interface Chat {
   generateText<TOOLS extends ToolSet, OUTPUT = never, OUTPUT_PARTIAL = never>(
     args: Partial<
       Parameters<typeof generateText<TOOLS, OUTPUT, OUTPUT_PARTIAL>>[0]
-    >
-  ): Promise<GenerateTextResult<TOOLS, OUTPUT>>;
+    > & ContextOptions & StorageOptions
+  ): Promise<GenerateTextResult<TOOLS, OUTPUT> & GenerationOutputMetadata>;
+
   streamText<TOOLS extends ToolSet, OUTPUT = never, PARTIAL_OUTPUT = never>(
     args: Partial<
       Parameters<typeof streamText<TOOLS, OUTPUT, PARTIAL_OUTPUT>>[0]
-    >
-  ): Promise<StreamTextResult<TOOLS, PARTIAL_OUTPUT>>;
-  generateObject<OBJECT extends string>(
-    args: Omit<Parameters<typeof generateObject<OBJECT>>[0], "model"> & {
+    > & ContextOptions & StorageOptions
+  ): Promise<
+    StreamTextResult<TOOLS, PARTIAL_OUTPUT> & GenerationOutputMetadata
+  >;
+  generateObject<T>(
+    args: Omit<Parameters<typeof generateObject>[0], "model"> & {
       model?: LanguageModelV1;
-    }
-  ): Promise<GenerateObjectResult<OBJECT>>;
+    } & ContextOptions & StorageOptions
+  ): Promise<GenerateObjectResult<T> & GenerationOutputMetadata>;
   streamObject<T>(
     args: Omit<Parameters<typeof streamObject<T>>[0], "model"> & {
       model?: LanguageModelV1;
-    }
-  ): Promise<StreamObjectResult<DeepPartial<T>, T, never>>;
+    } & ContextOptions
+  ): Promise<
+    StreamObjectResult<DeepPartial<T>, T, never> & GenerationOutputMetadata
+  >;
 }
 
 // type ToolParameters = ZodTypeAny | Schema<unknown>; // TODO: support convex validator
