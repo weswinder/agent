@@ -308,7 +308,9 @@ export class Agent<AgentTools extends ToolSet> {
       userId?: string;
       chatId: string;
     },
-    args: TextArgs<AgentTools, TOOLS,
+    args: TextArgs<
+      AgentTools,
+      TOOLS,
       Parameters<typeof generateText<TOOLS, OUTPUT, OUTPUT_PARTIAL>>[0]
     >
   ): Promise<GenerateTextResult<TOOLS, OUTPUT> & GenerationOutputMetadata> {
@@ -326,7 +328,9 @@ export class Agent<AgentTools extends ToolSet> {
       pending: true,
     });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const tools: any  = this.options.tools ? { ...this.options.tools, ...args.tools  } : args.tools;
+    const tools: any = this.options.tools
+      ? { ...this.options.tools, ...args.tools }
+      : args.tools;
     try {
       const result = await generateText({
         model: this.options.chat,
@@ -388,7 +392,9 @@ export class Agent<AgentTools extends ToolSet> {
       pending: true,
     });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const tools: any  = this.options.tools ? { ...this.options.tools, ...args.tools  } : args.tools;
+    const tools: any = this.options.tools
+      ? { ...this.options.tools, ...args.tools }
+      : args.tools;
     const result = streamText({
       model: this.options.chat,
       messages: [...contextMessages, ...messages],
@@ -568,53 +574,59 @@ export class Agent<AgentTools extends ToolSet> {
       isDone: messages.isDone,
     };
   }
-
 }
 
 type TextArgs<
   AgentTools extends ToolSet,
   TOOLS extends ToolSet,
   T extends {
-    toolChoice?: ToolChoice<{ [key in keyof TOOLS | keyof AgentTools]: unknown }>;
+    toolChoice?: ToolChoice<{
+      [key in keyof TOOLS | keyof AgentTools]: unknown;
+    }>;
     tools?: TOOLS;
     model: LanguageModelV1;
   },
 > = Omit<T, "toolChoice" | "tools" | "model"> & {
-     model?: LanguageModelV1 } & (
-        {
-            tools?: TOOLS;
-            toolChoice?: ToolChoice<{ [key in keyof TOOLS | keyof AgentTools]: unknown }>;
-          }
-      ) & ContextOptions & StorageOptions
-  ;
+  model?: LanguageModelV1;
+} & {
+  tools?: TOOLS;
+  toolChoice?: ToolChoice<{ [key in keyof TOOLS | keyof AgentTools]: unknown }>;
+} & ContextOptions &
+  StorageOptions;
 
-  type ObjectArgs<T extends {
+type ObjectArgs<
+  T extends {
     model: LanguageModelV1;
   },
 > = Omit<T, "model"> & {
   model?: LanguageModelV1;
-} & ContextOptions & StorageOptions;
+} & ContextOptions &
+  StorageOptions;
 
 interface Chat<AgentTools extends ToolSet> {
   generateText<TOOLS extends ToolSet, OUTPUT = never, OUTPUT_PARTIAL = never>(
-    args: TextArgs<AgentTools, TOOLS,
-      Parameters<(typeof generateText<TOOLS, OUTPUT, OUTPUT_PARTIAL>)>[0]
+    args: TextArgs<
+      AgentTools,
+      TOOLS,
+      Parameters<typeof generateText<TOOLS, OUTPUT, OUTPUT_PARTIAL>>[0]
     >
   ): Promise<GenerateTextResult<TOOLS, OUTPUT> & GenerationOutputMetadata>;
 
   streamText<TOOLS extends ToolSet, OUTPUT = never, PARTIAL_OUTPUT = never>(
-    args: TextArgs<AgentTools, TOOLS,
-      Parameters<(typeof streamText<TOOLS, OUTPUT, PARTIAL_OUTPUT>)>[0]
+    args: TextArgs<
+      AgentTools,
+      TOOLS,
+      Parameters<typeof streamText<TOOLS, OUTPUT, PARTIAL_OUTPUT>>[0]
     >
   ): Promise<
     StreamTextResult<TOOLS, PARTIAL_OUTPUT> & GenerationOutputMetadata
   >;
   // TODO: add all the overloads
   generateObject<T>(
-    args:  ObjectArgs<Parameters<typeof generateObject>[0]>
+    args: ObjectArgs<Parameters<typeof generateObject>[0]>
   ): Promise<GenerateObjectResult<T> & GenerationOutputMetadata>;
   streamObject<T>(
-    args:  ObjectArgs<Parameters<typeof streamObject<T>>[0]>
+    args: ObjectArgs<Parameters<typeof streamObject<T>>[0]>
   ): Promise<
     StreamObjectResult<DeepPartial<T>, T, never> & GenerationOutputMetadata
   >;
