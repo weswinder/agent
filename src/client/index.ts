@@ -15,7 +15,14 @@ import type {
 import { generateObject, generateText, streamObject, streamText } from "ai";
 import { api } from "../component/_generated/api";
 import { Message, MessageStatus, SearchOptions } from "../validators";
-import { RunActionCtx, RunMutationCtx, RunQueryCtx, UseApi } from "./types";
+import {
+  ChatDoc,
+  OpaqueIds,
+  RunActionCtx,
+  RunMutationCtx,
+  RunQueryCtx,
+  UseApi,
+} from "./types";
 // TODO: is this the only dependency that needs helpers in client?
 import { assert } from "convex-helpers";
 import { ConvexToZod, convexToZod } from "convex-helpers/server/zod";
@@ -27,6 +34,7 @@ import {
   serializeStep,
 } from "../mapping";
 import { DEFAULT_MESSAGE_RANGE, extractText } from "../shared";
+import { Doc } from "../component/_generated/dataModel";
 
 export type ContextOptions = {
   /**
@@ -593,6 +601,15 @@ export class Agent<AgentTools extends ToolSet> {
       search.vectorModel = this.options.textEmbedding.modelId;
     }
     return search;
+  }
+
+  async getChats(
+    ctx: RunQueryCtx,
+    args: { userId: string }
+  ): Promise<{ chats: ChatDoc[]; continueCursor: string; isDone: boolean }> {
+    return await ctx.runQuery(this.component.messages.getChatsByUserId, {
+      userId: args.userId,
+    });
   }
 
   async getChatMessages(

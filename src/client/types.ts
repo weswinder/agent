@@ -7,6 +7,10 @@ import {
   GenericActionCtx,
 } from "convex/server";
 import { GenericId } from "convex/values";
+import type { Doc } from "../component/_generated/dataModel";
+
+export type ChatDoc = OpaqueIds<Doc<"chats">>;
+export type MessageDoc = OpaqueIds<Doc<"messages">>;
 
 /* Type utils follow */
 export type RunQueryCtx = {
