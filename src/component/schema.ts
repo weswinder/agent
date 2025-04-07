@@ -32,16 +32,30 @@ export const schema = defineSchema({
     embeddingId: v.optional(vVectorId),
     // TODO: add sub-messages back in? or be able to skip them?
     tool: v.boolean(),
-    order: v.optional(v.number()), // Set when the message is finished
+    // Repeats until a non-tool message.
+    // Set when the message is finished
+    order: v.optional(v.number()),
+    stepOrder: v.optional(v.number()),
     fileId: v.optional(v.id("files")),
     status: vMessageStatus,
   })
     // Allows finding successful visible messages in order
     // Also surface pending messages separately to e.g. stream
-    .index("chatId_status_tool_order", ["chatId", "status", "tool", "order"])
-    // Allows finding all chat messages in order
+    .index("chatId_status_tool_order_stepOrder", [
+      "chatId",
+      "status",
+      "tool",
+      "order",
+      "stepOrder",
+    ])
+    // Allows finding all threaded messages in order
     // Allows finding all failed messages to evaluate
-    .index("status_chatId_order", ["status", "chatId", "order"])
+    // .index("status_threadId_order_stepOrder", [
+    //   "status",
+    //   "threadId",
+    //   "order",
+    //   "stepOrder",
+    // ])
     // Allows text search on message content
     .searchIndex("text_search", {
       searchField: "text",
@@ -65,7 +79,11 @@ export const schema = defineSchema({
       "order",
       "stepOrder",
     ])
-    .index("parentMessageId", ["parentMessageId"]),
+    .index("parentMessageId_order_stepOrder", [
+      "parentMessageId",
+      "order",
+      "stepOrder",
+    ]),
 
   files: defineTable({
     storageId: v.string(),

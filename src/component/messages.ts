@@ -240,10 +240,10 @@ async function deletePageForUserId(
       async (c) =>
         stream(ctx.db, schema)
           .query("messages")
-          .withIndex("chatId_status_tool_order", (q) =>
+          .withIndex("chatId_status_tool_order_stepOrder", (q) =>
             q.eq("chatId", c._id).eq("status", "success")
           ),
-      ["tool", "order"]
+      ["tool", "order", "stepOrder"]
     )
     .paginate({
       numItems: 100,
@@ -330,7 +330,7 @@ async function deletePageForChatIdHandler(
 ): Promise<DeleteChatReturns> {
   const messages = await stream(ctx.db, schema)
     .query("messages")
-    .withIndex("chatId_status_tool_order", (q) =>
+    .withIndex("chatId_status_tool_order_stepOrder", (q) =>
       q.eq("chatId", args.chatId).eq("status", "success")
     )
     .paginate({
@@ -405,12 +405,14 @@ async function addMessagesHandler(
   if (failPendingSteps) {
     const pendingMessages = await ctx.db
       .query("messages")
-      .withIndex("status_chatId_order", (q) =>
-        q.eq("status", "pending").eq("chatId", args.chatId)
+      .withIndex("chatId_status_tool_order_stepOrder", (q) =>
+        q.eq("chatId", args.chatId).eq("status", "pending")
       )
       .collect();
     await Promise.all(
-      pendingMessages.map((m) => ctx.db.patch(m._id, { status: "failed" }))
+      pendingMessages.map((m) =>
+        ctx.db.patch(m._id, { status: "failed", text: "Restarting" })
+      )
     );
   }
   let order: number | undefined;
@@ -418,12 +420,12 @@ async function addMessagesHandler(
   // If the previous message isn't our parent, we make a new thread.
   const threadId =
     parentMessageId && maxMessage?._id === parentMessageId
-      ? maxMessage.threadId
+      ? maxMessage.threadId ?? parentMessageId
       : parentMessageId;
   order = maxMessage?.order ?? -1;
   const toReturn: Doc<"messages">[] = [];
   if (messages.length > 0) {
-    for (const { message, fileId } of messages) {
+    for (const { message, fileId, id } of messages) {
       const tool = isTool(message);
       if (!tool) {
         order++;
@@ -433,6 +435,8 @@ async function addMessagesHandler(
         ...rest,
         threadId,
         userId: chat.userId,
+        message,
+        id,
         order,
         tool,
         text,
@@ -446,13 +450,17 @@ async function addMessagesHandler(
 }
 
 async function getMaxMessage(ctx: QueryCtx, chatId: Id<"chats">) {
-  return ctx.db
-    .query("messages")
-    .withIndex("chatId_status_tool_order", (q) =>
-      q.eq("chatId", chatId).eq("status", "success").eq("tool", false)
-    )
-    .order("desc")
-    .first();
+  return mergedStream(
+    ["success" as const, "pending" as const].map((status) =>
+      stream(ctx.db, schema)
+        .query("messages")
+        .withIndex("chatId_status_tool_order_stepOrder", (q) =>
+          q.eq("chatId", chatId).eq("status", status).eq("tool", false)
+        )
+        .order("desc")
+    ),
+    ["order", "stepOrder"]
+  ).first();
 }
 
 const addStepsArgs = {
@@ -473,17 +481,13 @@ async function addStepsHandler(
 ) {
   const parentMessage = await ctx.db.get(args.messageId);
   assert(parentMessage, `Message ${args.messageId} not found`);
-  assert(
-    parentMessage.status === "success",
-    `${args.messageId} is not a success, it is ${parentMessage.status}`
-  );
   const order = parentMessage.order;
   assert(order !== undefined, `${args.messageId} has no order`);
   let steps = await ctx.db
     .query("steps")
-    .withIndex("status_chatId_order_stepOrder", (q) =>
+    .withIndex("parentMessageId_order_stepOrder", (q) =>
       // TODO: fetch pending, and commit later
-      q.eq("status", "success").eq("chatId", args.chatId).eq("order", order)
+      q.eq("parentMessageId", args.messageId)
     )
     .collect();
   if (args.failPendingSteps) {
@@ -501,7 +505,7 @@ async function addStepsHandler(
       parentMessageId: args.messageId,
       order,
       stepOrder: nextStepOrder,
-      status: "pending",
+      status: step.finishReason === "stop" ? "success" : "pending",
       step,
     });
     await addMessagesHandler(ctx, {
@@ -511,9 +515,12 @@ async function addStepsHandler(
       messages,
       model: parentMessage.model,
       agentName: parentMessage.agentName,
-      pending: true,
+      pending: step.finishReason === "stop" ? false : true,
       failPendingSteps: false,
     });
+    if (step.finishReason === "stop") {
+      await commitMessageHandler(ctx, { messageId: args.messageId });
+    }
     steps.push((await ctx.db.get(stepId))!);
     nextStepOrder++;
   }
@@ -541,34 +548,45 @@ export const commitMessage = mutation({
     messageId: v.id("messages"),
   },
   returns: v.null(),
-  handler: async (ctx, { messageId }) => {
-    const message = await ctx.db.get(messageId);
-    assert(message, `Message ${messageId} not found`);
-
-    const allSteps = await ctx.db
-      .query("steps")
-      .withIndex("parentMessageId", (q) => q.eq("parentMessageId", messageId))
-      .collect();
-    for (const step of allSteps) {
-      if (step.status === "pending") {
-        await ctx.db.patch(step._id, { status: "success" });
-      }
-    }
-    const order = message.order!;
-    const messages = await ctx.db
-      .query("messages")
-      .withIndex("status_chatId_order", (q) =>
-        q
-          .eq("status", "pending")
-          .eq("chatId", message.chatId)
-          .eq("order", order)
-      )
-      .collect();
-    for (const message of messages) {
-      await ctx.db.patch(message._id, { status: "success" });
-    }
-  },
+  handler: commitMessageHandler,
 });
+async function commitMessageHandler(
+  ctx: MutationCtx,
+  { messageId }: { messageId: Id<"messages"> }
+) {
+  const message = await ctx.db.get(messageId);
+  assert(message, `Message ${messageId} not found`);
+
+  const allSteps = await ctx.db
+    .query("steps")
+    .withIndex("parentMessageId_order_stepOrder", (q) =>
+      q.eq("parentMessageId", messageId)
+    )
+    .collect();
+  for (const step of allSteps) {
+    if (step.status === "pending") {
+      await ctx.db.patch(step._id, { status: "success" });
+    }
+  }
+  const order = message.order!;
+  const messages = await mergedStream(
+    [true, false].map((tool) =>
+      stream(ctx.db, schema)
+        .query("messages")
+        .withIndex("chatId_status_tool_order_stepOrder", (q) =>
+          q
+            .eq("chatId", message.chatId)
+            .eq("status", "pending")
+            .eq("tool", tool)
+            .eq("order", order)
+        )
+    ),
+    ["order", "stepOrder"]
+  ).collect();
+  for (const message of messages) {
+    await ctx.db.patch(message._id, { status: "success" });
+  }
+}
 
 export const getChatMessages = query({
   args: {
@@ -582,30 +600,23 @@ export const getChatMessages = query({
   },
   handler: async (ctx, args) => {
     const statuses = args.statuses ?? ["success"];
-    const isTool = args.isTool;
+    const toolOptions =
+      args.isTool === undefined ? [true, false] : [args.isTool];
     const order = args.order ?? "desc";
-    const streams =
-      isTool !== undefined
-        ? statuses.map((status) =>
-            stream(ctx.db, schema)
-              .query("messages")
-              .withIndex("chatId_status_tool_order", (q) =>
-                q
-                  .eq("chatId", args.chatId)
-                  .eq("status", status)
-                  .eq("tool", isTool)
-              )
-              .order(order)
+    const streams = toolOptions.flatMap((tool) =>
+      statuses.map((status) =>
+        stream(ctx.db, schema)
+          .query("messages")
+          .withIndex("chatId_status_tool_order_stepOrder", (q) =>
+            q.eq("chatId", args.chatId).eq("status", status).eq("tool", tool)
           )
-        : statuses.map((status) =>
-            stream(ctx.db, schema)
-              .query("messages")
-              .withIndex("status_chatId_order", (q) =>
-                q.eq("status", status).eq("chatId", args.chatId)
-              )
-              .order(order)
-          );
-    const messages = await mergedStream(streams, ["order"]).paginate({
+          .order(order)
+      )
+    );
+    const messages = await mergedStream(streams, [
+      "order",
+      "stepOrder",
+    ]).paginate({
       numItems: args.limit ?? 100,
       cursor: args.cursor ?? null,
     });
@@ -748,7 +759,7 @@ export const _fetchVectorMessages = internalQuery({
       if (earliest !== latest) {
         const surrounding = await ctx.db
           .query("messages")
-          .withIndex("chatId_status_tool_order", (q) =>
+          .withIndex("chatId_status_tool_order_stepOrder", (q) =>
             q
               .eq("chatId", m.chatId)
               .eq("status", "success")

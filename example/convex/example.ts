@@ -53,17 +53,17 @@ const model = openai.chat("gpt-4o-mini");
 export const t = action({
   args: {},
   handler: async (ctx) => {
-    const { chatId, chat } = await agent.startChat(ctx, {
+    const { chat } = await agent.continueChat(ctx, {
       userId: "test",
-      title: "My first chat",
-      summary: "This is a summary of the chat.",
+      chatId: "j57agars0dsmn8vep711y6ev9s7dk5wg",
     });
-    const result = await chat.generateText({
+    const result = await chat.streamText({
       model,
-      maxSteps: 2,
+      maxSteps: 5,
       prompt:
         "What is the weather in San Francisco? " +
-        "Please get a second report if the first says it's over 60 degrees.",
+        "Please get a second report if the first says it's over 60 degrees." +
+        "Then give a summary of whether they match and if it's good weather.",
       tools: {
         weather: weatherTool,
       },
@@ -82,34 +82,39 @@ export const t = action({
         );
       },
     });
-    await ctx.runMutation(api.example.blindWrite, {
-      table: "results",
-      doc: JSON.parse(JSON.stringify(result)),
-    });
-    await Promise.all(
-      result.response.messages.map((m) =>
-        ctx.runMutation(api.example.blindWrite, {
-          table: "responseMessages",
-          doc: serializeMessageWithId(m),
-        })
-      )
-    );
-    await Promise.all(
-      serializeResponse(result.response).map((m) =>
-        ctx.runMutation(api.example.blindWrite, {
-          table: "messages",
-          doc: m,
-        })
-      )
-    );
-    await Promise.all(
-      result.steps.map((s) =>
-        ctx.runMutation(api.example.blindWrite, {
-          table: "steps",
-          doc: serializeStep(s),
-        })
-      )
-    );
+    let t = "";
+    for await (const delta of result.textStream) {
+      t += delta;
+    }
+    console.log(t);
+    // await ctx.runMutation(api.example.blindWrite, {
+    //   table: "results",
+    //   doc: JSON.parse(JSON.stringify(result)),
+    // });
+    // await Promise.all(
+    //   result...map((m) =>
+    //     ctx.runMutation(api.example.blindWrite, {
+    //       table: "responseMessages",
+    //       doc: serializeMessageWithId(m),
+    //     })
+    //   )
+    // );
+    // await Promise.all(
+    //   serializeResponse(result.response).map((m) =>
+    //     ctx.runMutation(api.example.blindWrite, {
+    //       table: "messages",
+    //       doc: m,
+    //     })
+    //   )
+    // );
+    // await Promise.all(
+    //   result.steps.map((s) =>
+    //     ctx.runMutation(api.example.blindWrite, {
+    //       table: "steps",
+    //       doc: serializeStep(s),
+    //     })
+    //   )
+    // );
   },
 });
 

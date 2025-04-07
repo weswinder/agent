@@ -95,30 +95,17 @@ export function serializeNewMessagesInStep<TOOLS extends ToolSet>(
 ): MessageWithFileAndId[] {
   const messages: MessageWithFileAndId[] = [];
   if (step.text) {
-    messages.push(
-      serializeMessageWithId({
-        id: step.response.id,
-        role: "assistant",
-        content: step.text,
-      })
-    );
+    messages.push(serializeMessageWithId(step.response.messages.at(-1)!));
   }
-  if (step.toolCalls) {
+  // TODO: get ID from regular messages
+  if (step.toolCalls || step.toolResults) {
     messages.push(
-      serializeMessageWithId({
-        id: step.response.id,
-        role: "assistant",
-        content: step.toolCalls,
-      })
-    );
-  }
-  if (step.toolResults) {
-    messages.push(
-      serializeMessageWithId({
-        id: step.response.id,
-        role: "tool",
-        content: step.toolResults,
-      })
+      ...step.response.messages
+        .slice(
+          0,
+          -((step.toolCalls?.length ?? 0) + (step.toolResults?.length ?? 0))
+        )
+        .map((m) => serializeMessageWithId(m))
     );
   }
   return messages;

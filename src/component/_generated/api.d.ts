@@ -265,6 +265,7 @@ export type Mounts = {
           order?: number;
           status: "pending" | "success" | "failed";
           stepId?: string;
+          stepOrder?: number;
           text?: string;
           threadId?: string;
           tool: boolean;
@@ -388,6 +389,7 @@ export type Mounts = {
           order?: number;
           status: "pending" | "success" | "failed";
           stepId?: string;
+          stepOrder?: number;
           text?: string;
           threadId?: string;
           tool: boolean;
@@ -1130,6 +1132,7 @@ export type Mounts = {
           order?: number;
           status: "pending" | "success" | "failed";
           stepId?: string;
+          stepOrder?: number;
           text?: string;
           threadId?: string;
           tool: boolean;
@@ -1315,6 +1318,7 @@ export type Mounts = {
         order?: number;
         status: "pending" | "success" | "failed";
         stepId?: string;
+        stepOrder?: number;
         text?: string;
         threadId?: string;
         tool: boolean;
@@ -1443,6 +1447,7 @@ export type Mounts = {
         order?: number;
         status: "pending" | "success" | "failed";
         stepId?: string;
+        stepOrder?: number;
         text?: string;
         threadId?: string;
         tool: boolean;

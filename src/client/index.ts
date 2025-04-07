@@ -27,6 +27,7 @@ import { assert } from "convex-helpers";
 import { DEFAULT_MESSAGE_RANGE, extractText } from "../shared";
 import {
   serializeMessage,
+  serializeMessageWithId,
   serializeNewMessagesInStep,
   serializeStep,
 } from "../mapping";
@@ -216,7 +217,7 @@ export class Agent {
       chatId: string;
       messages: CoreMessageMaybeWithId[];
       steps?: StepResult<ToolSet>[];
-      createPending: true;
+      pending?: boolean;
     }
   ): Promise<{
     lastMessageId: string;
@@ -232,16 +233,11 @@ export class Agent {
   ): Promise<{
     lastMessageId?: string;
   }> {
-    console.debug("saveMessages", args);
     const result = await ctx.runMutation(this.component.messages.addMessages, {
       chatId: args.chatId,
       agentName: this.options.name,
       model: this.options.chat.modelId,
-      messages: args.messages.map((m) => ({
-        id: m.id,
-        message: serializeMessage(m),
-        // TODO: add fileId if we save a file?
-      })),
+      messages: args.messages.map(serializeMessageWithId),
       failPendingSteps: true,
       pending: args.pending ?? false,
     });
@@ -267,7 +263,7 @@ export class Agent {
       chatId: args.chatId,
       messageId: args.messageId,
       steps: [{ step, messages: messages }],
-      failPendingSteps: true,
+      failPendingSteps: false,
     });
   }
 
@@ -340,38 +336,37 @@ export class Agent {
         chatId,
         // TODO: only save the last message unless explicitly told to save all
         messages,
-        createPending: true,
+        pending: true,
       });
       messageId = lastMessageId;
     }
-    const result = await generateText({
-      model: this.options.chat,
-      messages: [...contextMessages, ...messages],
-      system: this.options.defaultSystemPrompt,
-      ...rest,
-      onStepFinish: async (step) => {
-        console.log("onStepFinish", step);
-        if (chatId && messageId) {
-          await this.saveStep(ctx, {
-            chatId,
-            messageId,
-            step,
-          });
-        }
-        return args.onStepFinish?.(step);
-      },
-    });
-    if (messageId && chatId) {
-      await this.completeMessage(ctx, {
-        messageId,
-        chatId,
-        result: {
-          kind: "success",
-          value: { steps: result.steps },
+    try {
+      const result = await generateText({
+        model: this.options.chat,
+        messages: [...contextMessages, ...messages],
+        system: this.options.defaultSystemPrompt,
+        ...rest,
+        onStepFinish: async (step) => {
+          if (chatId && messageId) {
+            await this.saveStep(ctx, {
+              chatId,
+              messageId,
+              step,
+            });
+          }
+          return args.onStepFinish?.(step);
         },
       });
+      return result;
+    } catch (error) {
+      if (chatId && messageId) {
+        await ctx.runMutation(this.component.messages.rollbackMessage, {
+          messageId,
+          error: (error as Error).message,
+        });
+      }
+      throw error;
     }
-    return result;
   }
 
   async streamText<
@@ -394,6 +389,16 @@ export class Agent {
       chatId,
       messages,
     });
+    let messageId: string | undefined;
+    if (chatId) {
+      const { lastMessageId } = await this.saveMessages(ctx, {
+        chatId,
+        // TODO: only save the last message unless explicitly told to save all
+        messages,
+        pending: true,
+      });
+      messageId = lastMessageId;
+    }
     return streamText({
       model: this.options.chat,
       messages: [...contextMessages, ...messages],
@@ -405,6 +410,12 @@ export class Agent {
       },
       onError: async (error) => {
         console.error("onError", error);
+        if (chatId && messageId) {
+          await ctx.runMutation(this.component.messages.rollbackMessage, {
+            messageId,
+            error: (error.error as Error).message,
+          });
+        }
         return args.onError?.(error);
       },
       onFinish: async (result) => {
@@ -415,6 +426,13 @@ export class Agent {
       },
       onStepFinish: async (step) => {
         console.log("onStepFinish", step);
+        if (chatId && messageId) {
+          await this.saveStep(ctx, {
+            chatId,
+            messageId,
+            step,
+          });
+        }
         return args.onStepFinish?.(step);
       },
     });
