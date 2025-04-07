@@ -246,13 +246,6 @@ export class Agent<AgentTools extends ToolSet> {
     };
   }
 
-  async replaceMessages(
-    ctx: RunMutationCtx,
-    args: { chatId: string; messages: Message[] }
-  ): Promise<void> {
-    throw new Error("Not implemented");
-  }
-
   async saveStep<TOOLS extends ToolSet>(
     ctx: RunMutationCtx,
     args: { chatId: string; messageId: string; step: StepResult<TOOLS> }
@@ -576,14 +569,6 @@ export class Agent<AgentTools extends ToolSet> {
     };
   }
 
-  async getSteps(
-    ctx: RunQueryCtx,
-    args: { messageId: string }
-  ): Promise<{
-    steps: Step[];
-  }> {
-    return { steps: [] };
-  }
 }
 
 type TextArgs<
