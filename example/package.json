@@ -14,7 +14,8 @@
     "@convex-dev/agent": "file:..",
     "convex": "file:../node_modules/convex",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react-dom": "^18.3.1",
+    "zod": "^3.24.2"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.1.0",

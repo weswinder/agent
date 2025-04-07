@@ -44,14 +44,15 @@ export const getInProgressMessages = query({
       chatId,
       statuses: ["pending"],
     });
-    const withSteps = await Promise.all(
-      messages.map(async (message) => {
-        const messageId = message.id;
-        const steps = await supportAgent.getSteps(ctx, { messageId });
-        return { message, steps };
-      })
-    );
-    return withSteps;
+    return messages;
+    // const withSteps = await Promise.all(
+    //   messages.map(async (message) => {
+    //     const messageId = message.id;
+    //     const steps = await supportAgent.getSteps(ctx, { messageId });
+    //     return { message, steps };
+    //   })
+    // );
+    // return withSteps;
   },
 });
 

@@ -1,23 +1,16 @@
 import { action, mutation } from "./_generated/server";
 import { api, components } from "./_generated/api";
-import { Agent } from "@convex-dev/agent";
-import { generateText, tool } from "ai";
+import { Agent, tool } from "@convex-dev/agent";
 import { v } from "convex/values";
 import { openai } from "@ai-sdk/openai";
-import { z } from "zod";
-import {
-  serializeMessage,
-  serializeMessageWithId,
-  serializeResponse,
-  serializeStep,
-} from "../../src/mapping";
+import { serializeMessageWithId, serializeStep } from "../../src/mapping";
 
 export const weatherTool = tool({
   description: "Get the weather in a location",
-  parameters: z.object({
-    location: z.string().describe("The location to get the weather for"),
+  args: v.object({
+    location: v.string(),
   }),
-  execute: async ({ location } /*{ domainId, chatId  <<--INJECTED }*/) => ({
+  handler: async (ctx, { location }) => ({
     location,
     temperature: 72 + Math.floor(Math.random() * 21) - 10,
   }),
@@ -64,9 +57,8 @@ export const t = action({
         "What is the weather in San Francisco? " +
         "Please get a second report if the first says it's over 60 degrees." +
         "Then give a summary of whether they match and if it's good weather.",
-      tools: {
-        weather: weatherTool,
-      },
+      // tools: { a: weatherTool },
+      toolChoice: { toolName: "weather", type: "tool" },
       onStepFinish: async (step) => {
         await ctx.runMutation(api.example.blindWrite, {
           table: "stepsFinish",
@@ -164,9 +156,9 @@ export const generate = action({
       //   updateChatSummary: true,
       // },
       // toolChoices: ["memory", "weather"], // type safe
-      tools: {
-        // memory: agent.tools.memory({ retrievalConfig: {...}})
-      },
+      tools: { a: weatherTool },
+      toolChoice: { toolName: "a", type: "tool" },
+      // memory: agent.tools.memory({ retrievalConfig: {...}})
     });
     console.log(result.steps);
     console.log(result.response.messages[1].content);

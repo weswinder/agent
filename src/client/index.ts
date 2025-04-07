@@ -1,35 +1,41 @@
-import { api } from "../component/_generated/api";
-import { RunActionCtx, RunMutationCtx, RunQueryCtx, UseApi } from "./types";
 import type { EmbeddingModelV1, LanguageModelV1 } from "@ai-sdk/provider";
-import { Message, MessageStatus, SearchOptions } from "../validators";
 import type {
-  StreamTextResult,
-  ToolSet,
-  StepResult,
-  Message as UIMessage,
   CoreMessage,
-  GenerateObjectResult,
-  StreamObjectResult,
   DeepPartial,
+  GenerateObjectResult,
   GenerateTextResult,
+  StepResult,
+  StreamObjectResult,
+  StreamTextResult,
+  Tool,
   ToolChoice,
+  ToolExecutionOptions,
+  ToolSet,
+  Message as UIMessage,
 } from "ai";
 import {
-  generateText,
-  generateObject,
-  streamText,
-  streamObject,
   convertToCoreMessages,
   coreMessageSchema,
+  generateObject,
+  generateText,
+  streamObject,
+  streamText,
 } from "ai";
+import type { ZodType } from "zod";
+import { api } from "../component/_generated/api";
+import { Message, MessageStatus, SearchOptions } from "../validators";
+import { RunActionCtx, RunMutationCtx, RunQueryCtx, UseApi } from "./types";
 // TODO: is this the only dependency that needs helpers in client?
 import { assert } from "convex-helpers";
-import { DEFAULT_MESSAGE_RANGE, extractText } from "../shared";
+import { convexToZod } from "convex-helpers/server/zod";
+import { GenericActionCtx, GenericDataModel } from "convex/server";
+import { Infer, Validator } from "convex/values";
 import {
   serializeMessageWithId,
   serializeNewMessagesInStep,
   serializeStep,
 } from "../mapping";
+import { DEFAULT_MESSAGE_RANGE, extractText } from "../shared";
 
 export type ContextOptions = {
   parentMessageId?: string;
@@ -336,10 +342,8 @@ export class Agent<AgentTools extends ToolSet> {
       pending: true,
       parentMessageId: args.parentMessageId,
     });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const tools: any = this.options.tools
-      ? { ...this.options.tools, ...args.tools }
-      : args.tools;
+    const defaults = this.options.tools;
+    const tools = wrapTools(ctx, chatId, userId, defaults, args.tools) as TOOLS;
     try {
       const result = await generateText({
         model: this.options.chat,
@@ -377,7 +381,7 @@ export class Agent<AgentTools extends ToolSet> {
     OUTPUT = never,
     PARTIAL_OUTPUT = never,
   >(
-    ctx: RunMutationCtx,
+    ctx: RunActionCtx,
     { userId, chatId }: { userId?: string; chatId: string },
     args: Partial<
       Parameters<typeof streamText<TOOLS, OUTPUT, PARTIAL_OUTPUT>>[0]
@@ -401,10 +405,8 @@ export class Agent<AgentTools extends ToolSet> {
       pending: true,
       parentMessageId: args.parentMessageId,
     });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const tools: any = this.options.tools
-      ? { ...this.options.tools, ...args.tools }
-      : args.tools;
+    const defaults = this.options.tools;
+    const tools = wrapTools(ctx, chatId, userId, defaults, args.tools) as TOOLS;
     const result = streamText({
       model: this.options.chat,
       messages: [...contextMessages, ...messages],
@@ -586,6 +588,37 @@ export class Agent<AgentTools extends ToolSet> {
   }
 }
 
+export function promptOrMessagesToCoreMessages(args: {
+  system?: string;
+  prompt?: string;
+  messages?: CoreMessage[] | Omit<UIMessage, "id">[];
+}): CoreMessage[] {
+  const messages: CoreMessage[] = [];
+  if (args.system) {
+    messages.push({ role: "system", content: args.system });
+  }
+  if (!args.messages) {
+    assert(args.prompt, "messages or prompt is required");
+    messages.push({ role: "user", content: args.prompt });
+  } else if (
+    args.messages.some(
+      (m) =>
+        typeof m === "object" &&
+        m !== null &&
+        (m.role === "data" || // UI-only role
+          "toolInvocations" in m || // UI-specific field
+          "parts" in m || // UI-specific field
+          "experimental_attachments" in m)
+    )
+  ) {
+    messages.push(...convertToCoreMessages(args.messages as UIMessage[]));
+  } else {
+    messages.push(...coreMessageSchema.array().parse(args.messages));
+  }
+  assert(messages.length > 0, "Messages must contain at least one message");
+  return messages;
+}
+
 type TextArgs<
   AgentTools extends ToolSet,
   TOOLS extends ToolSet,
@@ -650,61 +683,71 @@ interface Chat<AgentTools extends ToolSet> {
 //     : PARAMETERS extends z.ZodTypeAny
 //       ? z.infer<PARAMETERS>
 //       : never;
-// /**
-//  * This is a wrapper around the ai.tool function that adds support for
-//  * userId and chatId to the tool, if they're called within a chat from an agent.
-//  * @param tool The AI tool. See https://sdk.vercel.ai/docs/ai-sdk-core/tools-and-tool-calling
-//  * @returns The same tool, but with userId and chatId args support added.
-//  */
-// export function tool<PARAMETERS extends ToolParameters, RESULT>(
-//   tool: Tool<PARAMETERS, RESULT> & {
-//     execute: (
-//       args: inferParameters<PARAMETERS> & { userId?: string; chatId?: string },
-//       options: ToolExecutionOptions
-//     ) => PromiseLike<RESULT>;
-//   }
-// ): Tool<PARAMETERS, RESULT> & {
-//   execute: (
-//     args: inferParameters<PARAMETERS>,
-//     options: ToolExecutionOptions
-//   ) => PromiseLike<RESULT>;
-// } {
-//   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-//   (tool as any).__acceptUserIdAndChatId = true;
-//   return tool;
-// }
-
-export function promptOrMessagesToCoreMessages(args: {
-  system?: string;
-  prompt?: string;
-  messages?: CoreMessage[] | Omit<UIMessage, "id">[];
-}): CoreMessage[] {
-  const messages: CoreMessage[] = [];
-  if (args.system) {
-    messages.push({ role: "system", content: args.system });
-  }
-  if (!args.messages) {
-    assert(args.prompt, "messages or prompt is required");
-    messages.push({ role: "user", content: args.prompt });
-  } else if (
-    args.messages.some(
-      (m) =>
-        typeof m === "object" &&
-        m !== null &&
-        (m.role === "data" || // UI-only role
-          "toolInvocations" in m || // UI-specific field
-          "parts" in m || // UI-specific field
-          "experimental_attachments" in m)
-    )
-  ) {
-    messages.push(...convertToCoreMessages(args.messages as UIMessage[]));
-  } else {
-    messages.push(...coreMessageSchema.array().parse(args.messages));
-  }
-  assert(messages.length > 0, "Messages must contain at least one message");
-  return messages;
+/**
+ * This is a wrapper around the ai.tool function that adds support for
+ * userId and chatId to the tool, if they're called within a chat from an agent.
+ * @param tool The AI tool. See https://sdk.vercel.ai/docs/ai-sdk-core/tools-and-tool-calling
+ * @returns The same tool, but with userId and chatId args support added.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function tool<V extends Validator<any, any, any>, RESULT>(convexTool: {
+  args: V;
+  description?: string;
+  handler: (
+    ctx: GenericActionCtx<GenericDataModel> & {
+      userId?: string;
+      chatId?: string;
+    },
+    args: Infer<V>,
+    options: ToolExecutionOptions
+  ) => PromiseLike<RESULT>;
+  ctx?: GenericActionCtx<GenericDataModel> & {
+    userId?: string;
+    chatId?: string;
+  };
+}): Tool<ZodType<Infer<V>>, RESULT> {
+  const tool = {
+    __acceptUserIdAndChatId: true,
+    description: convexTool.description,
+    parameters: convexToZod(convexTool.args),
+    execute: async (args: Infer<V>, options: ToolExecutionOptions) => {
+      if (!convexTool.ctx) {
+        throw new Error(
+          "To use a Convex tool, you must either provide the ctx" +
+            " at definition time (dynamically in an action), or use the Agent to" +
+            " call it (which injects the ctx, userId and chatId)"
+        );
+      }
+      return convexTool.handler(convexTool.ctx, args, options);
+    },
+  };
+  return tool;
 }
 
+export function wrapTools(
+  actionCtx: RunActionCtx,
+  chatId: string,
+  userId?: string,
+  ...toolSets: (ToolSet | undefined)[]
+): ToolSet {
+  const ctx = { ...actionCtx, chatId, userId };
+  const output = {} as ToolSet;
+  for (const toolSet of toolSets) {
+    if (!toolSet) {
+      continue;
+    }
+    for (const [name, tool] of Object.entries(toolSet)) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      if (!(tool as any).__acceptUserIdAndChatId) {
+        output[name] = tool;
+      } else {
+        const out = { ...tool, ctx };
+        output[name] = out;
+      }
+    }
+  }
+  return output;
+}
 // export function convexValidatorSchema<T>(validator: Validator<unknown>)  {
 //   return ai.jsonSchema(convexToJsonSchema(validator));
 // }
