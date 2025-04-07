@@ -275,7 +275,7 @@ export declare const components: {
                   role: "system";
                 };
             model?: string;
-            order?: number;
+            order: number;
             status: "pending" | "success" | "failed";
             stepId?: string;
             stepOrder?: number;
@@ -399,7 +399,7 @@ export declare const components: {
                   role: "system";
                 };
             model?: string;
-            order?: number;
+            order: number;
             status: "pending" | "success" | "failed";
             stepId?: string;
             stepOrder?: number;
@@ -1171,7 +1171,7 @@ export declare const components: {
                   role: "system";
                 };
             model?: string;
-            order?: number;
+            order: number;
             status: "pending" | "success" | "failed";
             stepId?: string;
             stepOrder?: number;
@@ -1358,7 +1358,7 @@ export declare const components: {
                 role: "system";
               };
           model?: string;
-          order?: number;
+          order: number;
           status: "pending" | "success" | "failed";
           stepId?: string;
           stepOrder?: number;
@@ -1487,7 +1487,7 @@ export declare const components: {
                 role: "system";
               };
           model?: string;
-          order?: number;
+          order: number;
           status: "pending" | "success" | "failed";
           stepId?: string;
           stepOrder?: number;

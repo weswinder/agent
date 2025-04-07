@@ -433,7 +433,7 @@ async function addMessagesHandler(
   if (messages.length > 0) {
     for (const { message, fileId, id } of messages) {
       const tool = isTool(message);
-      if (!tool && order !== undefined) {
+      if (!tool) {
         order++;
       }
       const text = extractText(message);
@@ -754,9 +754,7 @@ export const _fetchVectorMessages = internalQuery({
       )
     ).filter(
       (m): m is Doc<"messages"> =>
-        m !== undefined &&
-        m !== null &&
-        (!parent || !m.order || !parent.order || m.order <= parent.order)
+        m !== undefined && m !== null && (!parent || m.order <= parent.order)
     );
     messages.push(...(args.textSearchMessages ?? []));
     // TODO: prioritize more recent messages
@@ -764,14 +762,14 @@ export const _fetchVectorMessages = internalQuery({
     messages = messages.slice(0, args.limit);
     // Fetch the surrounding messages
     if (!chatId) {
-      return messages.sort((a, b) => a.order! - b.order!);
+      return messages.sort((a, b) => a.order - b.order);
     }
     const included: Record<string, Set<number>> = {};
     for (const m of messages) {
       if (!included[chatId]) {
         included[chatId] = new Set();
       }
-      included[chatId].add(m.order!);
+      included[m.chatId].add(m.order!);
     }
     const ranges: Record<Id<"chats">, Doc<"messages">[]> = {};
     const { before, after } = args.messageRange;

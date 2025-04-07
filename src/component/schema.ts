@@ -34,7 +34,7 @@ export const schema = defineSchema({
     tool: v.boolean(),
     // Repeats until a non-tool message.
     // Unset if it's not in a chat.
-    order: v.optional(v.number()),
+    order: v.number(),
     stepOrder: v.optional(v.number()),
     fileId: v.optional(v.id("files")),
     status: vMessageStatus,
@@ -43,6 +43,13 @@ export const schema = defineSchema({
     // Also surface pending messages separately to e.g. stream
     .index("chatId_status_tool_order_stepOrder", [
       "chatId",
+      "status",
+      "tool",
+      "order",
+      "stepOrder",
+    ])
+    .index("userId_status_tool_order_stepOrder", [
+      "userId",
       "status",
       "tool",
       "order",
