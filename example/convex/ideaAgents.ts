@@ -20,23 +20,26 @@ export const ideaSearch = createTool({
 });
 
 export const ideaCreation = createTool({
-  description: "Create an idea, optionally merging with an existing idea",
+  description:
+    "Create an idea, optionally merging with an existing idea. " +
+    "You can pass in the entryId of what inspired the idea.",
   args: v.object({
     title: v.string(),
     summary: v.string(),
     tags: v.array(v.string()),
+    entryId: v.union(v.id("entries"), v.null()),
   }),
-  handler: async (ctx, { title, summary, tags }): Promise<Id<"ideas">> =>
-    ctx.runMutation(api.ideas.createIdea, { title, summary, tags }),
+  handler: async (ctx, args): Promise<Id<"ideas">> =>
+    ctx.runMutation(api.ideas.createIdea, args),
 });
 
 export const ideaUpdate = createTool({
   description: "Update an idea's title, summary, or tags",
   args: v.object({
     id: v.id("ideas"),
-    title: v.optional(v.string()),
-    summary: v.optional(v.string()),
-    tags: v.optional(v.array(v.string())),
+    title: v.union(v.string(), v.null()),
+    summary: v.union(v.string(), v.null()),
+    tags: v.union(v.array(v.string()), v.null()),
   }),
   handler: (ctx, args): Promise<null> =>
     ctx.runMutation(api.ideas.updateIdea, args),
@@ -55,13 +58,23 @@ export const ideaMerge = createTool({
     ctx.runMutation(api.ideas.mergeIdeas, args),
 });
 
+export const attachEntryToIdea = createTool({
+  description: "Combine an entry into an existing idea",
+  args: v.object({
+    ideaId: v.id("ideas"),
+    entryId: v.id("entries"),
+  }),
+  handler: (ctx, args): Promise<null> =>
+    ctx.runMutation(api.ideas.attachEntryToIdea, args),
+});
+
 /**
  * AGENTS
  */
 
 const ideaManagerAgent = new Agent(components.agent, {
   name: "Idea Manager Agent",
-  chat: openai.chat("o1-mini"),
+  chat: openai.chat("gpt-4o"), // Fancier model for discerning between ideas
   textEmbedding: openai.embedding("text-embedding-3-small"),
   instructions:
     "You are a helpful assistant that helps manage ideas. " +
@@ -116,7 +129,7 @@ const ideaManager = ideaManagerAgent.createTool({
     id: v.optional(v.id("ideas")),
     command: v.string(),
   }),
-  maxSteps: 5,
+  maxSteps: 10,
 });
 
 const ideaDeveloper = ideaDevelopmentAgent.createTool({
@@ -128,7 +141,7 @@ const ideaDeveloper = ideaDevelopmentAgent.createTool({
     id: v.id("ideas"),
     command: v.string(),
   }),
-  maxSteps: 2,
+  maxSteps: 5,
 });
 
 /**
@@ -143,19 +156,20 @@ const ideaTriageAgent = new Agent(components.agent, {
     "You are a helpful assistant that helps triage ideas. " +
     "You should delegate to the manager or developer agents to help you. " +
     "You can search for existing ideas to help triage. " +
+    "If you are given an entryId, that is different from an ideaId, " +
+    "you should delegate to the ideaManager to create an idea from the entry. " +
     "Be willing to undo mistakes and get better.",
   tools: { ideaSearch, ideaManager, ideaDeveloper },
   contextOptions: {
     recentMessages: 5,
     searchOtherChats: false,
   },
-  maxSteps: 5,
+  maxSteps: 20,
 });
 
 export const submitRandomThought = action({
   args: {
-    userId: v.string(),
-    chatId: v.id("chats"),
+    userId: v.string(), // in practice you'd use the authenticated user's ID
     entry: v.string(),
   },
   handler: async (ctx, args): Promise<string> => {
@@ -164,6 +178,7 @@ export const submitRandomThought = action({
 
     const entryId = await ctx.runMutation(api.ideas.createEntry, {
       content: args.entry,
+      ideaId: null,
     });
 
     const result = await chat.generateText({
@@ -172,7 +187,6 @@ export const submitRandomThought = action({
       The entryId for this is ${entryId}.
       Please help me organize it with existing ideas.
       `,
-      toolChoice: { toolName: "ideaSearch", type: "tool" },
     });
     return result.text;
   },

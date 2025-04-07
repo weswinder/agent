@@ -385,10 +385,10 @@ export class Agent<AgentTools extends ToolSet> {
         messages: [...contextMessages, ...messages],
         system: this.options.instructions,
         maxSteps: this.options.maxSteps,
-        tools,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         toolChoice: args.toolChoice as any,
         ...rest,
+        tools,
         onStepFinish: async (step) => {
           if (chatId && messageId && args.saveOutputMessages) {
             await this.saveStep(ctx, {
@@ -448,10 +448,10 @@ export class Agent<AgentTools extends ToolSet> {
       messages: [...contextMessages, ...messages],
       system: this.options.instructions,
       maxSteps: this.options.maxSteps,
-      tools,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       toolChoice: args.toolChoice as any,
       ...rest,
+      tools,
       onChunk: async (chunk) => {
         console.log("onChunk", chunk);
         return args.onChunk?.(chunk);
@@ -708,18 +708,19 @@ export function createTool<
   ctx?: ToolCtx;
 }): Tool<ConvexToZod<V>, RESULT> {
   const tool = {
-    __acceptUserIdAndChatId: true,
+    __acceptsCtx: true,
+    ctx: convexTool.ctx,
     description: convexTool.description,
     parameters: convexToZod(convexTool.args),
-    execute: async (args: Infer<V>, options: ToolExecutionOptions) => {
-      if (!convexTool.ctx) {
+    async execute(args: Infer<V>, options: ToolExecutionOptions) {
+      if (!this.ctx) {
         throw new Error(
           "To use a Convex tool, you must either provide the ctx" +
             " at definition time (dynamically in an action), or use the Agent to" +
             " call it (which injects the ctx, userId and chatId)"
         );
       }
-      return convexTool.handler(convexTool.ctx, args, options);
+      return convexTool.handler(this.ctx, args, options);
     },
   };
   return tool;
@@ -736,7 +737,7 @@ function wrapTools(
     }
     for (const [name, tool] of Object.entries(toolSet)) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      if (!(tool as any).__acceptUserIdAndChatId) {
+      if (!(tool as any).__acceptsCtx) {
         output[name] = tool;
       } else {
         const out = { ...tool, ctx };

@@ -8,7 +8,7 @@ export const createIdea = mutation({
     title: v.string(),
     summary: v.string(),
     tags: v.array(v.string()),
-    entryId: v.optional(v.id("entries")),
+    entryId: v.union(v.id("entries"), v.null()),
   },
   handler: async (ctx, args) => {
     const ideaId = await ctx.db.insert("ideas", {
@@ -63,9 +63,9 @@ export const searchIdeas = query({
 export const updateIdea = mutation({
   args: {
     id: v.id("ideas"),
-    title: v.optional(v.string()),
-    summary: v.optional(v.string()),
-    tags: v.optional(v.array(v.string())),
+    title: v.union(v.string(), v.null()),
+    summary: v.union(v.string(), v.null()),
+    tags: v.union(v.array(v.string()), v.null()),
   },
   handler: async (ctx, args) => {
     const patch: Partial<Doc<"ideas">> = {
@@ -103,8 +103,8 @@ export const mergeIdeas = mutation({
   args: {
     sourceId: v.id("ideas"),
     targetId: v.id("ideas"),
-    newTargetTitle: v.optional(v.string()),
-    newTargetSummary: v.optional(v.string()),
+    newTargetTitle: v.union(v.string(), v.null()),
+    newTargetSummary: v.union(v.string(), v.null()),
   },
   handler: async (ctx, args) => {
     await ctx.db.patch(args.sourceId, {
@@ -199,23 +199,37 @@ export const getIdea = query({
 export const createEntry = mutation({
   args: {
     content: v.string(),
-    ideaId: v.optional(v.id("ideas")),
+    ideaId: v.union(v.id("ideas"), v.null()),
   },
   handler: async (ctx, args) => {
-    return await ctx.db.insert("entries", args);
+    return await ctx.db.insert("entries", {
+      ...args,
+      ideaId: args.ideaId ?? undefined,
+    });
+  },
+});
+
+export const attachEntryToIdea = mutation({
+  args: {
+    ideaId: v.id("ideas"),
+    entryId: v.id("entries"),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.entryId, { ideaId: args.ideaId });
   },
 });
 
 export const listEntries = query({
   args: {
-    ideaId: v.optional(v.id("ideas")),
+    ideaId: v.union(v.id("ideas"), v.null()),
     paginationOpts: paginationOptsValidator,
   },
   handler: async (ctx, args) => {
-    const query = args.ideaId
+    const ideaId = args.ideaId;
+    const query = ideaId
       ? ctx.db
           .query("entries")
-          .withIndex("by_ideaId", (q) => q.eq("ideaId", args.ideaId))
+          .withIndex("by_ideaId", (q) => q.eq("ideaId", ideaId))
       : ctx.db.query("entries");
 
     return await query.order("desc").paginate(args.paginationOpts);

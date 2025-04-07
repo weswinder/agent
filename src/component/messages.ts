@@ -58,7 +58,7 @@ export const getChatsByUserId = query({
             .gte("order", args.offset ?? 0)
         )
     );
-    const chats = await mergedStream(streams, ["order", "stepOrder"]).paginate({
+    const chats = await mergedStream(streams, ["order"]).paginate({
       numItems: args.limit ?? 100,
       cursor: args.cursor ?? null,
     });
