@@ -91,6 +91,7 @@ export class Agent<AgentTools extends ToolSet> {
       instructions?: string;
       tools?: AgentTools;
       contextOptions?: ContextOptions;
+      maxSteps?: number;
     }
   ) {}
 
@@ -190,6 +191,10 @@ export class Agent<AgentTools extends ToolSet> {
       userId,
     }: {
       chatId: string;
+      /**
+       * If supplied, the userId can be used to search across other chats for
+       * relevant messages from the same user as context for the LLM calls.
+       */
       userId?: string;
     }
   ): Promise<{
@@ -371,6 +376,7 @@ export class Agent<AgentTools extends ToolSet> {
         model: this.options.chat,
         messages: [...contextMessages, ...messages],
         system: this.options.instructions,
+        maxSteps: this.options.maxSteps,
         tools,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         toolChoice: args.toolChoice as any,
@@ -433,6 +439,7 @@ export class Agent<AgentTools extends ToolSet> {
       model: this.options.chat,
       messages: [...contextMessages, ...messages],
       system: this.options.instructions,
+      maxSteps: this.options.maxSteps,
       tools,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       toolChoice: args.toolChoice as any,
@@ -633,14 +640,23 @@ export class Agent<AgentTools extends ToolSet> {
     description: string;
     args: Validator<unknown, "required", string>;
     contextOptions?: ContextOptions;
+    maxSteps?: number;
   }) {
     return createTool({
       ...spec,
       handler: async (ctx, args) => {
+        const maxSteps = spec.maxSteps ?? this.options.maxSteps;
+        const contextOptions =
+          spec.contextOptions && this.mergedContextOptions(spec.contextOptions);
         const value = await this.generateText(
           ctx,
           { userId: ctx.userId, chatId: ctx.chatId },
-          { prompt: JSON.stringify(args), parentMessageId: ctx.messageId }
+          {
+            prompt: JSON.stringify(args),
+            parentMessageId: ctx.messageId,
+            maxSteps,
+            ...contextOptions,
+          }
         );
         return value.text;
       },

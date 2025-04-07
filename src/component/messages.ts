@@ -2,19 +2,14 @@ import { assert, omit, pick } from "convex-helpers";
 import { paginator } from "convex-helpers/server/pagination";
 import { mergedStream, stream } from "convex-helpers/server/stream";
 import { nullable, partial } from "convex-helpers/validators";
-import { Infer, ObjectType } from "convex/values";
+import { ObjectType } from "convex/values";
 import { DEFAULT_MESSAGE_RANGE, extractText, isTool } from "../shared.js";
 import {
-  Message,
-  MessageWithFileAndId,
-  vAssistantMessage,
   vChatStatus,
   vMessageStatus,
   vMessageWithFileAndId,
   vSearchOptions,
-  vStep,
   vStepWithMessagesWithFileAndId,
-  vToolMessage,
 } from "../validators.js";
 import { api, internal } from "./_generated/api.js";
 import { Doc, Id } from "./_generated/dataModel.js";
@@ -519,7 +514,8 @@ async function addStepsHandler(
       pending: step.finishReason === "stop" ? false : true,
       failPendingSteps: false,
     });
-    if (step.finishReason === "stop") {
+    // We don't commit if the parent is still pending.
+    if (step.finishReason === "stop" && parentMessage.status === "success") {
       await commitMessageHandler(ctx, { messageId: args.messageId });
     }
     steps.push((await ctx.db.get(stepId))!);
@@ -586,6 +582,7 @@ async function commitMessageHandler(
   ).collect();
   for (const message of messages) {
     await ctx.db.patch(message._id, { status: "success" });
+    // TODO: recursively commit steps & messages that might depend on this one.
   }
 }
 
