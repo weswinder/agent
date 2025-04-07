@@ -1,23 +1,33 @@
-import "./App.css";
-import { useMutation, useQuery } from "convex/react";
-import { api } from "../convex/_generated/api";
+import { BrowserRouter, Routes, Route, Link } from "react-router-dom";
+import { Home } from "./pages/Home";
+import { Ideas } from "./pages/Ideas";
+import { IdeaDetail } from "./pages/IdeaDetail";
+import { Toaster } from "./components/ui/toaster";
 
-function App() {
-  const count = useQuery(api.app.getCount);
-  const addOne = useMutation(api.app.addOne);
-
+export default function App() {
   return (
-    <>
-      <h1>Convex Agent Component Example</h1>
-      <div className="card">
-        <button onClick={() => addOne()}>count is {count}</button>
-        <p>
-          See <code>example/convex/example.ts</code> for all the ways to use
-          this component
-        </p>
+    <BrowserRouter>
+      <div className="min-h-screen flex flex-col">
+        <header className="sticky top-0 z-10 bg-white/80 backdrop-blur-sm p-4 flex justify-between items-center border-b">
+          <nav className="flex gap-4 items-center">
+            <h2 className="text-xl font-semibold accent-text">Ideas Pile</h2>
+            <Link to="/" className="hover:text-indigo-600">
+              Home
+            </Link>
+            <Link to="/ideas" className="hover:text-indigo-600">
+              Ideas
+            </Link>
+          </nav>
+        </header>
+        <main className="flex-1 p-8">
+          <Routes>
+            <Route path="/" element={<Home />} />
+            <Route path="/ideas" element={<Ideas />} />
+            <Route path="/ideas/:id" element={<IdeaDetail />} />
+          </Routes>
+        </main>
+        <Toaster />
       </div>
-    </>
+    </BrowserRouter>
   );
 }
-
-export default App;
