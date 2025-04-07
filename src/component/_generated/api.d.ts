@@ -40,7 +40,7 @@ export type Mounts = {
       "public",
       {
         agentName?: string;
-        chatId: string;
+        chatId?: string;
         failPendingSteps?: boolean;
         messages: Array<{
           fileId?: string;
@@ -147,13 +147,14 @@ export type Mounts = {
         parentMessageId?: string;
         pending?: boolean;
         stepId?: string;
+        userId?: string;
       },
       {
         messages: Array<{
           _creationTime: number;
           _id: string;
           agentName?: string;
-          chatId: string;
+          chatId?: string;
           embeddingId?:
             | string
             | string
@@ -264,7 +265,7 @@ export type Mounts = {
                 role: "system";
               };
           model?: string;
-          order: number;
+          order?: number;
           status: "pending" | "success" | "failed";
           stepId?: string;
           stepOrder?: number;
@@ -277,7 +278,7 @@ export type Mounts = {
           _creationTime: number;
           _id: string;
           agentName?: string;
-          chatId: string;
+          chatId?: string;
           embeddingId?:
             | string
             | string
@@ -388,7 +389,7 @@ export type Mounts = {
                 role: "system";
               };
           model?: string;
-          order: number;
+          order?: number;
           status: "pending" | "success" | "failed";
           stepId?: string;
           stepOrder?: number;
@@ -1021,7 +1022,7 @@ export type Mounts = {
           _creationTime: number;
           _id: string;
           agentName?: string;
-          chatId: string;
+          chatId?: string;
           embeddingId?:
             | string
             | string
@@ -1132,7 +1133,7 @@ export type Mounts = {
                 role: "system";
               };
           model?: string;
-          order: number;
+          order?: number;
           status: "pending" | "success" | "failed";
           stepId?: string;
           stepOrder?: number;
@@ -1208,7 +1209,7 @@ export type Mounts = {
         _creationTime: number;
         _id: string;
         agentName?: string;
-        chatId: string;
+        chatId?: string;
         embeddingId?:
           | string
           | string
@@ -1319,7 +1320,7 @@ export type Mounts = {
               role: "system";
             };
         model?: string;
-        order: number;
+        order?: number;
         status: "pending" | "success" | "failed";
         stepId?: string;
         stepOrder?: number;
@@ -1337,7 +1338,7 @@ export type Mounts = {
         _creationTime: number;
         _id: string;
         agentName?: string;
-        chatId: string;
+        chatId?: string;
         embeddingId?:
           | string
           | string
@@ -1448,7 +1449,7 @@ export type Mounts = {
               role: "system";
             };
         model?: string;
-        order: number;
+        order?: number;
         status: "pending" | "success" | "failed";
         stepId?: string;
         stepOrder?: number;

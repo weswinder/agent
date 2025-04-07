@@ -13,10 +13,10 @@ const supportAgent = new Agent(components.agent, {
 });
 
 // Use the agent from within a normal action:
-export const startChatting = action({
+export const createChatting = action({
   args: { prompt: v.string(), userId: v.string() },
   handler: async (ctx, { prompt, userId }) => {
-    const { chatId, chat } = await supportAgent.startChat(ctx, { userId });
+    const { chatId, chat } = await supportAgent.createChat(ctx, { userId });
     const result = await chat.generateText({ prompt });
     return { chatId, text: result.text };
   },
@@ -45,7 +45,8 @@ export const supportAgentWorkflow = workflow.define({
       createChat: { userId },
     });
     const result = await step.runAction(s.supportAgentStep, {
-      chatId, generateText: { prompt },
+      chatId,
+      generateText: { prompt },
     });
     console.log(result);
     // Call other agents here
@@ -76,7 +77,7 @@ export const getInProgressMessages = query({
 export const streamChat = action({
   args: { prompt: v.string(), userId: v.string() },
   handler: async (ctx, { prompt, userId }) => {
-    const { chatId, chat } = await supportAgent.startChat(ctx, { userId });
+    const { chatId, chat } = await supportAgent.createChat(ctx, { userId });
     const result = await chat.streamText({ prompt });
     return { chatId, text: result.text };
   },

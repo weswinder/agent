@@ -98,6 +98,7 @@ export class Agent<AgentTools extends ToolSet> {
       instructions?: string;
       tools?: AgentTools;
       contextOptions?: ContextOptions;
+      // TODO: storageOptions?: StorageOptions;
       maxSteps?: number;
       // TODO: maxRetries?: number;
     }
@@ -113,7 +114,7 @@ export class Agent<AgentTools extends ToolSet> {
    * @param args The chat metadata.
    * @returns The chatId of the new chat and the chat object.
    */
-  async startChat(
+  async createChat(
     ctx: RunActionCtx,
     args: {
       /**
@@ -149,7 +150,7 @@ export class Agent<AgentTools extends ToolSet> {
    * @param args The chat metadata.
    * @returns The chatId of the new chat.
    */
-  async startChat(
+  async createChat(
     ctx: RunMutationCtx,
     args: {
       userId?: string;
@@ -160,7 +161,7 @@ export class Agent<AgentTools extends ToolSet> {
   ): Promise<{
     chatId: string;
   }>;
-  async startChat(
+  async createChat(
     ctx: RunActionCtx | RunMutationCtx,
     args: {
       userId: string;
@@ -268,7 +269,8 @@ export class Agent<AgentTools extends ToolSet> {
   async saveMessages(
     ctx: RunMutationCtx,
     args: {
-      chatId: string;
+      chatId?: string;
+      userId?: string;
       messages: CoreMessageMaybeWithId[];
       pending?: boolean;
       parentMessageId?: string;
@@ -280,6 +282,7 @@ export class Agent<AgentTools extends ToolSet> {
   }> {
     const result = await ctx.runMutation(this.component.messages.addMessages, {
       chatId: args.chatId,
+      userId: args.userId,
       agentName: this.options.name,
       model: this.options.chat.modelId,
       messages: args.messages.map(serializeMessageWithId),
@@ -353,7 +356,7 @@ export class Agent<AgentTools extends ToolSet> {
       chatId,
     }: {
       userId?: string;
-      chatId: string;
+      chatId?: string;
     },
     args: TextArgs<
       AgentTools,
@@ -373,6 +376,7 @@ export class Agent<AgentTools extends ToolSet> {
     });
     const { lastMessageId: messageId } = await this.saveMessages(ctx, {
       chatId,
+      userId,
       messages: args.saveAllInputMessages ? messages : messages.slice(-1),
       pending: true,
       parentMessageId: args.parentMessageId,
@@ -420,7 +424,7 @@ export class Agent<AgentTools extends ToolSet> {
     PARTIAL_OUTPUT = never,
   >(
     ctx: RunActionCtx,
-    { userId, chatId }: { userId?: string; chatId: string },
+    { userId, chatId }: { userId?: string; chatId?: string },
     args: TextArgs<
       AgentTools,
       TOOLS,
@@ -492,7 +496,7 @@ export class Agent<AgentTools extends ToolSet> {
   // TODO: add the crazy number of overloads to get types through
   async generateObject<T>(
     ctx: RunActionCtx,
-    { userId, chatId }: { userId?: string; chatId: string },
+    { userId, chatId }: { userId?: string; chatId?: string },
     args: Omit<Parameters<typeof generateObject>[0], "model"> & {
       model?: LanguageModelV1;
     } & { parentMessageId?: string } & ContextOptions &
@@ -521,7 +525,7 @@ export class Agent<AgentTools extends ToolSet> {
 
   async streamObject<T>(
     ctx: RunMutationCtx,
-    { userId, chatId }: { userId?: string; chatId: string },
+    { userId, chatId }: { userId?: string; chatId?: string },
     args: Omit<Parameters<typeof streamObject<T>>[0], "model"> & {
       model?: LanguageModelV1;
     } & { parentMessageId?: string } & ContextOptions &
@@ -635,7 +639,7 @@ export class Agent<AgentTools extends ToolSet> {
         streamText: v.optional(vChatArgs),
         generateObject: v.optional(vObjectArgs),
         streamObject: v.optional(
-          v.object({ ...vObjectArgs.fields, schema: v.optional(v.any()) })
+          v.object({ ...vObjectArgs.fields, schema: v.any() })
         ),
       },
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -651,7 +655,7 @@ export class Agent<AgentTools extends ToolSet> {
           ...args.storageOptions,
         };
         if (args.createChat) {
-          return this.startChat(ctx, {
+          return this.createChat(ctx, {
             userId: args.createChat.userId,
             parentChatIds: args.createChat.parentChatIds,
             title: args.createChat.title,
@@ -664,33 +668,27 @@ export class Agent<AgentTools extends ToolSet> {
           });
         } else if (args.generateText) {
           return this.generateText(ctx, commonArgs, {
-            prompt: args.prompt,
-            messages: args.messages,
+            ...args.generateText,
             maxSteps: args.generateText.maxSteps ?? maxSteps,
             maxRetries,
           });
         } else if (args.streamText) {
           return this.streamText(ctx, commonArgs, {
-            prompt: args.prompt,
-            messages: args.messages,
+            ...args.streamText,
             maxSteps: args.streamText.maxSteps ?? maxSteps,
             maxRetries,
           });
         } else if (args.generateObject) {
           return this.generateObject(ctx, commonArgs, {
-            prompt: args.prompt,
-            messages: args.messages,
-            output: args.generateObject.output,
+            ...args.generateObject,
+            output: args.generateObject.output ?? "string",
             maxRetries,
-            mode: args.generateObject.mode,
           });
         } else if (args.streamObject) {
           return this.streamObject(ctx, commonArgs, {
-            prompt: args.prompt,
-            messages: args.messages,
-            output: args.streamObject.output,
-            mode: args.streamObject.mode,
-            schema: args.streamObject.schema,
+            ...args.streamObject,
+            output: args.streamObject.output ?? "string",
+            maxRetries,
           });
         }
       },
@@ -733,7 +731,7 @@ export class Agent<AgentTools extends ToolSet> {
 
 export type ToolCtx = RunActionCtx & {
   userId?: string;
-  chatId: string;
+  chatId?: string;
   messageId?: string;
 };
 

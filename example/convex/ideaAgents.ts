@@ -207,7 +207,7 @@ async function getOrCreateChat(ctx: ActionCtx, userId: string) {
     });
     return { chat, chatId };
   }
-  return await ideaTriageAgent.startChat(ctx, { userId });
+  return await ideaTriageAgent.createChat(ctx, { userId });
 }
 
 export const inProgressMessages = query({

@@ -22,7 +22,7 @@ export const schema = defineSchema({
   messages: defineTable({
     id: v.optional(v.string()), // external id, e.g. from Vercel AI SDK
     userId: v.optional(v.string()), // useful for future indexes (text search)
-    chatId: v.id("chats"),
+    chatId: v.optional(v.id("chats")),
     threadId: v.optional(v.id("messages")),
     stepId: v.optional(v.id("steps")),
     agentName: v.optional(v.string()),
@@ -33,8 +33,8 @@ export const schema = defineSchema({
     // TODO: add sub-messages back in? or be able to skip them?
     tool: v.boolean(),
     // Repeats until a non-tool message.
-    // Set when the message is finished
-    order: v.number(),
+    // Unset if it's not in a chat.
+    order: v.optional(v.number()),
     stepOrder: v.optional(v.number()),
     fileId: v.optional(v.id("files")),
     status: vMessageStatus,

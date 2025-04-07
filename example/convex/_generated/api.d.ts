@@ -50,7 +50,7 @@ export declare const components: {
         "internal",
         {
           agentName?: string;
-          chatId: string;
+          chatId?: string;
           failPendingSteps?: boolean;
           messages: Array<{
             fileId?: string;
@@ -157,13 +157,14 @@ export declare const components: {
           parentMessageId?: string;
           pending?: boolean;
           stepId?: string;
+          userId?: string;
         },
         {
           messages: Array<{
             _creationTime: number;
             _id: string;
             agentName?: string;
-            chatId: string;
+            chatId?: string;
             embeddingId?:
               | string
               | string
@@ -274,7 +275,7 @@ export declare const components: {
                   role: "system";
                 };
             model?: string;
-            order: number;
+            order?: number;
             status: "pending" | "success" | "failed";
             stepId?: string;
             stepOrder?: number;
@@ -287,7 +288,7 @@ export declare const components: {
             _creationTime: number;
             _id: string;
             agentName?: string;
-            chatId: string;
+            chatId?: string;
             embeddingId?:
               | string
               | string
@@ -398,7 +399,7 @@ export declare const components: {
                   role: "system";
                 };
             model?: string;
-            order: number;
+            order?: number;
             status: "pending" | "success" | "failed";
             stepId?: string;
             stepOrder?: number;
@@ -1059,7 +1060,7 @@ export declare const components: {
             _creationTime: number;
             _id: string;
             agentName?: string;
-            chatId: string;
+            chatId?: string;
             embeddingId?:
               | string
               | string
@@ -1170,7 +1171,7 @@ export declare const components: {
                   role: "system";
                 };
             model?: string;
-            order: number;
+            order?: number;
             status: "pending" | "success" | "failed";
             stepId?: string;
             stepOrder?: number;
@@ -1246,7 +1247,7 @@ export declare const components: {
           _creationTime: number;
           _id: string;
           agentName?: string;
-          chatId: string;
+          chatId?: string;
           embeddingId?:
             | string
             | string
@@ -1357,7 +1358,7 @@ export declare const components: {
                 role: "system";
               };
           model?: string;
-          order: number;
+          order?: number;
           status: "pending" | "success" | "failed";
           stepId?: string;
           stepOrder?: number;
@@ -1375,7 +1376,7 @@ export declare const components: {
           _creationTime: number;
           _id: string;
           agentName?: string;
-          chatId: string;
+          chatId?: string;
           embeddingId?:
             | string
             | string
@@ -1486,7 +1487,7 @@ export declare const components: {
                 role: "system";
               };
           model?: string;
-          order: number;
+          order?: number;
           status: "pending" | "success" | "failed";
           stepId?: string;
           stepOrder?: number;

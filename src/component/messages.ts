@@ -372,7 +372,8 @@ export const messageStatuses = vMessageDoc.fields.status.members.map(
 );
 
 const addMessagesArgs = {
-  chatId: v.id("chats"),
+  userId: v.optional(v.string()),
+  chatId: v.optional(v.id("chats")),
   stepId: v.optional(v.id("steps")),
   parentMessageId: v.optional(v.id("messages")),
   messages: v.array(vMessageWithFileAndId),
@@ -393,16 +394,22 @@ async function addMessagesHandler(
   ctx: MutationCtx,
   args: ObjectType<typeof addMessagesArgs>
 ) {
-  const chat = await ctx.db.get(args.chatId);
-  assert(chat, `Chat ${args.chatId} not found`);
+  let userId = args.userId;
+  const chatId = args.chatId;
+  if (!userId && args.chatId) {
+    const chat = await ctx.db.get(args.chatId);
+    assert(chat, `Chat ${args.chatId} not found`);
+    userId = chat._id;
+  }
   const { failPendingSteps, pending, messages, parentMessageId, ...rest } =
     args;
   const parent = parentMessageId && (await ctx.db.get(parentMessageId));
   if (failPendingSteps && parent?.status !== "pending") {
+    assert(args.chatId, "chatId is required to fail pending steps");
     const pendingMessages = await ctx.db
       .query("messages")
       .withIndex("chatId_status_tool_order_stepOrder", (q) =>
-        q.eq("chatId", args.chatId).eq("status", "pending")
+        q.eq("chatId", chatId).eq("status", "pending")
       )
       .collect();
     await Promise.all(
@@ -412,25 +419,28 @@ async function addMessagesHandler(
     );
   }
   let order: number | undefined;
-  const maxMessage = await getMaxMessage(ctx, args.chatId);
-  // If the previous message isn't our parent, we make a new thread.
-  const threadId =
-    parentMessageId && maxMessage?._id === parentMessageId
-      ? maxMessage.threadId ?? parentMessageId
-      : parentMessageId;
-  order = maxMessage?.order ?? -1;
+  let threadId = parentMessageId;
+  if (chatId) {
+    const maxMessage = await getMaxMessage(ctx, chatId);
+    // If the previous message isn't our parent, we make a new thread.
+    threadId =
+      parentMessageId && maxMessage?._id === parentMessageId
+        ? maxMessage.threadId ?? parentMessageId
+        : parentMessageId;
+    order = maxMessage?.order ?? -1;
+  }
   const toReturn: Doc<"messages">[] = [];
   if (messages.length > 0) {
     for (const { message, fileId, id } of messages) {
       const tool = isTool(message);
-      if (!tool) {
+      if (!tool && order !== undefined) {
         order++;
       }
       const text = extractText(message);
       const messageId = await ctx.db.insert("messages", {
         ...rest,
         threadId,
-        userId: chat.userId,
+        userId,
         message,
         id,
         order,
@@ -725,37 +735,43 @@ export const _fetchVectorMessages = internalQuery({
   handler: async (ctx, args): Promise<Doc<"messages">[]> => {
     const parent =
       args.parentMessageId && (await ctx.db.get(args.parentMessageId));
+    const { userId, chatId } = args;
+    assert(userId || chatId, "Specify userId or chatId to search");
     let messages = (
       await Promise.all(
         args.vectorIds.map((embeddingId) =>
           ctx.db
             .query("messages")
             .withIndex("embeddingId", (q) => q.eq("embeddingId", embeddingId))
-            .filter(
-              (q) =>
-                args.userId
-                  ? q.eq("userId", args.userId)
-                  : // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                    q.eq("chatId", args.chatId as any) // not sure why it's failing...
+            .filter((q) =>
+              userId
+                ? q.eq("userId", userId)
+                : // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  q.eq("chatId", chatId as any)
             )
             .first()
         )
       )
     ).filter(
       (m): m is Doc<"messages"> =>
-        m !== undefined && m !== null && (!parent || m.order <= parent.order)
+        m !== undefined &&
+        m !== null &&
+        (!parent || !m.order || !parent.order || m.order <= parent.order)
     );
     messages.push(...(args.textSearchMessages ?? []));
     // TODO: prioritize more recent messages
     messages.sort((a, b) => a.order! - b.order!);
     messages = messages.slice(0, args.limit);
     // Fetch the surrounding messages
-    const included: Record<Id<"chats">, Set<number>> = {};
+    if (!chatId) {
+      return messages.sort((a, b) => a.order! - b.order!);
+    }
+    const included: Record<string, Set<number>> = {};
     for (const m of messages) {
-      if (!included[m.chatId]) {
-        included[m.chatId] = new Set();
+      if (!included[chatId]) {
+        included[chatId] = new Set();
       }
-      included[m.chatId].add(m.order!);
+      included[chatId].add(m.order!);
     }
     const ranges: Record<Id<"chats">, Doc<"messages">[]> = {};
     const { before, after } = args.messageRange;
@@ -764,17 +780,17 @@ export const _fetchVectorMessages = internalQuery({
       let earliest = order - before;
       let latest = order + after;
       for (; earliest <= latest; earliest++) {
-        if (!included[m.chatId].has(earliest)) {
+        if (!included[m.chatId!].has(earliest)) {
           break;
         }
       }
       for (; latest >= earliest; latest--) {
-        if (!included[m.chatId].has(latest)) {
+        if (!included[m.chatId!].has(latest)) {
           break;
         }
       }
       for (let i = earliest; i <= latest; i++) {
-        included[m.chatId].add(i);
+        included[m.chatId!].add(i);
       }
       if (earliest !== latest) {
         const surrounding = await ctx.db
@@ -788,10 +804,10 @@ export const _fetchVectorMessages = internalQuery({
               .lt("order", latest)
           )
           .collect();
-        if (!ranges[m.chatId]) {
-          ranges[m.chatId] = [];
+        if (!ranges[m.chatId!]) {
+          ranges[m.chatId!] = [];
         }
-        ranges[m.chatId].push(...surrounding);
+        ranges[m.chatId!].push(...surrounding);
       }
     }
     return Object.values(ranges)
