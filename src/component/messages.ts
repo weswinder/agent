@@ -31,7 +31,7 @@ import {
   VectorTableId,
   vVectorId,
 } from "./vector/tables.js";
-import { insertVector, searchVectors } from "./vector/index.js";
+import { insertVector, paginate, searchVectors } from "./vector/index.js";
 
 export const getThread = query({
   args: { threadId: v.id("threads") },
@@ -48,23 +48,23 @@ export const getThreadsByUserId = query({
     cursor: v.optional(v.union(v.string(), v.null())),
     limit: v.optional(v.number()),
     offset: v.optional(v.number()),
-    statuses: v.optional(v.array(vThreadStatus)),
+    statuses: v.optional(vThreadStatus),
   },
   handler: async (ctx, args) => {
-    const streams = (args.statuses ?? ["active"]).map((status) =>
-      stream(ctx.db, schema)
-        .query("threads")
-        .withIndex("status_userId_order", (q) =>
-          q
-            .eq("status", status)
-            .eq("userId", args.userId)
-            .gte("order", args.offset ?? 0)
-        )
-    );
-    const threads = await mergedStream(streams, ["order"]).paginate({
-      numItems: args.limit ?? 100,
-      cursor: args.cursor ?? null,
-    });
+    const status = args.statuses ?? "active";
+    const threads = await paginator(ctx.db, schema)
+      .query("threads")
+      .withIndex("userId_status_order", (q) =>
+        q
+          .eq("userId", args.userId)
+          .eq("status", status)
+          .gte("order", args.offset ?? 0)
+      )
+      .order("desc")
+      .paginate({
+        numItems: args.limit ?? 100,
+        cursor: args.cursor ?? null,
+      });
     return {
       threads: threads.page,
       continueCursor: threads.continueCursor,
@@ -79,20 +79,17 @@ export const getThreadsByUserId = query({
 });
 
 const vThread = schema.tables.threads.validator;
-const statuses = vThread.fields.status.members.map((m) => m.value);
 
 export const createThread = mutation({
   args: omit(vThread.fields, ["order", "status"]),
   handler: async (ctx, args) => {
-    const streams = statuses.map((status) =>
-      stream(ctx.db, schema)
-        .query("threads")
-        .withIndex("status_userId_order", (q) =>
-          q.eq("status", status).eq("userId", args.userId)
-        )
-        .order("desc")
-    );
-    const latestThread = await mergedStream(streams, ["order"]).first();
+    const latestThread = await ctx.db
+      .query("threads")
+      .withIndex("userId_status_order", (q) =>
+        q.eq("userId", args.userId).eq("status", "active")
+      )
+      .order("desc")
+      .first();
     const order = (latestThread?.order ?? -1) + 1;
     const threadId = await ctx.db.insert("threads", {
       ...args,
@@ -224,45 +221,29 @@ async function deletePageForUserId(
   ctx: MutationCtx,
   args: DeleteAllArgs
 ): Promise<DeleteAllReturns> {
-  const streams = statuses.map((status) =>
-    stream(ctx.db, schema)
-      .query("threads")
-      .withIndex("status_userId_order", (q) =>
-        q.eq("status", status).eq("userId", args.userId)
-      )
-      .order("desc")
-  );
-  const threadStreams = mergedStream(streams, ["order"]);
-  const messages = await threadStreams
-    .flatMap(
-      async (c) =>
-        stream(ctx.db, schema)
-          .query("messages")
-          .withIndex("threadId_status_tool_order_stepOrder", (q) =>
-            q.eq("threadId", c._id).eq("status", "success")
-          ),
-      ["tool", "order", "stepOrder"]
+  const threads = await paginator(ctx.db, schema)
+    .query("threads")
+    .withIndex("userId_status_order", (q) => q.eq("userId", args.userId))
+    .order("desc")
+    .paginate({
+      numItems: 100,
+      cursor: args.threadsCursor ?? null,
+    });
+  await Promise.all(threads.page.map((c) => ctx.db.delete(c._id)));
+  const messages = await paginator(ctx.db, schema)
+    .query("messages")
+    .withIndex("userId_status_tool_order_stepOrder", (q) =>
+      q.eq("userId", args.userId)
     )
+    .order("desc")
     .paginate({
       numItems: 100,
       cursor: args.messagesCursor ?? null,
     });
   await Promise.all(messages.page.map((m) => deleteMessage(ctx, m)));
-  if (messages.isDone) {
-    const threads = await threadStreams.paginate({
-      numItems: 100,
-      cursor: args.threadsCursor ?? null,
-    });
-    await Promise.all(threads.page.map((c) => ctx.db.delete(c._id)));
-    return {
-      messagesCursor: messages.continueCursor,
-      threadsCursor: threads.continueCursor,
-      isDone: threads.isDone,
-    };
-  }
   return {
     messagesCursor: messages.continueCursor,
-    threadsCursor: null,
+    threadsCursor: threads.continueCursor,
     isDone: messages.isDone,
   };
 }
@@ -329,10 +310,10 @@ async function deletePageForThreadIdHandler(
   ctx: MutationCtx,
   args: DeleteThreadArgs
 ): Promise<DeleteThreadReturns> {
-  const messages = await stream(ctx.db, schema)
+  const messages = await paginator(ctx.db, schema)
     .query("messages")
     .withIndex("threadId_status_tool_order_stepOrder", (q) =>
-      q.eq("threadId", args.threadId).eq("status", "success")
+      q.eq("threadId", args.threadId)
     )
     .paginate({
       numItems: args.limit ?? 100,
@@ -379,7 +360,7 @@ export const messageStatuses = vMessageDoc.fields.status.members.map(
 
 const addMessagesArgs = {
   userId: v.optional(v.string()),
-  threadId: v.optional(v.id("threads")),
+  threadId: v.id("threads"),
   stepId: v.optional(v.id("steps")),
   parentMessageId: v.optional(v.id("messages")),
   messages: v.array(vMessageWithFileAndId),
@@ -410,7 +391,7 @@ async function addMessagesHandler(
   if (!userId && args.threadId) {
     const thread = await ctx.db.get(args.threadId);
     assert(thread, `Thread ${args.threadId} not found`);
-    userId = thread._id;
+    userId = thread.userId;
   }
   const {
     failPendingSteps,
@@ -499,17 +480,28 @@ async function getMaxMessage(
       ["order", "stepOrder"]
     ).first();
   } else {
-    return mergedStream(
-      ["success" as const, "pending" as const].map((status) =>
-        stream(ctx.db, schema)
-          .query("messages")
-          .withIndex("userId_status_tool_order_stepOrder", (q) =>
-            q.eq("userId", userId).eq("status", status).eq("tool", false)
-          )
-          .order("desc")
-      ),
-      ["order", "stepOrder"]
-    ).first();
+    // DO explicitly
+    const maxPending = await ctx.db
+      .query("messages")
+      .withIndex("userId_status_tool_order_stepOrder", (q) =>
+        q.eq("userId", userId).eq("status", "pending").eq("tool", false)
+      )
+      .order("desc")
+      .first();
+    const maxSuccess = await ctx.db
+      .query("messages")
+      .withIndex("userId_status_tool_order_stepOrder", (q) =>
+        q.eq("userId", userId).eq("status", "success").eq("tool", false)
+      )
+      .order("desc")
+      .first();
+    return maxPending
+      ? maxSuccess
+        ? maxPending.order > maxSuccess.order
+          ? maxPending
+          : maxSuccess
+        : maxPending
+      : maxSuccess ?? null;
   }
 }
 

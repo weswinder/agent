@@ -151,7 +151,7 @@ export type Mounts = {
         parentMessageId?: string;
         pending?: boolean;
         stepId?: string;
-        threadId?: string;
+        threadId: string;
         userId?: string;
       },
       {
@@ -275,7 +275,7 @@ export type Mounts = {
           stepId?: string;
           stepOrder?: number;
           text?: string;
-          threadId?: string;
+          threadId: string;
           tool: boolean;
           userId?: string;
         }>;
@@ -399,7 +399,7 @@ export type Mounts = {
           stepId?: string;
           stepOrder?: number;
           text?: string;
-          threadId?: string;
+          threadId: string;
           tool: boolean;
           userId?: string;
         };
@@ -1164,7 +1164,7 @@ export type Mounts = {
           stepId?: string;
           stepOrder?: number;
           text?: string;
-          threadId?: string;
+          threadId: string;
           tool: boolean;
           userId?: string;
         }>;
@@ -1177,7 +1177,7 @@ export type Mounts = {
         cursor?: string | null;
         limit?: number;
         offset?: number;
-        statuses?: Array<"active" | "archived">;
+        statuses?: "active" | "archived";
         userId: string;
       },
       {
@@ -1335,7 +1335,7 @@ export type Mounts = {
         stepId?: string;
         stepOrder?: number;
         text?: string;
-        threadId?: string;
+        threadId: string;
         tool: boolean;
         userId?: string;
       }>
@@ -1464,7 +1464,7 @@ export type Mounts = {
         stepId?: string;
         stepOrder?: number;
         text?: string;
-        threadId?: string;
+        threadId: string;
         tool: boolean;
         userId?: string;
       }>

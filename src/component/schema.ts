@@ -17,12 +17,12 @@ export const schema = defineSchema({
     // the parent thread(s). There are multiple if the thread is a merging of
     // multiple threads.
     parentThreadIds: v.optional(v.array(v.id("threads"))),
-  }).index("status_userId_order", ["status", "userId", "order"]),
+  }).index("userId_status_order", ["userId", "status", "order"]),
   // TODO: text search on title/ summary
   messages: defineTable({
     id: v.optional(v.string()), // external id, e.g. from Vercel AI SDK
     userId: v.optional(v.string()), // useful for future indexes (text search)
-    threadId: v.optional(v.id("threads")),
+    threadId: v.id("threads"),
     parentMessageId: v.optional(v.id("messages")),
     stepId: v.optional(v.id("steps")),
     agentName: v.optional(v.string()),

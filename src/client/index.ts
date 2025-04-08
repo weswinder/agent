@@ -89,7 +89,7 @@ export type StorageOptions = {
   saveOutputMessages?: boolean;
 };
 
-export type GenerationOutputMetadata = { messageId: string };
+export type GenerationOutputMetadata = { messageId?: string };
 
 type CoreMessageMaybeWithId = CoreMessage & { id?: string | undefined };
 
@@ -316,7 +316,7 @@ export class Agent<AgentTools extends ToolSet> {
   async saveMessages(
     ctx: RunMutationCtx,
     args: {
-      threadId?: string;
+      threadId: string;
       userId?: string;
       messages: CoreMessageMaybeWithId[];
       pending?: boolean;
@@ -421,13 +421,17 @@ export class Agent<AgentTools extends ToolSet> {
       threadId,
       messages,
     });
-    const { lastMessageId: messageId } = await this.saveMessages(ctx, {
-      threadId,
-      userId,
-      messages: args.saveAllInputMessages ? messages : messages.slice(-1),
-      pending: true,
-      parentMessageId: args.parentMessageId,
-    });
+    let messageId: string | undefined;
+    if (threadId) {
+      const saved = await this.saveMessages(ctx, {
+        threadId,
+        userId,
+        messages: args.saveAllInputMessages ? messages : messages.slice(-1),
+        pending: true,
+        parentMessageId: args.parentMessageId,
+      });
+      messageId = saved.lastMessageId;
+    }
     const toolCtx = { ...ctx, userId, threadId, messageId };
     const tools = wrapTools(toolCtx, this.options.tools, args.tools) as TOOLS;
     try {
@@ -441,7 +445,7 @@ export class Agent<AgentTools extends ToolSet> {
         ...rest,
         tools,
         onStepFinish: async (step) => {
-          if (threadId && messageId && args.saveOutputMessages) {
+          if (threadId && messageId && args.saveOutputMessages !== false) {
             console.log("onStepFinish", step);
             await this.saveStep(ctx, {
               threadId,
@@ -488,12 +492,17 @@ export class Agent<AgentTools extends ToolSet> {
       threadId,
       messages,
     });
-    const { lastMessageId: messageId } = await this.saveMessages(ctx, {
-      threadId,
-      messages: args.saveAllInputMessages ? messages : messages.slice(-1),
-      pending: true,
-      parentMessageId: args.parentMessageId,
-    });
+    let messageId: string | undefined;
+    if (threadId) {
+      const saved = await this.saveMessages(ctx, {
+        threadId,
+        userId,
+        messages: args.saveAllInputMessages ? messages : messages.slice(-1),
+        pending: true,
+        parentMessageId: args.parentMessageId,
+      });
+      messageId = saved.lastMessageId;
+    }
     const toolCtx = { ...ctx, userId, threadId, messageId };
     const tools = wrapTools(toolCtx, this.options.tools, args.tools) as TOOLS;
     const result = streamText({
@@ -511,7 +520,7 @@ export class Agent<AgentTools extends ToolSet> {
       },
       onError: async (error) => {
         console.error("onError", error);
-        if (threadId && messageId) {
+        if (threadId && messageId && args.saveOutputMessages !== false) {
           await ctx.runMutation(this.component.messages.rollbackMessage, {
             messageId,
             error: (error.error as Error).message,
@@ -557,17 +566,56 @@ export class Agent<AgentTools extends ToolSet> {
       threadId,
       messages,
     });
-    const { lastMessageId: messageId } = await this.saveMessages(ctx, {
-      threadId,
-      messages: args.saveAllInputMessages ? messages : messages.slice(-1),
-      pending: true,
-    });
+    let messageId: string | undefined;
+    if (threadId) {
+      const saved = await this.saveMessages(ctx, {
+        threadId,
+        userId,
+        messages: args.saveAllInputMessages ? messages : messages.slice(-1),
+        pending: true,
+        parentMessageId: args.parentMessageId,
+      });
+      messageId = saved.lastMessageId;
+    }
     const result = (await generateObject({
       model: this.options.thread,
       messages: [...contextMessages, ...messages],
       ...rest,
     })) as GenerateObjectResult<T>;
+    if (threadId && messageId && args.saveOutputMessages !== false) {
+      await this.saveObject(ctx, { threadId, messageId, result });
+    }
     return { ...result, messageId };
+  }
+
+  async saveObject<T>(
+    ctx: RunMutationCtx,
+    args: {
+      threadId: string;
+      messageId: string;
+      result: GenerateObjectResult<T>;
+    }
+  ): Promise<void> {
+    await ctx.runMutation(this.component.messages.addObject, {
+      threadId: args.threadId,
+      step: {
+        request: result.request,
+        response: {
+          ...result.response,
+          messages: [
+            {
+              role: "assistant",
+
+              content: result.object,
+            },
+          ],
+        },
+        finishReason: result.finishReason,
+        providerMetadata: result.providerMetadata,
+        usage: result.usage,
+        warnings: result.warnings,
+      },
+    });
   }
 
   async streamObject<T>(
@@ -580,6 +628,7 @@ export class Agent<AgentTools extends ToolSet> {
   ): Promise<
     StreamObjectResult<DeepPartial<T>, T, never> & GenerationOutputMetadata
   > {
+    // TODO: unify all this shared code between all the generate* and stream* functions
     const { prompt, messages: raw, ...rest } = args;
     const messages = promptOrMessagesToCoreMessages({ prompt, messages: raw });
     const contextMessages = await this.fetchContextMessages(ctx, {
@@ -588,11 +637,17 @@ export class Agent<AgentTools extends ToolSet> {
       threadId,
       messages,
     });
-    const { lastMessageId: messageId } = await this.saveMessages(ctx, {
-      threadId,
-      messages: args.saveAllInputMessages ? messages : messages.slice(-1),
-      pending: true,
-    });
+    let messageId: string | undefined;
+    if (threadId) {
+      const saved = await this.saveMessages(ctx, {
+        threadId,
+        userId,
+        messages: args.saveAllInputMessages ? messages : messages.slice(-1),
+        pending: true,
+        parentMessageId: args.parentMessageId,
+      });
+      messageId = saved.lastMessageId;
+    }
     const result = streamObject<T>({
       model: this.options.thread,
       messages: [...contextMessages, ...messages],

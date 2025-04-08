@@ -161,7 +161,7 @@ export declare const components: {
           parentMessageId?: string;
           pending?: boolean;
           stepId?: string;
-          threadId?: string;
+          threadId: string;
           userId?: string;
         },
         {
@@ -285,7 +285,7 @@ export declare const components: {
             stepId?: string;
             stepOrder?: number;
             text?: string;
-            threadId?: string;
+            threadId: string;
             tool: boolean;
             userId?: string;
           }>;
@@ -409,7 +409,7 @@ export declare const components: {
             stepId?: string;
             stepOrder?: number;
             text?: string;
-            threadId?: string;
+            threadId: string;
             tool: boolean;
             userId?: string;
           };
@@ -1202,7 +1202,7 @@ export declare const components: {
             stepId?: string;
             stepOrder?: number;
             text?: string;
-            threadId?: string;
+            threadId: string;
             tool: boolean;
             userId?: string;
           }>;
@@ -1215,7 +1215,7 @@ export declare const components: {
           cursor?: string | null;
           limit?: number;
           offset?: number;
-          statuses?: Array<"active" | "archived">;
+          statuses?: "active" | "archived";
           userId: string;
         },
         {
@@ -1373,7 +1373,7 @@ export declare const components: {
           stepId?: string;
           stepOrder?: number;
           text?: string;
-          threadId?: string;
+          threadId: string;
           tool: boolean;
           userId?: string;
         }>
@@ -1502,7 +1502,7 @@ export declare const components: {
           stepId?: string;
           stepOrder?: number;
           text?: string;
-          threadId?: string;
+          threadId: string;
           tool: boolean;
           userId?: string;
         }>
