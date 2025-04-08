@@ -1,12 +1,6 @@
 import { paginator } from "convex-helpers/server/pagination";
 import { v } from "convex/values";
-import {
-  ActionCtx,
-  mutation,
-  MutationCtx,
-  query,
-  QueryCtx,
-} from "../_generated/server";
+import { ActionCtx, mutation, MutationCtx, query } from "../_generated/server";
 import {
   EmbeddingsWithoutDenormalizedFields,
   getVectorTableName,
