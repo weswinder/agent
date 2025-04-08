@@ -14,9 +14,11 @@ const supportAgent = new Agent(components.agent, {
 
 // Use the agent from within a normal action:
 export const createThread = action({
-  args: { prompt: v.string() },
-  handler: async (ctx, { prompt }) => {
-    const { threadId, thread } = await supportAgent.createThread(ctx, {});
+  args: { prompt: v.string(), userId: v.optional(v.string()) },
+  handler: async (ctx, { prompt, userId }) => {
+    const { threadId, thread } = await supportAgent.createThread(ctx, {
+      userId,
+    });
     const result = await thread.generateText({ prompt });
     return { threadId, text: result.text };
   },
@@ -80,5 +82,28 @@ export const streamThread = action({
     const { threadId, thread } = await supportAgent.createThread(ctx, {});
     const result = await thread.streamText({ prompt });
     return { threadId, text: result.text };
+  },
+});
+
+export const searchMessages = action({
+  args: {
+    text: v.string(),
+    userId: v.optional(v.string()),
+    threadId: v.optional(v.string()),
+  },
+  handler: async (ctx, { text, userId, threadId }) => {
+    return supportAgent.fetchContextMessages(ctx, {
+      userId,
+      threadId,
+      messages: [{ role: "user", content: text }],
+      searchOtherThreads: true,
+      recentMessages: 0,
+      searchOptions: {
+        textSearch: true,
+        vectorSearch: true,
+        messageRange: { before: 0, after: 0 },
+        limit: 10,
+      },
+    });
   },
 });
