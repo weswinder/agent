@@ -116,7 +116,7 @@ export class Agent<AgentTools extends ToolSet> {
    */
   async createThread(
     ctx: RunActionCtx,
-    args: {
+    args?: {
       /**
        * The userId to associate with the thread. If not provided, the thread will be
        * anonymous.
@@ -152,7 +152,7 @@ export class Agent<AgentTools extends ToolSet> {
    */
   async createThread(
     ctx: RunMutationCtx,
-    args: {
+    args?: {
       userId?: string;
       parentThreadIds?: string[];
       title?: string;
@@ -163,7 +163,7 @@ export class Agent<AgentTools extends ToolSet> {
   }>;
   async createThread(
     ctx: RunActionCtx | RunMutationCtx,
-    args: {
+    args?: {
       userId: string;
       parentThreadIds?: string[];
       title?: string;
@@ -177,10 +177,10 @@ export class Agent<AgentTools extends ToolSet> {
       this.component.messages.createThread,
       {
         defaultSystemPrompt: this.options.instructions,
-        userId: args.userId,
-        title: args.title,
-        summary: args.summary,
-        parentThreadIds: args.parentThreadIds,
+        userId: args?.userId,
+        title: args?.title,
+        summary: args?.summary,
+        parentThreadIds: args?.parentThreadIds,
       }
     );
     if (!("runAction" in ctx)) {
@@ -188,7 +188,7 @@ export class Agent<AgentTools extends ToolSet> {
     }
     const { thread } = await this.continueThread(ctx, {
       threadId: threadDoc._id,
-      userId: args.userId,
+      userId: args?.userId,
     });
     return {
       threadId: threadDoc._id,

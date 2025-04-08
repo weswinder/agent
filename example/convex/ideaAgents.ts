@@ -1,4 +1,3 @@
-import { vMessageDoc } from "./../../src/component/messages";
 import { action, ActionCtx, query } from "./_generated/server";
 import { api, components } from "./_generated/api";
 import { Agent } from "@convex-dev/agent";
@@ -7,7 +6,6 @@ import { openai } from "@ai-sdk/openai";
 
 import { createTool } from "@convex-dev/agent";
 import { Doc, Id } from "./_generated/dataModel";
-import { Message } from "../../src/validators";
 import { MessageDoc } from "../../src/client/types";
 
 /**

@@ -9,12 +9,14 @@ AI Agent framework built on Convex.
 - Automatic storage of chat history, per-user or per-thread.
 - RAG for chat context, via hybrid text & vector search, with configuration options.
   Or use the API to query the history yourself and do it your way.
-- Opt-in search for messages from other threads (for the same specifieduser).
+- Opt-in search for messages from other threads (for the same specified user).
 - Tool calls via the AI SDK, along with Convex-specific helpers.
 - Easy workflow integration with the [Workflow component](https://convex.dev/components/workflow).
 - Reactive & realtime updates to asynchronous threads.
 - Support for streaming text and storing the result in the database.
 - Optionally filter tool calls out of the thread history.
+
+[Read the associated Stack post here](https://stack.convex.dev/ai-agents).
 
 Example usage:
 
@@ -31,7 +33,7 @@ const supportAgent = new Agent(components.agent, {
 export const createThread = action({
   args: { prompt: v.string() },
   handler: async (ctx, { prompt }) => {
-    const { threadId, thread } = await supportAgent.createThread(ctx, {});
+    const { threadId, thread } = await supportAgent.createThread(ctx);
     const result = await thread.generateText({ prompt });
     return { threadId, text: result.text };
   },
@@ -68,7 +70,7 @@ export const supportAgentWorkflow = workflow.define({
 });
 ```
 
-Also see the [Stack article](https://stack.convex.dev/ai-agent).
+Also see the [Stack article](https://stack.convex.dev/ai-agents).
 
 Coming soon:
 
@@ -333,7 +335,7 @@ const messages = await ctx.runQuery(components.agent.embeddings.deleteBatch, {
 ```
 
 See example usage in [example.ts](./example/convex/example.ts).
-Read more in [this Stack post](https://stack.convex.dev/ai-agent).
+Read more in [this Stack post](https://stack.convex.dev/ai-agents).
 
 ```sh
 npm i @convex-dev/agent
