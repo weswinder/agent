@@ -449,6 +449,7 @@ async function addMessagesHandler(
         text,
         fileId,
         status: pending ? "pending" : "success",
+        stepOrder: 0,
       });
       if (fileId) {
         await ctx.db.patch(fileId, {

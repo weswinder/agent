@@ -273,7 +273,7 @@ export type Mounts = {
           parentMessageId?: string;
           status: "pending" | "success" | "failed";
           stepId?: string;
-          stepOrder?: number;
+          stepOrder: number;
           text?: string;
           threadId: string;
           tool: boolean;
@@ -397,7 +397,7 @@ export type Mounts = {
           parentMessageId?: string;
           status: "pending" | "success" | "failed";
           stepId?: string;
-          stepOrder?: number;
+          stepOrder: number;
           text?: string;
           threadId: string;
           tool: boolean;
@@ -1162,7 +1162,7 @@ export type Mounts = {
           parentMessageId?: string;
           status: "pending" | "success" | "failed";
           stepId?: string;
-          stepOrder?: number;
+          stepOrder: number;
           text?: string;
           threadId: string;
           tool: boolean;
@@ -1333,7 +1333,7 @@ export type Mounts = {
         parentMessageId?: string;
         status: "pending" | "success" | "failed";
         stepId?: string;
-        stepOrder?: number;
+        stepOrder: number;
         text?: string;
         threadId: string;
         tool: boolean;
@@ -1462,7 +1462,7 @@ export type Mounts = {
         parentMessageId?: string;
         status: "pending" | "success" | "failed";
         stepId?: string;
-        stepOrder?: number;
+        stepOrder: number;
         text?: string;
         threadId: string;
         tool: boolean;

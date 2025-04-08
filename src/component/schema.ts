@@ -35,7 +35,7 @@ export const schema = defineSchema({
     // Repeats until a non-tool message.
     // Unset if it's not in a thread.
     order: v.number(),
-    stepOrder: v.optional(v.number()),
+    stepOrder: v.number(),
     fileId: v.optional(v.id("files")),
     status: vMessageStatus,
   })
