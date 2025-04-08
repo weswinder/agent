@@ -594,7 +594,7 @@ export const rollbackMessage = mutation({
     }
     await ctx.db.patch(messageId, {
       status: "failed",
-      text: error ?? message.text,
+      error: error,
     });
   },
 });
