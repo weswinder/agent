@@ -587,40 +587,40 @@ export class Agent<AgentTools extends ToolSet> {
       ...rest,
     })) as GenerateObjectResult<T>;
     if (threadId && messageId && args.saveOutputMessages !== false) {
-      await this.saveObject(ctx, { threadId, messageId, result });
+      // await this.saveObject(ctx, { threadId, messageId, result });
     }
     return { ...result, messageId };
   }
 
-  async saveObject<T>(
-    ctx: RunMutationCtx,
-    args: {
-      threadId: string;
-      messageId: string;
-      result: GenerateObjectResult<T>;
-    }
-  ): Promise<void> {
-    await ctx.runMutation(this.component.messages.addObject, {
-      threadId: args.threadId,
-      step: {
-        request: result.request,
-        response: {
-          ...result.response,
-          messages: [
-            {
-              role: "assistant",
+  // async saveObject<T>(
+  //   ctx: RunMutationCtx,
+  //   args: {
+  //     threadId: string;
+  //     messageId: string;
+  //     result: GenerateObjectResult<T>;
+  //   }
+  // ): Promise<void> {
+  //   await ctx.runMutation(this.component.messages.addObject, {
+  //     threadId: args.threadId,
+  //     step: {
+  //       request: result.request,
+  //       response: {
+  //         ...result.response,
+  //         messages: [
+  //           {
+  //             role: "assistant",
 
-              content: result.object,
-            },
-          ],
-        },
-        finishReason: result.finishReason,
-        providerMetadata: result.providerMetadata,
-        usage: result.usage,
-        warnings: result.warnings,
-      },
-    });
-  }
+  //             content: result.object,
+  //           },
+  //         ],
+  //       },
+  //       finishReason: result.finishReason,
+  //       providerMetadata: result.providerMetadata,
+  //       usage: result.usage,
+  //       warnings: result.warnings,
+  //     },
+  //   });
+  // }
 
   async streamObject<T>(
     ctx: RunMutationCtx,
