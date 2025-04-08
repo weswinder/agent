@@ -243,6 +243,7 @@ export class Agent<AgentTools extends ToolSet> {
     assert(args.userId || args.threadId, "Specify userId or threadId");
     // Fetch the latest messages from the thread
     const contextMessages: CoreMessage[] = [];
+    let included: Set<string> | undefined;
     const opts = this.mergedContextOptions(args);
     if (opts.searchOptions?.textSearch || opts.searchOptions?.vectorSearch) {
       if (!("runAction" in ctx)) {
@@ -258,6 +259,7 @@ export class Agent<AgentTools extends ToolSet> {
         }
       );
       // TODO: track what messages we used for context
+      included = new Set(searchMessages.map((m) => m._id));
       contextMessages.push(...searchMessages.map((m) => m.message!));
     }
     if (args.threadId) {
@@ -272,7 +274,9 @@ export class Agent<AgentTools extends ToolSet> {
           statuses: ["success"],
         }
       );
-      contextMessages.push(...messages.map((m) => m.message!));
+      contextMessages.push(
+        ...messages.filter((m) => !included?.has(m._id)).map((m) => m.message!)
+      );
     }
     return contextMessages;
   }
