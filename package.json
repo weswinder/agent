@@ -70,19 +70,19 @@
     }
   },
   "peerDependencies": {
-    "ai": "^4.2.11",
-    "convex": "^1.22.0",
+    "ai": "^4.3.4",
+    "convex": "^1.23.0",
     "convex-helpers": "^0.1.78"
   },
   "devDependencies": {
     "@eslint/js": "^9.9.1",
-    "@types/node": "^18.17.0",
+    "@types/node": "^18.19.86",
     "convex-test": "^0.0.33",
-    "eslint": "^9.9.1",
-    "globals": "^15.9.0",
+    "eslint": "^9.24.0",
+    "globals": "^15.15.0",
     "prettier": "3.2.5",
     "typescript": "^5.8.3",
-    "typescript-eslint": "^8.4.0",
+    "typescript-eslint": "^8.29.1",
     "vitest": "^3.1.1"
   },
   "main": "./dist/commonjs/client/index.js",
