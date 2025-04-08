@@ -734,7 +734,7 @@ export const searchMessages = action({
           threadId: args.threadId,
           limit,
         })
-      ).filter((v) => v._score > 0.5);
+      ).filter((v) => v._score > (args.vectorScoreThreshold ?? 0));
       // Reciprocal rank fusion
       const k = 10;
       const textEmbeddingIds = textSearchMessages?.map((m) => m.embeddingId);

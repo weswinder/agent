@@ -1252,6 +1252,7 @@ export declare const components: {
           userId?: string;
           vector?: Array<number>;
           vectorModel?: string;
+          vectorScoreThreshold?: number;
         },
         Array<{
           _creationTime: number;

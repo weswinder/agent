@@ -255,6 +255,7 @@ export const vSearchOptions = v.object({
   vectorModel: v.optional(v.string()),
   text: v.optional(v.string()),
   limit: v.number(),
+  vectorScoreThreshold: v.optional(v.number()),
   messageRange: v.optional(v.object({ before: v.number(), after: v.number() })),
 });
 export type SearchOptions = Infer<typeof vSearchOptions>;
