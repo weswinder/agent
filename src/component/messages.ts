@@ -31,6 +31,7 @@ import {
   VectorTableId,
   vVectorId,
 } from "./vector/tables.js";
+import { insertVector, searchVectors } from "./vector/index.js";
 
 export const getThread = query({
   args: { threadId: v.id("threads") },
@@ -442,8 +443,7 @@ async function addMessagesHandler(
       const embedding = embeddings?.vectors[i] ?? undefined;
       let embeddingId: VectorTableId | undefined;
       if (embeddings && embedding) {
-        const tableName = getVectorTableName(embeddings.dimension);
-        embeddingId = await ctx.db.insert(tableName, {
+        embeddingId = await insertVector(ctx, embeddings.dimension, {
           vector: embedding,
           model: embeddings.model,
           table: "messages",
@@ -733,20 +733,13 @@ export const searchMessages = action({
       if (!VectorDimensions.includes(dimension)) {
         throw new Error(`Unsupported vector dimension: ${dimension}`);
       }
-      const model = args.vectorModel ?? "unknown";
-      const tableName = getVectorTableName(dimension);
       const vectors = (
-        await ctx.vectorSearch(tableName, "vector", {
-          vector: args.vector,
-          // TODO: to support more tables, add more "OR" clauses for each.
-          filter: (q) =>
-            args.userId
-              ? q.eq("model_table_userId", [model, "messages", args.userId])
-              : q.eq("model_table_threadId", [
-                  model,
-                  "messages",
-                  args.threadId!,
-                ]),
+        await searchVectors(ctx, args.vector, {
+          dimension,
+          model: args.vectorModel ?? "unknown",
+          table: "messages",
+          userId: args.userId,
+          threadId: args.threadId,
           limit,
         })
       ).filter((v) => v._score > 0.5);

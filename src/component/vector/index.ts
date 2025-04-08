@@ -1,7 +1,20 @@
 import { paginator } from "convex-helpers/server/pagination";
 import { v } from "convex/values";
-import { mutation, query } from "../_generated/server";
-import { getVectorTableName, vVectorDimension, vVectorId } from "./tables";
+import {
+  ActionCtx,
+  mutation,
+  MutationCtx,
+  query,
+  QueryCtx,
+} from "../_generated/server";
+import {
+  EmbeddingsWithoutDenormalizedFields,
+  getVectorTableName,
+  VectorDimension,
+  vEmbeddingsWithoutDenormalizedFields,
+  vVectorDimension,
+  vVectorId,
+} from "./tables";
 import schema from "../schema";
 import { mergedStream } from "convex-helpers/server/stream";
 import { stream } from "convex-helpers/server/stream";
@@ -86,37 +99,57 @@ export const deleteBatchForThread = mutation({
 export const insertBatch = mutation({
   args: {
     vectorDimension: vVectorDimension,
-    vectors: v.array(
-      v.object({
-        model: v.string(),
-        table: v.string(),
-        userId: v.optional(v.string()),
-        threadId: v.optional(v.string()),
-        vector: v.array(v.number()),
-      })
-    ),
+    vectors: v.array(vEmbeddingsWithoutDenormalizedFields),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
     await Promise.all(
-      args.vectors.map((v) =>
-        ctx.db.insert(getVectorTableName(args.vectorDimension), {
-          model: v.model,
-          table: v.table,
-          userId: v.userId,
-          threadId: v.threadId,
-          vector: v.vector,
-          model_table_userId: v.userId
-            ? [v.model, v.table, v.userId]
-            : undefined,
-          model_table_threadId: v.threadId
-            ? [v.model, v.table, v.threadId]
-            : undefined,
-        })
-      )
+      args.vectors.map((v) => insertVector(ctx, args.vectorDimension, v))
     );
   },
 });
+
+export async function insertVector(
+  ctx: MutationCtx,
+  dimension: VectorDimension,
+  v: EmbeddingsWithoutDenormalizedFields
+) {
+  return ctx.db.insert(getVectorTableName(dimension), {
+    ...v,
+    model_table_userId: v.userId ? [v.model, v.table, v.userId] : undefined,
+    model_table_threadId: v.threadId
+      ? [v.model, v.table, v.threadId]
+      : undefined,
+  });
+}
+
+export function searchVectors(
+  ctx: ActionCtx,
+  vector: number[],
+  args: {
+    dimension: VectorDimension;
+    model: string;
+    table: string;
+    userId?: string;
+    threadId?: string;
+    limit?: number;
+  }
+) {
+  const tableName = getVectorTableName(args.dimension);
+  return ctx.vectorSearch(tableName, "vector", {
+    vector,
+    // TODO: to support more tables, add more "OR" clauses for each.
+    filter: (q) =>
+      args.userId
+        ? q.eq("model_table_userId", [args.model, args.table, args.userId])
+        : q.eq("model_table_threadId", [
+            args.model,
+            args.table,
+            args.threadId!,
+          ]),
+    limit: args.limit,
+  });
+}
 
 export const updateBatch = mutation({
   args: {

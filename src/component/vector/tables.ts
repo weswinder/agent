@@ -1,3 +1,4 @@
+import { omit } from "convex-helpers";
 import { literals } from "convex-helpers/validators";
 import {
   defineTable,
@@ -5,7 +6,15 @@ import {
   SchemaDefinition,
   TableDefinition,
 } from "convex/server";
-import { GenericId, ObjectType, v, VId, VObject, VUnion } from "convex/values";
+import {
+  GenericId,
+  Infer,
+  ObjectType,
+  v,
+  VId,
+  VObject,
+  VUnion,
+} from "convex/values";
 import { QueryCtx } from "../_generated/server";
 
 // We only generate embeddings for non-tool, non-system messages
@@ -20,6 +29,13 @@ const embeddings = {
   model_table_threadId: v.optional(v.array(v.string())),
   vector: v.array(v.number()),
 };
+
+export const vEmbeddingsWithoutDenormalizedFields = v.object(
+  omit(embeddings, ["model_table_userId", "model_table_threadId"])
+);
+export type EmbeddingsWithoutDenormalizedFields = Infer<
+  typeof vEmbeddingsWithoutDenormalizedFields
+>;
 
 function table<D extends number>(dimensions: D): Table<D> {
   return defineTable(embeddings)
