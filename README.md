@@ -6,7 +6,7 @@
 
 AI Agent framework built on Convex.
 
-- Automatic storage of chat history, per-user or per-thread.
+- Automatic storage of chat history, per-user or per-thread, that can span multiple agents.
 - RAG for chat context, via hybrid text & vector search, with configuration options.
   Or use the API to query the history yourself and do it your way.
 - Opt-in search for messages from other threads (for the same specified user).
@@ -39,12 +39,12 @@ export const createThread = action({
   },
 });
 
-// Pick up where you left off:
+// Pick up where you left off, with the same or a different agent:
 export const continueThread = action({
   args: { prompt: v.string(), threadId: v.string() },
   handler: async (ctx, { prompt, threadId }) => {
     // This includes previous message history from the thread automatically.
-    const { thread } = await supportAgent.continueThread(ctx, { threadId });
+    const { thread } = await anotherAgent.continueThread(ctx, { threadId });
     const result = await thread.generateText({ prompt });
     return result.text;
   },
