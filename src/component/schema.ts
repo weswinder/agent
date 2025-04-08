@@ -92,6 +92,16 @@ export const schema = defineSchema({
       "stepOrder",
     ]),
 
+  memories: defineTable({
+    threadId: v.optional(v.id("threads")),
+    userId: v.optional(v.string()),
+    memory: v.string(),
+    embeddingId: v.optional(vVectorId),
+  })
+    .index("threadId", ["threadId"])
+    .index("userId", ["userId"])
+    .index("embeddingId", ["embeddingId"]),
+
   files: defineTable({
     storageId: v.string(),
     hash: v.string(),

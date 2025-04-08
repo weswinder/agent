@@ -10,6 +10,7 @@ export const paginate = query({
   args: {
     vectorDimension: vVectorDimension,
     targetModel: v.string(),
+    table: v.optional(v.string()),
     cursor: v.optional(v.string()),
     limit: v.number(),
   },
@@ -23,8 +24,11 @@ export const paginate = query({
     const vectors = await paginator(ctx.db, schema)
       .query(tableName)
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .withIndex("model_kind_threadId" as any, (q) =>
-        q.eq("model", args.targetModel)
+      .withIndex("model_table_threadId" as any, (q) =>
+        args.table
+          ? // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (q.eq("model", args.targetModel) as any).eq("table", args.table)
+          : q.eq("model", args.targetModel)
       )
       .paginate({
         cursor: args.cursor ?? null,
@@ -85,7 +89,7 @@ export const insertBatch = mutation({
     vectors: v.array(
       v.object({
         model: v.string(),
-        kind: v.union(v.literal("thread"), v.literal("memory")),
+        table: v.string(),
         userId: v.optional(v.string()),
         threadId: v.optional(v.string()),
         vector: v.array(v.number()),
@@ -98,13 +102,15 @@ export const insertBatch = mutation({
       args.vectors.map((v) =>
         ctx.db.insert(getVectorTableName(args.vectorDimension), {
           model: v.model,
-          kind: v.kind,
+          table: v.table,
           userId: v.userId,
           threadId: v.threadId,
           vector: v.vector,
-          model_kind_userId: v.userId ? [v.model, v.kind, v.userId] : undefined,
-          model_kind_threadId: v.threadId
-            ? [v.model, v.kind, v.threadId]
+          model_table_userId: v.userId
+            ? [v.model, v.table, v.userId]
+            : undefined,
+          model_table_threadId: v.threadId
+            ? [v.model, v.table, v.threadId]
             : undefined,
         })
       )

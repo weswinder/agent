@@ -2,6 +2,7 @@ import { literals } from "convex-helpers/validators";
 import {
   defineTable,
   GenericTableSearchIndexes,
+  SchemaDefinition,
   TableDefinition,
 } from "convex/server";
 import { GenericId, ObjectType, v, VId, VObject, VUnion } from "convex/values";
@@ -10,12 +11,13 @@ import { QueryCtx } from "../_generated/server";
 // We only generate embeddings for non-tool, non-system messages
 const embeddings = {
   model: v.string(),
-  kind: v.union(v.literal("thread"), v.literal("memory")),
+  // What table it's stored in. (usually messages or memories)
+  table: v.string(),
   userId: v.optional(v.string()),
   threadId: v.optional(v.string()),
   // not set for private threads
-  model_kind_userId: v.optional(v.array(v.string())),
-  model_kind_threadId: v.optional(v.array(v.string())),
+  model_table_userId: v.optional(v.array(v.string())),
+  model_table_threadId: v.optional(v.array(v.string())),
   vector: v.array(v.number()),
 };
 
@@ -24,14 +26,28 @@ function table<D extends number>(dimensions: D): Table<D> {
     .vectorIndex("vector", {
       vectorField: "vector",
       dimensions,
-      filterFields: ["model_kind_userId", "model_kind_threadId"],
+      filterFields: ["model_table_userId", "model_table_threadId"],
     })
-    .index("model_kind_threadId", ["model", "kind", "threadId"]);
+    .index("model_table_threadId", ["model", "table", "threadId"]);
 }
+
+export type VectorSchema = SchemaDefinition<
+  { [key in VectorTableName]: Table<128> },
+  true
+>;
 
 export const VectorDimensions = [
   128, 256, 512, 768, 1024, 1536, 2048, 3072, 4096,
 ] as const;
+export function validateVectorDimension(
+  dimension: number
+): asserts dimension is VectorDimension {
+  if (!VectorDimensions.includes(dimension as VectorDimension)) {
+    throw new Error(
+      `Unsupported vector dimension${dimension}. Supported: ${VectorDimensions.join(", ")}`
+    );
+  }
+}
 export type VectorDimension = (typeof VectorDimensions)[number];
 export const VectorTableNames = VectorDimensions.map(
   (d) => `embeddings_${d}`

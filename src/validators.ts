@@ -1,4 +1,5 @@
 import { Infer, v } from "convex/values";
+import { vVectorDimension } from "./component/vector/tables";
 
 // const deprecated = v.optional(v.any()) as unknown as VNull<unknown, "optional">;
 
@@ -243,13 +244,11 @@ export const vStep = v.object({
 });
 export type Step = Infer<typeof vStep>;
 
-export const vStepWithMessagesWithFileAndId = v.object({
+export const vStepWithMessages = v.object({
   step: vStep,
   messages: v.array(vMessageWithFileAndId),
 });
-export type StepWithMessagesWithFileAndId = Infer<
-  typeof vStepWithMessagesWithFileAndId
->;
+export type StepWithMessagesWithFileAndId = Infer<typeof vStepWithMessages>;
 
 export const vSearchOptions = v.object({
   vector: v.optional(v.array(v.number())),
@@ -291,3 +290,10 @@ export const vObjectArgs = v.object({
   prompt: v.optional(v.string()),
   messages: v.optional(v.array(vMessage)),
 });
+
+export const vEmbeddingsWithMetadata = v.object({
+  vectors: v.array(v.union(v.array(v.number()), v.null())),
+  dimension: vVectorDimension,
+  model: v.string(),
+});
+export type EmbeddingsWithMetadata = Infer<typeof vEmbeddingsWithMetadata>;

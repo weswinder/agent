@@ -40,6 +40,11 @@ export type Mounts = {
       "public",
       {
         agentName?: string;
+        embeddings?: {
+          dimension: 128 | 256 | 512 | 768 | 1024 | 1536 | 2048 | 3072 | 4096;
+          model: string;
+          vectors: Array<Array<number> | null>;
+        };
         failPendingSteps?: boolean;
         messages: Array<{
           fileId?: string;
@@ -400,13 +405,18 @@ export type Mounts = {
         };
       }
     >;
-    addSteps: FunctionReference<
+    addStep: FunctionReference<
       "mutation",
       "public",
       {
+        embeddings?: {
+          dimension: 128 | 256 | 512 | 768 | 1024 | 1536 | 2048 | 3072 | 4096;
+          model: string;
+          vectors: Array<Array<number> | null>;
+        };
         failPendingSteps?: boolean;
         messageId: string;
-        steps: Array<{
+        step: {
           messages: Array<{
             fileId?: string;
             id?: string;
@@ -709,7 +719,7 @@ export type Mounts = {
               | { message: string; type: "other" }
             >;
           };
-        }>;
+        };
         threadId: string;
       },
       Array<{
@@ -1540,8 +1550,8 @@ export type Mounts = {
             | 3072
             | 4096;
           vectors: Array<{
-            kind: "thread" | "memory";
             model: string;
+            table: string;
             threadId?: string;
             userId?: string;
             vector: Array<number>;
@@ -1555,6 +1565,7 @@ export type Mounts = {
         {
           cursor?: string;
           limit: number;
+          table?: string;
           targetModel: string;
           vectorDimension:
             | 128

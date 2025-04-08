@@ -5,11 +5,12 @@ import { nullable, partial } from "convex-helpers/validators";
 import { ObjectType } from "convex/values";
 import { DEFAULT_MESSAGE_RANGE, extractText, isTool } from "../shared.js";
 import {
-  vThreadStatus,
+  vEmbeddingsWithMetadata,
   vMessageStatus,
   vMessageWithFileAndId,
   vSearchOptions,
-  vStepWithMessagesWithFileAndId,
+  vStepWithMessages,
+  vThreadStatus,
 } from "../validators.js";
 import { api, internal } from "./_generated/api.js";
 import { Doc, Id } from "./_generated/dataModel.js";
@@ -27,6 +28,7 @@ import {
   getVectorTableName,
   VectorDimension,
   VectorDimensions,
+  VectorTableId,
   vVectorId,
 } from "./vector/tables.js";
 
@@ -164,7 +166,7 @@ export const deleteAllForUserIdAsync = mutation({
     userId: v.string(),
   },
   handler: async (ctx, args) => {
-    const isDone = await deleteAllFroUserIdAsyncHandler(ctx, {
+    const isDone = await deleteAllForUserIdAsyncHandler(ctx, {
       userId: args.userId,
       messagesCursor: null,
       threadsCursor: null,
@@ -189,11 +191,11 @@ type DeleteAllReturns = ObjectType<typeof deleteAllReturns>;
 
 export const _deleteAllForUserIdAsync = internalMutation({
   args: deleteAllArgs,
-  handler: deleteAllFroUserIdAsyncHandler,
+  handler: deleteAllForUserIdAsyncHandler,
   returns: v.boolean(),
 });
 
-async function deleteAllFroUserIdAsyncHandler(
+async function deleteAllForUserIdAsyncHandler(
   ctx: MutationCtx,
   args: DeleteAllArgs
 ): Promise<boolean> {
@@ -266,6 +268,9 @@ async function deletePageForUserId(
 
 async function deleteMessage(ctx: MutationCtx, messageDoc: Doc<"messages">) {
   await ctx.db.delete(messageDoc._id);
+  if (messageDoc.embeddingId) {
+    await ctx.db.delete(messageDoc.embeddingId);
+  }
   if (messageDoc.fileId) {
     const file = await ctx.db.get(messageDoc.fileId);
     if (file) {
@@ -381,6 +386,7 @@ const addMessagesArgs = {
   agentName: v.optional(v.string()),
   pending: v.optional(v.boolean()),
   failPendingSteps: v.optional(v.boolean()),
+  embeddings: v.optional(vEmbeddingsWithMetadata),
 };
 export const addMessages = mutation({
   args: addMessagesArgs,
@@ -394,6 +400,10 @@ async function addMessagesHandler(
   ctx: MutationCtx,
   args: ObjectType<typeof addMessagesArgs>
 ) {
+  assert(
+    !args.embeddings || args.embeddings.vectors.length === args.messages.length,
+    "embeddings must have one vector per message"
+  );
   let userId = args.userId;
   const threadId = args.threadId;
   if (!userId && args.threadId) {
@@ -401,8 +411,14 @@ async function addMessagesHandler(
     assert(thread, `Thread ${args.threadId} not found`);
     userId = thread._id;
   }
-  const { failPendingSteps, pending, messages, parentMessageId, ...rest } =
-    args;
+  const {
+    failPendingSteps,
+    pending,
+    messages,
+    parentMessageId,
+    embeddings,
+    ...rest
+  } = args;
   const parent = parentMessageId && (await ctx.db.get(parentMessageId));
   if (failPendingSteps && parent?.status !== "pending") {
     assert(args.threadId, "threadId is required to fail pending steps");
@@ -422,7 +438,19 @@ async function addMessagesHandler(
   let order = maxMessage?.order ?? -1;
   const toReturn: Doc<"messages">[] = [];
   if (messages.length > 0) {
-    for (const { message, fileId, id } of messages) {
+    for (const [i, { message, fileId, id }] of messages.entries()) {
+      const embedding = embeddings?.vectors[i] ?? undefined;
+      let embeddingId: VectorTableId | undefined;
+      if (embeddings && embedding) {
+        const tableName = getVectorTableName(embeddings.dimension);
+        embeddingId = await ctx.db.insert(tableName, {
+          vector: embedding,
+          model: embeddings.model,
+          table: "messages",
+          userId,
+          threadId,
+        });
+      }
       const tool = isTool(message);
       if (!tool) {
         order++;
@@ -430,6 +458,7 @@ async function addMessagesHandler(
       const text = extractText(message);
       const messageId = await ctx.db.insert("messages", {
         ...rest,
+        embeddingId,
         parentMessageId,
         userId,
         message,
@@ -440,6 +469,11 @@ async function addMessagesHandler(
         fileId,
         status: pending ? "pending" : "success",
       });
+      if (fileId) {
+        await ctx.db.patch(fileId, {
+          refcount: (await ctx.db.get(fileId))!.refcount + 1,
+        });
+      }
       toReturn.push((await ctx.db.get(messageId))!);
     }
   }
@@ -479,21 +513,22 @@ async function getMaxMessage(
   }
 }
 
-const addStepsArgs = {
+const addStepArgs = {
   threadId: v.id("threads"),
   messageId: v.id("messages"),
-  steps: v.array(vStepWithMessagesWithFileAndId),
+  step: vStepWithMessages,
   failPendingSteps: v.optional(v.boolean()),
+  embeddings: v.optional(vEmbeddingsWithMetadata),
 };
 
-export const addSteps = mutation({
-  args: addStepsArgs,
+export const addStep = mutation({
+  args: addStepArgs,
   returns: v.array(v.doc("steps")),
-  handler: addStepsHandler,
+  handler: addStepHandler,
 });
-async function addStepsHandler(
+async function addStepHandler(
   ctx: MutationCtx,
-  args: ObjectType<typeof addStepsArgs>
+  args: ObjectType<typeof addStepArgs>
 ) {
   const parentMessage = await ctx.db.get(args.messageId);
   assert(parentMessage, `Message ${args.messageId} not found`);
@@ -512,35 +547,33 @@ async function addStepsHandler(
         await ctx.db.patch(step._id, { status: "failed" });
       }
     }
-    steps = steps.filter((s) => s.status === "success");
+    steps = steps.filter((s) => s.status !== "failed");
   }
-  let nextStepOrder = (steps.at(-1)?.stepOrder ?? -1) + 1;
-  for (const { step, messages } of args.steps) {
-    const stepId = await ctx.db.insert("steps", {
-      threadId: args.threadId,
-      parentMessageId: args.messageId,
-      order,
-      stepOrder: nextStepOrder,
-      status: step.finishReason === "stop" ? "success" : "pending",
-      step,
-    });
-    await addMessagesHandler(ctx, {
-      threadId: args.threadId,
-      parentMessageId: args.messageId,
-      stepId,
-      messages,
-      model: parentMessage.model,
-      agentName: parentMessage.agentName,
-      pending: step.finishReason === "stop" ? false : true,
-      failPendingSteps: false,
-    });
-    // We don't commit if the parent is still pending.
-    if (step.finishReason === "stop" && parentMessage.status === "success") {
-      await commitMessageHandler(ctx, { messageId: args.messageId });
-    }
-    steps.push((await ctx.db.get(stepId))!);
-    nextStepOrder++;
+  const { step, messages } = args.step;
+  const stepId = await ctx.db.insert("steps", {
+    threadId: args.threadId,
+    parentMessageId: args.messageId,
+    order,
+    stepOrder: (steps.at(-1)?.stepOrder ?? -1) + 1,
+    status: step.finishReason === "stop" ? "success" : "pending",
+    step,
+  });
+  await addMessagesHandler(ctx, {
+    threadId: args.threadId,
+    parentMessageId: args.messageId,
+    stepId,
+    messages,
+    model: parentMessage.model,
+    agentName: parentMessage.agentName,
+    pending: step.finishReason === "stop" ? false : true,
+    failPendingSteps: false,
+    embeddings: args.embeddings,
+  });
+  // We don't commit if the parent is still pending.
+  if (step.finishReason === "stop" && parentMessage.status === "success") {
+    await commitMessageHandler(ctx, { messageId: args.messageId });
   }
+  steps.push((await ctx.db.get(stepId))!);
   return steps;
 }
 
@@ -553,6 +586,20 @@ export const rollbackMessage = mutation({
   handler: async (ctx, { messageId, error }) => {
     const message = await ctx.db.get(messageId);
     assert(message, `Message ${messageId} not found`);
+    // TODO: do BFS to fail all associated messages, then steps
+    // with parentMessageId of those messages, etc.
+    const steps = await ctx.db
+      .query("steps")
+      .withIndex("parentMessageId_order_stepOrder", (q) =>
+        // TODO: fetch pending, and commit later
+        q.eq("parentMessageId", messageId)
+      )
+      .collect();
+    for (const step of steps) {
+      if (step.status === "pending") {
+        await ctx.db.patch(step._id, { status: "failed" });
+      }
+    }
     await ctx.db.patch(messageId, {
       status: "failed",
       text: error ?? message.text,
@@ -691,10 +738,15 @@ export const searchMessages = action({
       const vectors = (
         await ctx.vectorSearch(tableName, "vector", {
           vector: args.vector,
+          // TODO: to support more tables, add more "OR" clauses for each.
           filter: (q) =>
             args.userId
-              ? q.eq("model_kind_userId", [model, "thread", args.userId])
-              : q.eq("model_kind_threadId", [model, "thread", args.threadId!]),
+              ? q.eq("model_table_userId", [model, "messages", args.userId])
+              : q.eq("model_table_threadId", [
+                  model,
+                  "messages",
+                  args.threadId!,
+                ]),
           limit,
         })
       ).filter((v) => v._score > 0.5);
@@ -759,6 +811,8 @@ export const _fetchVectorMessages = internalQuery({
                 : // eslint-disable-next-line @typescript-eslint/no-explicit-any
                   q.eq("threadId", threadId as any)
             )
+            // Don't include pending. Failed messages hopefully are deleted but may as well be safe.
+            .filter((q) => q.eq(q.field("status"), "success"))
             .first()
         )
       )
@@ -867,157 +921,3 @@ export const textSearch = query({
   },
   returns: v.array(v.doc("messages")),
 });
-
-// const vMemoryConfig = v.object({
-//   lastMessages: v.optional(v.union(v.number(), v.literal(false))),
-//   semanticRecall: v.optional(
-//     v.union(
-//       v.boolean(),
-//       v.object({
-//         topK: v.number(),
-//         messageRange: v.union(
-//           v.number(),
-//           v.object({ before: v.number(), after: v.number() }),
-//         ),
-//       }),
-//     ),
-//   ),
-//   workingMemory: v.optional(
-//     v.object({
-//       enabled: v.boolean(),
-//       template: v.optional(v.string()),
-//       use: v.optional(
-//         v.union(v.literal("text-stream"), v.literal("tool-call")),
-//       ),
-//     }),
-//   ),
-//   threads: v.optional(
-//     v.object({
-//       generateTitle: v.optional(v.boolean()),
-//     }),
-//   ),
-// });
-// const vSelectBy = v.object({
-//   vectorSearchString: v.optional(v.string()),
-//   last: v.optional(v.union(v.number(), v.literal(false))),
-//   include: v.optional(
-//     v.array(
-//       v.object({
-//         id: v.string(),
-//         withPreviousMessages: v.optional(v.number()),
-//         withNextMessages: v.optional(v.number()),
-//       })
-//     )
-//   ),
-// });
-
-// const DEFAULT_MESSAGES_LIMIT = 40; // What pg & upstash do too.
-
-// export const getThreadMessagesPage = query({
-//   args: {
-//     parentMessageId: v.string(),
-//     selectBy: v.optional(vSelectBy),
-//     // Unimplemented and as far I can tell no storage provider has either.
-//     // memoryConfig: v.optional(vMemoryConfig),
-//   },
-//   handler: async (ctx, args): Promise<SerializedMessage[]> => {
-//     const messages = await ctx.db
-//       .query("messages")
-//       .withIndex("parentMessageId", (q) => q.eq("parentMessageId", args.parentMessageId))
-//       .order("desc")
-//       .take(args.selectBy?.last ? args.selectBy.last : DEFAULT_MESSAGES_LIMIT);
-
-//     const handled: boolean[] = [];
-//     const toFetch: number[] = [];
-//     for (const m of messages) {
-//       handled[m.threadOrder] = true;
-//     }
-//     await Promise.all(
-//       args.selectBy?.include?.map(async (range) => {
-//         const includeDoc = await ctx.db
-//           .query("messages")
-//           .withIndex("id", (q) => q.eq("id", range.id))
-//           .unique();
-//         if (!includeDoc) {
-//           console.warn(`Message ${range.id} not found`);
-//           return;
-//         }
-//         if (!range.withPreviousMessages && !range.withNextMessages) {
-//           messages.push(includeDoc);
-//           return;
-//         }
-//         const order = includeDoc.threadOrder;
-//         for (
-//           let i = order - (range.withPreviousMessages ?? 0);
-//           i < order + (range.withNextMessages ?? 0);
-//           i++
-//         ) {
-//           if (!handled[i]) {
-//             toFetch.push(i);
-//             handled[i] = true;
-//           }
-//         }
-//       }) ?? []
-//     );
-//     // sort and find unique numbers in toFetch
-//     const uniqueToFetch = [...new Set(toFetch)].sort();
-//     // find contiguous ranges in uniqueToFetch
-//     const ranges: { start: number; end: number }[] = [];
-//     for (let i = 0; i < uniqueToFetch.length; i++) {
-//       const start = uniqueToFetch[i];
-//       let end = start;
-//       while (i + 1 < uniqueToFetch.length && uniqueToFetch[i + 1] === end + 1) {
-//         end++;
-//         i++;
-//       }
-//       ranges.push({ start, end });
-//     }
-//     const fetched = (
-//       await Promise.all(
-//         ranges.map(async (range) => {
-//           return await ctx.db
-//             .query("messages")
-//             .withIndex("parentMessageId", (q) =>
-//               q
-//                 .eq("parentMessageId", args.parentMessageId)
-//                 .gte("threadOrder", range.start)
-//                 .lte("threadOrder", range.end)
-//             )
-//             .collect();
-//         })
-//       )
-//     ).flat();
-//     messages.push(...fetched);
-//     return messages.map(messageToSerializedMastra);
-//   },
-//   returns: v.array(vSerializedMessage),
-// });
-
-// export const saveMessages = mutation({
-//   args: { messages: v.array(vSerializedMessage) },
-//   handler: async (ctx, args) => {
-//     const messagesByParentMessageId: Record<string, SerializedMessage[]> = {};
-//     for (const message of args.messages) {
-//       messagesByParentMessageId[message.parentMessageId] = [
-//         ...(messagesByParentMessageId[message.parentMessageId] ?? []),
-//         message,
-//       ];
-//     }
-//     for (const parentMessageId in messagesByParentMessageId) {
-//       const lastMessage = await ctx.db
-//         .query("messages")
-//         .withIndex("parentMessageId", (q) => q.eq("parentMessageId", parentMessageId))
-//         .order("desc")
-//         .first();
-//       let threadOrder = lastMessage?.threadOrder ?? 0;
-//       for (const message of messagesByParentMessageId[parentMessageId]) {
-//         threadOrder++;
-//         await ctx.db.insert("messages", {
-//           ...message,
-//           threadOrder,
-//         });
-//       }
-//     }
-//   },
-//   returns: v.null(),
-// });

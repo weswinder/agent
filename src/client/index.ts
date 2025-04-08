@@ -16,17 +16,20 @@ import { generateObject, generateText, streamObject, streamText } from "ai";
 import { api } from "../component/_generated/api";
 import {
   SearchOptions,
-  vThreadArgs,
   vContextOptions,
   vObjectArgs,
   vStorageOptions,
+  vThreadArgs,
 } from "../validators";
 import { RunActionCtx, RunMutationCtx, RunQueryCtx, UseApi } from "./types";
-// TODO: is this the only dependency that needs helpers in client?
 import { assert } from "convex-helpers";
 import { ConvexToZod, convexToZod } from "convex-helpers/server/zod";
 import { internalActionGeneric } from "convex/server";
 import { Infer, v, Validator } from "convex/values";
+import {
+  validateVectorDimension,
+  VectorDimension,
+} from "../component/vector/tables";
 import {
   promptOrMessagesToCoreMessages,
   serializeMessageWithId,
@@ -80,7 +83,9 @@ export type StorageOptions = {
   // be in addition to automatically fetched content.
   // Pass true to have all input messages saved to the thread history.
   saveAllInputMessages?: boolean;
-  // Defaults to true
+  // Defaults to true, saving the prompt, or last message passed to generateText.
+  saveAnyInputMessages?: boolean;
+  // Defaults to true.
   saveOutputMessages?: boolean;
 };
 
@@ -272,6 +277,42 @@ export class Agent<AgentTools extends ToolSet> {
     return contextMessages;
   }
 
+  async getEmbeddings(messages: CoreMessage[]) {
+    let embeddings:
+      | {
+          vectors: (number[] | null)[];
+          dimension: VectorDimension;
+          model: string;
+        }
+      | undefined;
+    if (this.options.textEmbedding) {
+      const messageTexts = messages.map((m) => extractText(m));
+      // Find the indexes of the messages that have text.
+      const textIndexes = messageTexts
+        .map((t, i) => (t ? i : undefined))
+        .filter((i) => i !== undefined);
+      // Then embed those messages.
+      const textEmbeddings = await this.options.textEmbedding.doEmbed({
+        values: messageTexts.filter((t): t is string => !!t),
+      });
+      // Then assemble the embeddings into a single array with nulls for the messages without text.
+      const embeddingsOrNull = Array(messages.length).fill(null);
+      textIndexes.forEach((i, j) => {
+        embeddingsOrNull[i] = textEmbeddings.embeddings[j];
+      });
+      if (textEmbeddings.embeddings.length > 0) {
+        const dimension = textEmbeddings.embeddings[0].length;
+        validateVectorDimension(dimension);
+        embeddings = {
+          vectors: embeddingsOrNull,
+          dimension,
+          model: this.options.textEmbedding.modelId,
+        };
+      }
+    }
+    return embeddings;
+  }
+
   async saveMessages(
     ctx: RunMutationCtx,
     args: {
@@ -292,6 +333,7 @@ export class Agent<AgentTools extends ToolSet> {
       agentName: this.options.name,
       model: this.options.thread.modelId,
       messages: args.messages.map(serializeMessageWithId),
+      embeddings: await this.getEmbeddings(args.messages),
       failPendingSteps: args.failPendingSteps ?? true,
       pending: args.pending ?? false,
       parentMessageId: args.parentMessageId,
@@ -308,11 +350,12 @@ export class Agent<AgentTools extends ToolSet> {
   ): Promise<void> {
     const step = serializeStep(args.step as StepResult<ToolSet>);
     const messages = serializeNewMessagesInStep(args.step);
-    await ctx.runMutation(this.component.messages.addSteps, {
+    await ctx.runMutation(this.component.messages.addStep, {
       threadId: args.threadId,
       messageId: args.messageId,
-      steps: [{ step, messages: messages }],
+      step: { step, messages },
       failPendingSteps: false,
+      embeddings: await this.getEmbeddings(messages.map((m) => m.message)),
     });
   }
 
@@ -333,11 +376,9 @@ export class Agent<AgentTools extends ToolSet> {
         messageId: args.messageId,
       });
     } else {
-      await ctx.runMutation(this.component.messages.addSteps, {
-        threadId: args.threadId,
+      await ctx.runMutation(this.component.messages.rollbackMessage, {
         messageId: args.messageId,
-        steps: [],
-        failPendingSteps: true,
+        error: result.error,
       });
     }
   }
