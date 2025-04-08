@@ -17,6 +17,6 @@ jobs:
             package.json
           node-version: "18.x"
           cache: "npm"
-      - run: npm ci
+      - run: npm i
       - run: cd example && npm i && cd ..
       - run: npm test
