@@ -717,7 +717,7 @@ export class Agent<AgentTools extends ToolSet> {
   /**
    *
    */
-  asAction(spec: { contextOptions?: ContextOptions; maxSteps?: number }) {
+  asAction(spec?: { contextOptions?: ContextOptions; maxSteps?: number }) {
     return internalActionGeneric({
       args: {
         userId: v.optional(v.string()),
@@ -750,8 +750,9 @@ export class Agent<AgentTools extends ToolSet> {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       handler: async (ctx, args): Promise<any> => {
         const contextOptions =
-          spec.contextOptions && this.mergedContextOptions(spec.contextOptions);
-        const maxSteps = spec.maxSteps ?? this.options.maxSteps;
+          spec?.contextOptions &&
+          this.mergedContextOptions(spec.contextOptions);
+        const maxSteps = spec?.maxSteps ?? this.options.maxSteps;
         const maxRetries = args.maxRetries;
         const commonArgs = {
           userId: args.userId,

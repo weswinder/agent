@@ -12,6 +12,12 @@ const supportAgent = new Agent(components.agent, {
   instructions: "You are a helpful assistant.",
 });
 
+const wordsmithAgent = new Agent(components.agent, {
+  thread: openai.chat("gpt-4o-mini"),
+  textEmbedding: openai.embedding("text-embedding-3-small"),
+  instructions: "You output a spiffy quirky version of what the user says.",
+});
+
 // Use the agent from within a normal action:
 export const createThread = action({
   args: { prompt: v.string(), userId: v.optional(v.string()) },
@@ -36,22 +42,26 @@ export const continueThread = action({
 
 // Or use it within a workflow:
 export const supportAgentStep = supportAgent.asAction({ maxSteps: 10 });
+export const wordsmithAgentStep = wordsmithAgent.asAction();
 
 const workflow = new WorkflowManager(components.workflow);
 const s = internal.example; // where steps are defined
 
 export const supportAgentWorkflow = workflow.define({
   args: { prompt: v.string() },
-  handler: async (step, { prompt }) => {
+  handler: async (step, { prompt }): Promise<string> => {
     const { threadId } = await step.runAction(s.supportAgentStep, {
       createThread: {},
     });
-    const result = await step.runAction(s.supportAgentStep, {
+    const roughSuggestion = await step.runAction(s.supportAgentStep, {
       threadId,
       generateText: { prompt },
     });
-    console.log(result);
-    // Call other agents here
+    const wordsmithSuggestion = await step.runAction(s.wordsmithAgentStep, {
+      generateText: { prompt: roughSuggestion },
+    });
+    console.log(wordsmithSuggestion);
+    return wordsmithSuggestion;
   },
 });
 
