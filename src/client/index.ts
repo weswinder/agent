@@ -450,7 +450,6 @@ export class Agent<AgentTools extends ToolSet> {
         tools,
         onStepFinish: async (step) => {
           if (threadId && messageId && args.saveOutputMessages !== false) {
-            console.log("onStepFinish", step);
             await this.saveStep(ctx, {
               threadId,
               messageId,
@@ -519,7 +518,7 @@ export class Agent<AgentTools extends ToolSet> {
       ...rest,
       tools,
       onChunk: async (chunk) => {
-        console.log("onChunk", chunk);
+        // console.log("onChunk", chunk);
         return args.onChunk?.(chunk);
       },
       onError: async (error) => {
@@ -534,12 +533,12 @@ export class Agent<AgentTools extends ToolSet> {
       },
       onFinish: async (result) => {
         result.response.messages.forEach((message) => {
-          console.log("onFinish", message);
+          // console.log("onFinish", message);
         });
         return args.onFinish?.(result);
       },
       onStepFinish: async (step) => {
-        console.log("onStepFinish", step);
+        // console.log("onStepFinish", step);
         if (threadId && messageId) {
           await this.saveStep(ctx, {
             threadId,
@@ -661,7 +660,7 @@ export class Agent<AgentTools extends ToolSet> {
         return args.onError?.(error);
       },
       onFinish: async (result) => {
-        console.log("onFinish", result);
+        // console.log("onFinish", result);
       },
     }) as StreamObjectResult<DeepPartial<T>, T, never>;
     return { ...result, messageId };

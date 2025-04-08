@@ -24,14 +24,13 @@ import {
   QueryCtx,
 } from "./_generated/server.js";
 import { schema, v } from "./schema.js";
+import { insertVector, searchVectors } from "./vector/index.js";
 import {
-  getVectorTableName,
   VectorDimension,
   VectorDimensions,
   VectorTableId,
   vVectorId,
 } from "./vector/tables.js";
-import { insertVector, paginate, searchVectors } from "./vector/index.js";
 
 export const getThread = query({
   args: { threadId: v.id("threads") },
@@ -563,7 +562,7 @@ async function addStepHandler(
     embeddings: args.embeddings,
   });
   // We don't commit if the parent is still pending.
-  if (step.finishReason === "stop" && parentMessage.status === "success") {
+  if (step.finishReason === "stop") {
     await commitMessageHandler(ctx, { messageId: args.messageId });
   }
   steps.push((await ctx.db.get(stepId))!);
@@ -744,11 +743,10 @@ export const searchMessages = action({
           id: v._id,
           score:
             1 / (i + k) +
-            1 / (textEmbeddingIds?.indexOf(v._id) ?? Infinity + k),
+            1 / ((textEmbeddingIds?.indexOf(v._id) ?? Infinity) + k),
         }))
         .sort((a, b) => b.score - a.score);
       const vectorIds = vectorScores.slice(0, limit).map((v) => v.id);
-
       const messages: Doc<"messages">[] = await ctx.runQuery(
         internal.messages._fetchVectorMessages,
         {
@@ -793,9 +791,8 @@ export const _fetchVectorMessages = internalQuery({
             .withIndex("embeddingId", (q) => q.eq("embeddingId", embeddingId))
             .filter((q) =>
               userId
-                ? q.eq("userId", userId)
-                : // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                  q.eq("threadId", threadId as any)
+                ? q.eq(q.field("userId"), userId)
+                : q.eq(q.field("threadId"), threadId)
             )
             // Don't include pending. Failed messages hopefully are deleted but may as well be safe.
             .filter((q) => q.eq(q.field("status"), "success"))
@@ -851,8 +848,8 @@ export const _fetchVectorMessages = internalQuery({
                 .eq("threadId", m.threadId)
                 .eq("status", "success")
                 .eq("tool", false)
-                .gt("order", earliest)
-                .lt("order", latest)
+                .gte("order", earliest)
+                .lte("order", latest)
             )
             .collect();
           if (!ranges[searchId]) {
@@ -867,8 +864,8 @@ export const _fetchVectorMessages = internalQuery({
                 .eq("userId", m.userId!)
                 .eq("status", "success")
                 .eq("tool", false)
-                .gt("order", earliest)
-                .lt("order", latest)
+                .gte("order", earliest)
+                .lte("order", latest)
             )
             .collect();
           if (!ranges[searchId]) {
@@ -878,9 +875,12 @@ export const _fetchVectorMessages = internalQuery({
         }
       }
     }
-    return Object.values(ranges)
-      .map((r) => r.sort((a, b) => a.order! - b.order!))
-      .flat();
+    for (const r of Object.values(ranges).flat()) {
+      if (!messages.includes(r)) {
+        messages.push(r);
+      }
+    }
+    return messages.sort((a, b) => a.order - b.order);
   },
 });
 
