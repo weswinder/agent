@@ -305,6 +305,9 @@ export class Agent<AgentTools extends ToolSet> {
       const textIndexes = messageTexts
         .map((t, i) => (t ? i : undefined))
         .filter((i) => i !== undefined);
+      if (textIndexes.length === 0) {
+        return undefined;
+      }
       // Then embed those messages.
       const textEmbeddings = await this.options.textEmbedding.doEmbed({
         values: messageTexts.filter((t): t is string => !!t),
