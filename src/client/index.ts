@@ -554,10 +554,7 @@ export class Agent<AgentTools extends ToolSet> {
   async generateObject<T>(
     ctx: RunActionCtx,
     { userId, threadId }: { userId?: string; threadId?: string },
-    args: Omit<Parameters<typeof generateObject>[0], "model"> & {
-      model?: LanguageModelV1;
-    } & { parentMessageId?: string } & ContextOptions &
-      StorageOptions
+    args: ObjectArgs<Parameters<typeof generateObject>[0], "model">
   ): Promise<GenerateObjectResult<T> & GenerationOutputMetadata> {
     const { prompt, messages: raw, parentMessageId, ...rest } = args;
     const messages = promptOrMessagesToCoreMessages({ prompt, messages: raw });
@@ -592,10 +589,7 @@ export class Agent<AgentTools extends ToolSet> {
   async streamObject<T>(
     ctx: RunMutationCtx,
     { userId, threadId }: { userId?: string; threadId?: string },
-    args: Omit<Parameters<typeof streamObject<T>>[0], "model"> & {
-      model?: LanguageModelV1;
-    } & { parentMessageId?: string } & ContextOptions &
-      StorageOptions
+    args: ObjectArgs<Parameters<typeof streamObject<T>>[0]>
   ): Promise<
     StreamObjectResult<DeepPartial<T>, T, never> & GenerationOutputMetadata
   > {
