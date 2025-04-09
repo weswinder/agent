@@ -146,6 +146,15 @@ const ideaDeveloper = ideaDevelopmentAgent.asTool({
 });
 
 /**
+ * AGENTS AS STANDALONE ACTIONS
+ */
+
+export const ideaManagerAction = ideaManagerAgent.asAction();
+export const ideaDeveloperAction = ideaDevelopmentAgent.asAction({
+  maxSteps: 5,
+});
+
+/**
  * AGENT DISPATCHERS
  */
 
