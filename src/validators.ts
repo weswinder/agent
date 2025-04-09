@@ -1,10 +1,12 @@
-import { Infer, v } from "convex/values";
+import { Infer, ObjectType, v } from "convex/values";
 import { vVectorDimension } from "./component/vector/tables";
 
 // const deprecated = v.optional(v.any()) as unknown as VNull<unknown, "optional">;
 
 const providerOptions = v.optional(v.record(v.string(), v.any()));
+export type ProviderOptions = Infer<typeof providerOptions>;
 const experimental_providerMetadata = providerOptions;
+export type ProviderMetadata = Infer<typeof experimental_providerMetadata>;
 
 export const vThreadStatus = v.union(
   v.literal("active"),
@@ -316,6 +318,7 @@ export const vCallSettingsFields = {
   maxRetries: v.optional(v.number()),
   headers: v.optional(v.record(v.string(), v.string())),
 };
+export type CallSettings = ObjectType<typeof vCallSettingsFields>;
 
 export const vTextArgs = v.object({
   ...vCallSettingsFields,

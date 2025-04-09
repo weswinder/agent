@@ -4,9 +4,12 @@ import type {
   DeepPartial,
   GenerateObjectResult,
   GenerateTextResult,
+  JSONValue,
+  RepairTextFunction,
   StepResult,
   StreamObjectResult,
   StreamTextResult,
+  TelemetrySettings,
   Tool,
   ToolChoice,
   ToolExecutionOptions,
@@ -18,6 +21,7 @@ import { assert } from "convex-helpers";
 import { ConvexToZod, convexToZod } from "convex-helpers/server/zod";
 import { internalActionGeneric } from "convex/server";
 import { Infer, v, Validator } from "convex/values";
+import { z } from "zod";
 import { api } from "../component/_generated/api";
 import {
   validateVectorDimension,
@@ -32,6 +36,9 @@ import {
 } from "../mapping";
 import { DEFAULT_MESSAGE_RANGE, extractText } from "../shared";
 import {
+  CallSettings,
+  ProviderMetadata,
+  ProviderOptions,
   SearchOptions,
   vContextOptions,
   vSafeObjectArgs,
@@ -909,15 +916,77 @@ type TextArgs<
 } & ContextOptions &
   StorageOptions;
 
-type ObjectArgs<
-  T extends {
-    model: LanguageModelV1;
-  },
-> = Omit<T, "model"> & {
-  model?: LanguageModelV1;
-  parentMessageId?: string;
-} & ContextOptions &
-  StorageOptions;
+type BaseGenerateObjectOptions = StorageOptions &
+  ContextOptions &
+  CallSettings & {
+    model?: LanguageModelV1;
+    parentMessageId?: string;
+    system?: string;
+    prompt?: string;
+    messages?: CoreMessage[];
+    experimental_repairText?: RepairTextFunction;
+    experimental_telemetry?: TelemetrySettings;
+    providerOptions?: ProviderOptions;
+    experimental_providerMetadata?: ProviderMetadata;
+  };
+
+type GenerateObjectObjectOptions<T extends Record<string, unknown>> =
+  BaseGenerateObjectOptions & {
+    output: "object";
+    mode?: "auto" | "json" | "tool";
+    schema: z.Schema<T>;
+    schemaName?: string;
+    schemaDescription?: string;
+  };
+
+type GenerateObjectArrayOptions<T> = BaseGenerateObjectOptions & {
+  output: "array";
+  mode?: "auto" | "json" | "tool";
+  schema: z.Schema<T>;
+  schemaName?: string;
+  schemaDescription?: string;
+};
+
+type GenerateObjectWithEnumOptions<T extends string> =
+  BaseGenerateObjectOptions & {
+    output: "enum";
+    enum: Array<T>;
+    mode?: "auto" | "json" | "tool";
+  };
+
+type GenerateObjectNoSchemaOptions = BaseGenerateObjectOptions & {
+  schema?: undefined;
+  mode?: "json";
+};
+
+type GenerateObjectArgs<T> =
+  T extends Record<string, unknown>
+    ? GenerateObjectObjectOptions<T>
+    : T extends Array<unknown>
+      ? GenerateObjectArrayOptions<T>
+      : T extends string
+        ? GenerateObjectWithEnumOptions<T>
+        : GenerateObjectNoSchemaOptions;
+
+type StreamObjectArgs<T> =
+  T extends Record<string, unknown>
+    ? GenerateObjectObjectOptions<T>
+    : T extends Array<unknown>
+      ? GenerateObjectArrayOptions<T>
+      : GenerateObjectNoSchemaOptions;
+
+type OurObjectArgs<T> = GenerateObjectArgs<T> &
+  Pick<
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    Parameters<typeof generateObject<any>>[0],
+    "experimental_repairText" | "abortSignal"
+  >;
+
+type OurStreamObjectArgs<T> = StreamObjectArgs<T> &
+  Pick<
+    Parameters<typeof streamObject<T>>[0],
+    "onError" | "onFinish" | "abortSignal"
+  >;
 
 interface Thread<AgentTools extends ToolSet> {
   generateText<TOOLS extends ToolSet, OUTPUT = never, OUTPUT_PARTIAL = never>(
@@ -942,10 +1011,13 @@ interface Thread<AgentTools extends ToolSet> {
   >;
   // TODO: add all the overloads
   generateObject<T>(
-    args: ObjectArgs<Parameters<typeof generateObject>[0]>
+    args: OurObjectArgs<T>
   ): Promise<GenerateObjectResult<T> & GenerationOutputMetadata>;
+  generateObject(
+    args: GenerateObjectNoSchemaOptions
+  ): Promise<GenerateObjectResult<JSONValue> & GenerationOutputMetadata>;
   streamObject<T>(
-    args: ObjectArgs<Parameters<typeof streamObject<T>>[0]>
+    args: OurStreamObjectArgs<T>
   ): Promise<
     StreamObjectResult<DeepPartial<T>, T, never> & GenerationOutputMetadata
   >;
