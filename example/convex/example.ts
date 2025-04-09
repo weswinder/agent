@@ -4,6 +4,7 @@ import { components, internal } from "./_generated/api";
 import { openai } from "@ai-sdk/openai";
 import { action, query } from "./_generated/server";
 import { v } from "convex/values";
+import { z } from "zod";
 
 // Define an agent similarly to the AI SDK
 const supportAgent = new Agent(components.agent, {
@@ -115,5 +116,21 @@ export const searchMessages = action({
         limit: 10,
       },
     });
+  },
+});
+
+export const generateObject = action({
+  args: { prompt: v.string() },
+  handler: async (ctx, { prompt }) => {
+    const { threadId, thread } = await supportAgent.createThread(ctx, {});
+    const result = await thread.generateObject({
+      output: "object",
+      schema: z.object({
+        name: z.string(),
+        age: z.number(),
+      }),
+      prompt,
+    });
+    return result.object;
   },
 });
