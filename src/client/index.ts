@@ -418,7 +418,7 @@ export class Agent<AgentTools extends ToolSet> {
   ): Promise<
     GenerateTextResult<TOOLS & AgentTools, OUTPUT> & GenerationOutputMetadata
   > {
-    const { prompt, messages: raw, ...rest } = args;
+    const { prompt, messages: raw, parentMessageId, ...rest } = args;
     const messages = promptOrMessagesToCoreMessages({ prompt, messages: raw });
     const contextMessages = await this.fetchContextMessages(ctx, {
       ...args,
@@ -435,7 +435,7 @@ export class Agent<AgentTools extends ToolSet> {
         pending: true,
         // We should just fail if you pass in an ID for the message, fail those children
         // failPendingSteps: true,
-        parentMessageId: args.parentMessageId,
+        parentMessageId,
       });
       messageId = saved.lastMessageId;
     }
@@ -490,7 +490,7 @@ export class Agent<AgentTools extends ToolSet> {
   ): Promise<
     StreamTextResult<TOOLS, PARTIAL_OUTPUT> & GenerationOutputMetadata
   > {
-    const { prompt, messages: raw, ...rest } = args;
+    const { prompt, messages: raw, parentMessageId, ...rest } = args;
     const messages = promptOrMessagesToCoreMessages({ prompt, messages: raw });
     const contextMessages = await this.fetchContextMessages(ctx, {
       ...args,
@@ -505,7 +505,7 @@ export class Agent<AgentTools extends ToolSet> {
         userId,
         messages: args.saveAllInputMessages ? messages : messages.slice(-1),
         pending: true,
-        parentMessageId: args.parentMessageId,
+        parentMessageId,
       });
       messageId = saved.lastMessageId;
     }
@@ -559,7 +559,7 @@ export class Agent<AgentTools extends ToolSet> {
     } & { parentMessageId?: string } & ContextOptions &
       StorageOptions
   ): Promise<GenerateObjectResult<T> & GenerationOutputMetadata> {
-    const { prompt, messages: raw, ...rest } = args;
+    const { prompt, messages: raw, parentMessageId, ...rest } = args;
     const messages = promptOrMessagesToCoreMessages({ prompt, messages: raw });
     const contextMessages = await this.fetchContextMessages(ctx, {
       ...args,
@@ -574,7 +574,7 @@ export class Agent<AgentTools extends ToolSet> {
         userId,
         messages: args.saveAllInputMessages ? messages : messages.slice(-1),
         pending: true,
-        parentMessageId: args.parentMessageId,
+        parentMessageId,
       });
       messageId = saved.lastMessageId;
     }
@@ -600,7 +600,7 @@ export class Agent<AgentTools extends ToolSet> {
     StreamObjectResult<DeepPartial<T>, T, never> & GenerationOutputMetadata
   > {
     // TODO: unify all this shared code between all the generate* and stream* functions
-    const { prompt, messages: raw, ...rest } = args;
+    const { prompt, messages: raw, parentMessageId, ...rest } = args;
     const messages = promptOrMessagesToCoreMessages({ prompt, messages: raw });
     const contextMessages = await this.fetchContextMessages(ctx, {
       ...args,
@@ -615,7 +615,7 @@ export class Agent<AgentTools extends ToolSet> {
         userId,
         messages: args.saveAllInputMessages ? messages : messages.slice(-1),
         pending: true,
-        parentMessageId: args.parentMessageId,
+        parentMessageId,
       });
       messageId = saved.lastMessageId;
     }
@@ -730,6 +730,7 @@ export class Agent<AgentTools extends ToolSet> {
         contextOptions: v.optional(vContextOptions),
         storageOptions: v.optional(vStorageOptions),
         maxRetries: v.optional(v.number()),
+        parentMessageId: v.optional(v.string()),
 
         createThread: v.optional(
           v.object({
