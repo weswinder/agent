@@ -18,7 +18,11 @@ import type {
 } from "ai";
 import { generateObject, generateText, streamObject, streamText } from "ai";
 import { assert } from "convex-helpers";
-import { ConvexToZod, convexToZod } from "convex-helpers/server/zod";
+import {
+  ConvexToZod,
+  convexToZod,
+  zodToConvex,
+} from "convex-helpers/server/zod";
 import { internalActionGeneric } from "convex/server";
 import { Infer, v, Validator } from "convex/values";
 import { z } from "zod";
@@ -46,6 +50,8 @@ import {
   vTextArgs,
 } from "../validators";
 import { RunActionCtx, RunMutationCtx, RunQueryCtx, UseApi } from "./types";
+
+export { convexToZod, zodToConvex };
 
 export type ContextOptions = {
   /**
