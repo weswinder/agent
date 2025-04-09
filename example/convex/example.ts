@@ -8,13 +8,13 @@ import { z } from "zod";
 
 // Define an agent similarly to the AI SDK
 const supportAgent = new Agent(components.agent, {
-  thread: openai.chat("gpt-4o-mini"),
+  chat: openai.chat("gpt-4o-mini"),
   textEmbedding: openai.embedding("text-embedding-3-small"),
   instructions: "You are a helpful assistant.",
 });
 
 const wordsmithAgent = new Agent(components.agent, {
-  thread: openai.chat("gpt-4o-mini"),
+  chat: openai.chat("gpt-4o-mini"),
   textEmbedding: openai.embedding("text-embedding-3-small"),
   instructions: "You output a spiffy quirky version of what the user says.",
 });

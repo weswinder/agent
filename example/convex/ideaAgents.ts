@@ -75,7 +75,7 @@ export const attachEntryToIdea = createTool({
 
 const ideaManagerAgent = new Agent(components.agent, {
   name: "Idea Manager Agent",
-  thread: openai.chat("gpt-4o"), // Fancier model for discerning between ideas
+  chat: openai.chat("gpt-4o"), // Fancier model for discerning between ideas
   textEmbedding: openai.embedding("text-embedding-3-small"),
   instructions:
     "You are a helpful assistant that helps manage ideas. " +
@@ -96,7 +96,7 @@ const ideaManagerAgent = new Agent(components.agent, {
 
 const ideaDevelopmentAgent = new Agent(components.agent, {
   name: "Idea Development Agent",
-  thread: openai.chat("gpt-4o-mini"),
+  chat: openai.chat("gpt-4o-mini"),
   textEmbedding: openai.embedding("text-embedding-3-small"),
   instructions:
     "You are a helpful assistant that helps develop ideas. " +
@@ -151,7 +151,7 @@ const ideaDeveloper = ideaDevelopmentAgent.asTool({
 
 const ideaTriageAgent = new Agent(components.agent, {
   name: "Idea Triage Agent",
-  thread: openai.chat("gpt-4o-mini"),
+  chat: openai.chat("gpt-4o-mini"),
   textEmbedding: openai.embedding("text-embedding-3-small"),
   instructions:
     "You are a helpful assistant that helps triage ideas. " +

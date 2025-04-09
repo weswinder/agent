@@ -99,7 +99,7 @@ export class Agent<AgentTools extends ToolSet> {
     public component: UseApi<typeof api>,
     public options: {
       name?: string;
-      thread: LanguageModelV1;
+      chat: LanguageModelV1;
       textEmbedding?: EmbeddingModelV1<string>;
       instructions?: string;
       tools?: AgentTools;
@@ -336,7 +336,7 @@ export class Agent<AgentTools extends ToolSet> {
       threadId: args.threadId,
       userId: args.userId,
       agentName: this.options.name,
-      model: this.options.thread.modelId,
+      model: this.options.chat.modelId,
       messages: args.messages.map(serializeMessageWithId),
       embeddings: await this.getEmbeddings(args.messages),
       failPendingSteps: args.failPendingSteps ?? true,
@@ -443,7 +443,7 @@ export class Agent<AgentTools extends ToolSet> {
     const tools = wrapTools(toolCtx, this.options.tools, args.tools) as TOOLS;
     try {
       const result = await generateText({
-        model: this.options.thread,
+        model: this.options.chat,
         messages: [...contextMessages, ...messages],
         system: this.options.instructions,
         maxSteps: this.options.maxSteps,
@@ -512,7 +512,7 @@ export class Agent<AgentTools extends ToolSet> {
     const toolCtx = { ...ctx, userId, threadId, messageId };
     const tools = wrapTools(toolCtx, this.options.tools, args.tools) as TOOLS;
     const result = streamText({
-      model: this.options.thread,
+      model: this.options.chat,
       messages: [...contextMessages, ...messages],
       system: this.options.instructions,
       maxSteps: this.options.maxSteps,
@@ -576,7 +576,7 @@ export class Agent<AgentTools extends ToolSet> {
       messageId = saved.lastMessageId;
     }
     const result = (await generateObject({
-      model: this.options.thread,
+      model: this.options.chat,
       messages: [...contextMessages, ...messages],
       ...rest,
     })) as GenerateObjectResult<T>;
@@ -614,7 +614,7 @@ export class Agent<AgentTools extends ToolSet> {
       messageId = saved.lastMessageId;
     }
     const stream = streamObject<T>({
-      model: this.options.thread,
+      model: this.options.chat,
       messages: [...contextMessages, ...messages],
       ...rest,
       onError: async (error) => {
