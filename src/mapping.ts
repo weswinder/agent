@@ -210,23 +210,26 @@ export function promptOrMessagesToCoreMessages(args: {
   if (args.system) {
     messages.push({ role: "system", content: args.system });
   }
-  if (!args.messages) {
-    assert(args.prompt, "messages or prompt is required");
+  assert(args.prompt || args.messages, "messages or prompt is required");
+  if (args.messages) {
+    if (
+      args.messages.some(
+        (m) =>
+          typeof m === "object" &&
+          m !== null &&
+          (m.role === "data" || // UI-only role
+            "toolInvocations" in m || // UI-specific field
+            "parts" in m || // UI-specific field
+            "experimental_attachments" in m)
+      )
+    ) {
+      messages.push(...convertToCoreMessages(args.messages as UIMessage[]));
+    } else {
+      messages.push(...coreMessageSchema.array().parse(args.messages));
+    }
+  }
+  if (args.prompt) {
     messages.push({ role: "user", content: args.prompt });
-  } else if (
-    args.messages.some(
-      (m) =>
-        typeof m === "object" &&
-        m !== null &&
-        (m.role === "data" || // UI-only role
-          "toolInvocations" in m || // UI-specific field
-          "parts" in m || // UI-specific field
-          "experimental_attachments" in m)
-    )
-  ) {
-    messages.push(...convertToCoreMessages(args.messages as UIMessage[]));
-  } else {
-    messages.push(...coreMessageSchema.array().parse(args.messages));
   }
   assert(messages.length > 0, "Messages must contain at least one message");
   return messages;
