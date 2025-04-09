@@ -593,16 +593,26 @@ export class Agent<AgentTools extends ToolSet> {
       { ...args, userId, threadId }
     );
 
-    const result = (await generateObject({
-      model: this.options.chat,
-      ...aiArgs,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } as any)) as GenerateObjectResult<T>;
+    try {
+      const result = (await generateObject({
+        model: this.options.chat,
+        ...aiArgs,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as any)) as GenerateObjectResult<T>;
 
-    if (threadId && messageId && args.saveOutputMessages !== false) {
-      await this.saveObject(ctx, { threadId, messageId, result });
+      if (threadId && messageId && args.saveOutputMessages !== false) {
+        await this.saveObject(ctx, { threadId, messageId, result });
+      }
+      return { ...result, messageId };
+    } catch (error) {
+      if (threadId && messageId) {
+        await ctx.runMutation(this.component.messages.rollbackMessage, {
+          messageId,
+          error: (error as Error).message,
+        });
+      }
+      throw error;
     }
-    return { ...result, messageId };
   }
 
   async streamObject<T>(
