@@ -69,15 +69,6 @@ export function serializeContent(content: Content): SerializedContent {
   return serialized as SerializedContent;
 }
 
-export function serializeResponse<TOOLS extends ToolSet, OUTPUT>(
-  response: GenerateTextResult<TOOLS, OUTPUT>["response"]
-): { message: SerializedMessage; id?: string }[] {
-  const { id, timestamp, modelId, headers, messages, body } = response;
-  // TODO: what to do about all the rest?
-  // Store body?
-  return messages.map((m) => serializeMessageWithId(m));
-}
-
 export function serializeStep<TOOLS extends ToolSet>(
   step: StepResult<TOOLS>
 ): Step {
@@ -89,7 +80,7 @@ export function serializeStep<TOOLS extends ToolSet>(
     ...step.response,
     messages: content,
     timestamp,
-    headers: {},
+    headers: {}, // these are large and low value
   };
   return {
     ...step,
