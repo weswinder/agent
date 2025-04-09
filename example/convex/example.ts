@@ -131,6 +131,6 @@ export const generateObject = action({
       }),
       prompt,
     });
-    return result.object;
+    return { threadId, object: result.object };
   },
 });

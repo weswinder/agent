@@ -229,6 +229,7 @@ export class Agent<AgentTools extends ToolSet> {
     // return this.component.continueThread(ctx, args);
     return {
       thread: {
+        threadId,
         generateText: this.generateText.bind(this, ctx, { userId, threadId }),
         streamText: this.streamText.bind(this, ctx, { userId, threadId }),
         generateObject: this.generateObject.bind(this, ctx, {
@@ -749,12 +750,6 @@ export class Agent<AgentTools extends ToolSet> {
             summary: v.optional(v.string()),
           })
         ),
-        continueThread: v.optional(
-          v.object({
-            threadId: v.string(),
-            userId: v.optional(v.string()),
-          })
-        ),
         generateText: v.optional(vTextArgs),
         streamText: v.optional(vTextArgs),
         generateObject: v.optional(vSafeObjectArgs),
@@ -774,35 +769,40 @@ export class Agent<AgentTools extends ToolSet> {
           ...args.storageOptions,
         };
         if (args.createThread) {
-          return this.createThread(ctx, {
+          const { threadId } = await this.createThread(ctx, {
             userId: args.createThread.userId,
             parentThreadIds: args.createThread.parentThreadIds,
             title: args.createThread.title,
             summary: args.createThread.summary,
           });
-        } else if (args.continueThread) {
-          return this.continueThread(ctx, {
-            threadId: args.continueThread.threadId,
-            userId: args.continueThread.userId,
-          });
+          return threadId;
         } else if (args.generateText) {
-          return this.generateText(ctx, commonArgs, {
+          const value = await this.generateText(ctx, commonArgs, {
             ...args.generateText,
             maxSteps: args.generateText.maxSteps ?? maxSteps,
           });
+          return value.text;
         } else if (args.streamText) {
-          return this.streamText(ctx, commonArgs, {
+          const value = await this.streamText(ctx, commonArgs, {
             ...args.streamText,
             maxSteps: args.streamText.maxSteps ?? maxSteps,
           });
+          return value.text;
         } else if (args.generateObject) {
-          return this.generateObject(ctx, commonArgs, {
+          const value = await this.generateObject(ctx, commonArgs, {
             ...(args.generateObject as GenerateObjectArgs<unknown>),
           });
+          return value.object;
         } else if (args.streamObject) {
-          return this.streamObject(ctx, commonArgs, {
+          const value = await this.streamObject(ctx, commonArgs, {
             ...(args.streamObject as StreamObjectArgs<unknown>),
           });
+          return value.object;
+        } else {
+          throw new Error(
+            "No action specified. Maybe try :" +
+              'generateText: { prompt: "Hello world" }'
+          );
         }
       },
     });
@@ -999,6 +999,7 @@ type OurStreamObjectArgs<T> = StreamObjectArgs<T> &
   >;
 
 interface Thread<AgentTools extends ToolSet> {
+  threadId: string;
   generateText<TOOLS extends ToolSet, OUTPUT = never, OUTPUT_PARTIAL = never>(
     args: TextArgs<
       AgentTools,
