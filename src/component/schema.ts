@@ -27,6 +27,7 @@ export const schema = defineSchema({
     stepId: v.optional(v.id("steps")),
     agentName: v.optional(v.string()),
     message: v.optional(vMessage),
+    error: v.optional(v.string()),
     model: v.optional(v.string()),
     text: v.optional(v.string()),
     embeddingId: v.optional(vVectorId),

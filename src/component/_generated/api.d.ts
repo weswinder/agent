@@ -169,6 +169,7 @@ export type Mounts = {
             | string
             | string
             | string;
+          error?: string;
           fileId?: string;
           id?: string;
           message?:
@@ -293,6 +294,7 @@ export type Mounts = {
             | string
             | string
             | string;
+          error?: string;
           fileId?: string;
           id?: string;
           message?:
@@ -1058,6 +1060,7 @@ export type Mounts = {
             | string
             | string
             | string;
+          error?: string;
           fileId?: string;
           id?: string;
           message?:
@@ -1230,6 +1233,7 @@ export type Mounts = {
           | string
           | string
           | string;
+        error?: string;
         fileId?: string;
         id?: string;
         message?:
@@ -1359,6 +1363,7 @@ export type Mounts = {
           | string
           | string
           | string;
+        error?: string;
         fileId?: string;
         id?: string;
         message?:

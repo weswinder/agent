@@ -1,6 +1,7 @@
 import {
   convertToCoreMessages,
   coreMessageSchema,
+  GenerateObjectResult,
   type AssistantContent,
   type CoreMessage,
   type DataContent,
@@ -11,8 +12,12 @@ import {
   type Message as UIMessage,
   type UserContent,
 } from "ai";
-import { MessageWithFileAndId, Step } from "./validators";
 import { assert } from "convex-helpers";
+import {
+  MessageWithFileAndId,
+  Step,
+  StepWithMessagesWithFileAndId,
+} from "./validators";
 
 export type SerializeUrlsAndUint8Arrays<T> = T extends URL
   ? string
@@ -64,15 +69,6 @@ export function serializeContent(content: Content): SerializedContent {
   return serialized as SerializedContent;
 }
 
-export function serializeResponse<TOOLS extends ToolSet, OUTPUT>(
-  response: GenerateTextResult<TOOLS, OUTPUT>["response"]
-): { message: SerializedMessage; id?: string }[] {
-  const { id, timestamp, modelId, headers, messages, body } = response;
-  // TODO: what to do about all the rest?
-  // Store body?
-  return messages.map((m) => serializeMessageWithId(m));
-}
-
 export function serializeStep<TOOLS extends ToolSet>(
   step: StepResult<TOOLS>
 ): Step {
@@ -84,7 +80,7 @@ export function serializeStep<TOOLS extends ToolSet>(
     ...step.response,
     messages: content,
     timestamp,
-    headers: {},
+    headers: {}, // these are large and low value
   };
   return {
     ...step,
@@ -111,6 +107,41 @@ export function serializeNewMessagesInStep<TOOLS extends ToolSet>(
     );
   }
   return messages;
+}
+
+export function serializeObjectResult(
+  result: GenerateObjectResult<unknown>
+): StepWithMessagesWithFileAndId {
+  const text = JSON.stringify(result.object);
+  const serializedMessage = serializeMessageWithId({
+    role: "assistant" as const,
+    content: text,
+    id: result.response.id,
+  });
+
+  const messages = [serializedMessage];
+
+  return {
+    messages,
+    step: {
+      text,
+      isContinued: false,
+      stepType: "initial",
+      toolCalls: [],
+      toolResults: [],
+      usage: result.usage,
+      warnings: result.warnings,
+      finishReason: result.finishReason,
+      request: result.request,
+      response: {
+        ...result.response,
+        timestamp: result.response.timestamp.getTime(),
+        messages,
+      },
+      providerMetadata: result.providerMetadata,
+      experimental_providerMetadata: result.experimental_providerMetadata,
+    },
+  };
 }
 
 export function deserializeContent(content: SerializedContent): Content {
@@ -170,23 +201,26 @@ export function promptOrMessagesToCoreMessages(args: {
   if (args.system) {
     messages.push({ role: "system", content: args.system });
   }
-  if (!args.messages) {
-    assert(args.prompt, "messages or prompt is required");
+  assert(args.prompt || args.messages, "messages or prompt is required");
+  if (args.messages) {
+    if (
+      args.messages.some(
+        (m) =>
+          typeof m === "object" &&
+          m !== null &&
+          (m.role === "data" || // UI-only role
+            "toolInvocations" in m || // UI-specific field
+            "parts" in m || // UI-specific field
+            "experimental_attachments" in m)
+      )
+    ) {
+      messages.push(...convertToCoreMessages(args.messages as UIMessage[]));
+    } else {
+      messages.push(...coreMessageSchema.array().parse(args.messages));
+    }
+  }
+  if (args.prompt) {
     messages.push({ role: "user", content: args.prompt });
-  } else if (
-    args.messages.some(
-      (m) =>
-        typeof m === "object" &&
-        m !== null &&
-        (m.role === "data" || // UI-only role
-          "toolInvocations" in m || // UI-specific field
-          "parts" in m || // UI-specific field
-          "experimental_attachments" in m)
-    )
-  ) {
-    messages.push(...convertToCoreMessages(args.messages as UIMessage[]));
-  } else {
-    messages.push(...coreMessageSchema.array().parse(args.messages));
   }
   assert(messages.length > 0, "Messages must contain at least one message");
   return messages;

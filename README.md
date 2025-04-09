@@ -10,6 +10,7 @@ AI Agent framework built on Convex.
 - RAG for chat context, via hybrid text & vector search, with configuration options.
   Or use the API to query the history yourself and do it your way.
 - Opt-in search for messages from other threads (for the same specified user).
+- Support for generating and storing objects in messages (as JSON).
 - Tool calls via the AI SDK, along with Convex-specific helpers.
 - Easy workflow integration with the [Workflow component](https://convex.dev/components/workflow).
 - Reactive & realtime updates to asynchronous threads.

@@ -4,16 +4,17 @@ import { components, internal } from "./_generated/api";
 import { openai } from "@ai-sdk/openai";
 import { action, query } from "./_generated/server";
 import { v } from "convex/values";
+import { z } from "zod";
 
 // Define an agent similarly to the AI SDK
 const supportAgent = new Agent(components.agent, {
-  thread: openai.chat("gpt-4o-mini"),
+  chat: openai.chat("gpt-4o-mini"),
   textEmbedding: openai.embedding("text-embedding-3-small"),
   instructions: "You are a helpful assistant.",
 });
 
 const wordsmithAgent = new Agent(components.agent, {
-  thread: openai.chat("gpt-4o-mini"),
+  chat: openai.chat("gpt-4o-mini"),
   textEmbedding: openai.embedding("text-embedding-3-small"),
   instructions: "You output a spiffy quirky version of what the user says.",
 });
@@ -115,5 +116,21 @@ export const searchMessages = action({
         limit: 10,
       },
     });
+  },
+});
+
+export const generateObject = action({
+  args: { prompt: v.string() },
+  handler: async (ctx, { prompt }) => {
+    const { threadId, thread } = await supportAgent.createThread(ctx, {});
+    const result = await thread.streamObject({
+      output: "object",
+      schema: z.object({
+        name: z.string(),
+        age: z.number(),
+      }),
+      prompt,
+    });
+    return { threadId, object: result.object };
   },
 });

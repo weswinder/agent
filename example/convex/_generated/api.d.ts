@@ -179,6 +179,7 @@ export declare const components: {
               | string
               | string
               | string;
+            error?: string;
             fileId?: string;
             id?: string;
             message?:
@@ -303,6 +304,7 @@ export declare const components: {
               | string
               | string
               | string;
+            error?: string;
             fileId?: string;
             id?: string;
             message?:
@@ -1096,6 +1098,7 @@ export declare const components: {
               | string
               | string
               | string;
+            error?: string;
             fileId?: string;
             id?: string;
             message?:
@@ -1268,6 +1271,7 @@ export declare const components: {
             | string
             | string
             | string;
+          error?: string;
           fileId?: string;
           id?: string;
           message?:
@@ -1397,6 +1401,7 @@ export declare const components: {
             | string
             | string
             | string;
+          error?: string;
           fileId?: string;
           id?: string;
           message?:

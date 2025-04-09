@@ -4,28 +4,29 @@ import type {
   DeepPartial,
   GenerateObjectResult,
   GenerateTextResult,
+  JSONValue,
+  RepairTextFunction,
   StepResult,
   StreamObjectResult,
   StreamTextResult,
+  TelemetrySettings,
   Tool,
   ToolChoice,
   ToolExecutionOptions,
   ToolSet,
+  Message as UIMessage,
 } from "ai";
 import { generateObject, generateText, streamObject, streamText } from "ai";
-import { api } from "../component/_generated/api";
-import {
-  SearchOptions,
-  vContextOptions,
-  vObjectArgs,
-  vStorageOptions,
-  vThreadArgs,
-} from "../validators";
-import { RunActionCtx, RunMutationCtx, RunQueryCtx, UseApi } from "./types";
 import { assert } from "convex-helpers";
-import { ConvexToZod, convexToZod } from "convex-helpers/server/zod";
+import {
+  ConvexToZod,
+  convexToZod,
+  zodToConvex,
+} from "convex-helpers/server/zod";
 import { internalActionGeneric } from "convex/server";
 import { Infer, v, Validator } from "convex/values";
+import { z } from "zod";
+import { api, Mounts } from "../component/_generated/api";
 import {
   validateVectorDimension,
   VectorDimension,
@@ -34,9 +35,23 @@ import {
   promptOrMessagesToCoreMessages,
   serializeMessageWithId,
   serializeNewMessagesInStep,
+  serializeObjectResult,
   serializeStep,
 } from "../mapping";
 import { DEFAULT_MESSAGE_RANGE, extractText } from "../shared";
+import {
+  CallSettings,
+  ProviderMetadata,
+  ProviderOptions,
+  SearchOptions,
+  vContextOptions,
+  vSafeObjectArgs,
+  vStorageOptions,
+  vTextArgs,
+} from "../validators";
+import { RunActionCtx, RunMutationCtx, RunQueryCtx, UseApi } from "./types";
+
+export { convexToZod, zodToConvex };
 
 export type ContextOptions = {
   /**
@@ -95,10 +110,10 @@ type CoreMessageMaybeWithId = CoreMessage & { id?: string | undefined };
 
 export class Agent<AgentTools extends ToolSet> {
   constructor(
-    public component: UseApi<typeof api>,
+    public component: UseApi<Mounts>,
     public options: {
       name?: string;
-      thread: LanguageModelV1;
+      chat: LanguageModelV1;
       textEmbedding?: EmbeddingModelV1<string>;
       instructions?: string;
       tools?: AgentTools;
@@ -220,6 +235,7 @@ export class Agent<AgentTools extends ToolSet> {
     // return this.component.continueThread(ctx, args);
     return {
       thread: {
+        threadId,
         generateText: this.generateText.bind(this, ctx, { userId, threadId }),
         streamText: this.streamText.bind(this, ctx, { userId, threadId }),
         generateObject: this.generateObject.bind(this, ctx, {
@@ -295,6 +311,9 @@ export class Agent<AgentTools extends ToolSet> {
       const textIndexes = messageTexts
         .map((t, i) => (t ? i : undefined))
         .filter((i) => i !== undefined);
+      if (textIndexes.length === 0) {
+        return undefined;
+      }
       // Then embed those messages.
       const textEmbeddings = await this.options.textEmbedding.doEmbed({
         values: messageTexts.filter((t): t is string => !!t),
@@ -335,7 +354,7 @@ export class Agent<AgentTools extends ToolSet> {
       threadId: args.threadId,
       userId: args.userId,
       agentName: this.options.name,
-      model: this.options.thread.modelId,
+      model: this.options.chat.modelId,
       messages: args.messages.map(serializeMessageWithId),
       embeddings: await this.getEmbeddings(args.messages),
       failPendingSteps: args.failPendingSteps ?? true,
@@ -417,36 +436,20 @@ export class Agent<AgentTools extends ToolSet> {
   ): Promise<
     GenerateTextResult<TOOLS & AgentTools, OUTPUT> & GenerationOutputMetadata
   > {
-    const { prompt, messages: raw, ...rest } = args;
-    const messages = promptOrMessagesToCoreMessages({ prompt, messages: raw });
-    const contextMessages = await this.fetchContextMessages(ctx, {
-      ...args,
-      userId,
-      threadId,
-      messages,
-    });
-    let messageId: string | undefined;
-    if (threadId) {
-      const saved = await this.saveMessages(ctx, {
-        threadId,
-        userId,
-        messages: args.saveAllInputMessages ? messages : messages.slice(-1),
-        pending: true,
-        parentMessageId: args.parentMessageId,
-      });
-      messageId = saved.lastMessageId;
-    }
+    const { args: aiArgs, messageId } = await this.saveMessagesAndFetchContext(
+      ctx,
+      { ...args, userId, threadId }
+    );
     const toolCtx = { ...ctx, userId, threadId, messageId };
     const tools = wrapTools(toolCtx, this.options.tools, args.tools) as TOOLS;
+    const maxSteps = args.maxSteps ?? this.options.maxSteps;
     try {
       const result = await generateText({
-        model: this.options.thread,
-        messages: [...contextMessages, ...messages],
-        system: this.options.instructions,
-        maxSteps: this.options.maxSteps,
+        model: this.options.chat,
+        ...aiArgs,
+        maxSteps,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         toolChoice: args.toolChoice as any,
-        ...rest,
         tools,
         onStepFinish: async (step) => {
           if (threadId && messageId && args.saveOutputMessages !== false) {
@@ -487,35 +490,19 @@ export class Agent<AgentTools extends ToolSet> {
   ): Promise<
     StreamTextResult<TOOLS, PARTIAL_OUTPUT> & GenerationOutputMetadata
   > {
-    const { prompt, messages: raw, ...rest } = args;
-    const messages = promptOrMessagesToCoreMessages({ prompt, messages: raw });
-    const contextMessages = await this.fetchContextMessages(ctx, {
-      ...args,
-      userId,
-      threadId,
-      messages,
-    });
-    let messageId: string | undefined;
-    if (threadId) {
-      const saved = await this.saveMessages(ctx, {
-        threadId,
-        userId,
-        messages: args.saveAllInputMessages ? messages : messages.slice(-1),
-        pending: true,
-        parentMessageId: args.parentMessageId,
-      });
-      messageId = saved.lastMessageId;
-    }
+    const { args: aiArgs, messageId } = await this.saveMessagesAndFetchContext(
+      ctx,
+      { ...args, userId, threadId }
+    );
     const toolCtx = { ...ctx, userId, threadId, messageId };
     const tools = wrapTools(toolCtx, this.options.tools, args.tools) as TOOLS;
+    const maxSteps = args.maxSteps ?? this.options.maxSteps;
     const result = streamText({
-      model: this.options.thread,
-      messages: [...contextMessages, ...messages],
-      system: this.options.instructions,
-      maxSteps: this.options.maxSteps,
+      model: this.options.chat,
+      ...aiArgs,
+      maxSteps,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       toolChoice: args.toolChoice as any,
-      ...rest,
       tools,
       onChunk: async (chunk) => {
         // console.log("onChunk", chunk);
@@ -531,14 +518,9 @@ export class Agent<AgentTools extends ToolSet> {
         }
         return args.onError?.(error);
       },
-      onFinish: async (result) => {
-        result.response.messages.forEach((message) => {
-          // console.log("onFinish", message);
-        });
-        return args.onFinish?.(result);
-      },
       onStepFinish: async (step) => {
         // console.log("onStepFinish", step);
+        // TODO: compare delta to the output. internally drop the deltas when committing
         if (threadId && messageId) {
           await this.saveStep(ctx, {
             threadId,
@@ -552,118 +534,160 @@ export class Agent<AgentTools extends ToolSet> {
     return { ...result, messageId };
   }
 
-  // TODO: add the crazy number of overloads to get types through
-  async generateObject<T>(
-    ctx: RunActionCtx,
-    { userId, threadId }: { userId?: string; threadId?: string },
-    args: Omit<Parameters<typeof generateObject>[0], "model"> & {
-      model?: LanguageModelV1;
-    } & { parentMessageId?: string } & ContextOptions &
-      StorageOptions
-  ): Promise<GenerateObjectResult<T> & GenerationOutputMetadata> {
-    const { prompt, messages: raw, ...rest } = args;
-    const messages = promptOrMessagesToCoreMessages({ prompt, messages: raw });
-    const contextMessages = await this.fetchContextMessages(ctx, {
-      ...args,
+  async saveMessagesAndFetchContext<
+    T extends {
+      prompt?: string;
+      messages?: CoreMessage[] | Omit<UIMessage, "id">[];
+      system?: string;
+    },
+  >(
+    ctx: RunActionCtx | RunMutationCtx,
+    {
       userId,
       threadId,
+      parentMessageId,
+      saveAllInputMessages,
+      system,
+      ...args
+    }: {
+      userId: string | undefined;
+      threadId: string | undefined;
+      parentMessageId?: string;
+      saveAllInputMessages?: boolean;
+      saveAnyInputMessages?: boolean;
+    } & ContextOptions &
+      T
+  ): Promise<{
+    args: T;
+    messageId: string | undefined;
+  }> {
+    const messages = promptOrMessagesToCoreMessages(args);
+    const contextMessages = await this.fetchContextMessages(ctx, {
       messages,
+      parentMessageId,
+      userId,
+      threadId,
+      ...args,
     });
     let messageId: string | undefined;
     if (threadId) {
       const saved = await this.saveMessages(ctx, {
         threadId,
         userId,
-        messages: args.saveAllInputMessages ? messages : messages.slice(-1),
+        messages: saveAllInputMessages ? messages : messages.slice(-1),
         pending: true,
-        parentMessageId: args.parentMessageId,
+        // We should just fail if you pass in an ID for the message, fail those children
+        // failPendingSteps: true,
+        parentMessageId,
       });
       messageId = saved.lastMessageId;
     }
-    const result = (await generateObject({
-      model: this.options.thread,
-      messages: [...contextMessages, ...messages],
-      ...rest,
-    })) as GenerateObjectResult<T>;
-    if (threadId && messageId && args.saveOutputMessages !== false) {
-      // await this.saveObject(ctx, { threadId, messageId, result });
-    }
-    return { ...result, messageId };
+    const { prompt: _, ...rest } = args;
+    return {
+      args: {
+        ...rest,
+        system: system ?? this.options.instructions,
+        messages: [...contextMessages, ...messages],
+      } as T,
+      messageId,
+    };
   }
 
-  // async saveObject<T>(
-  //   ctx: RunMutationCtx,
-  //   args: {
-  //     threadId: string;
-  //     messageId: string;
-  //     result: GenerateObjectResult<T>;
-  //   }
-  // ): Promise<void> {
-  //   await ctx.runMutation(this.component.messages.addObject, {
-  //     threadId: args.threadId,
-  //     step: {
-  //       request: result.request,
-  //       response: {
-  //         ...result.response,
-  //         messages: [
-  //           {
-  //             role: "assistant",
+  async generateObject<T>(
+    ctx: RunActionCtx,
+    { userId, threadId }: { userId?: string; threadId?: string },
+    args: OurObjectArgs<T>
+  ): Promise<GenerateObjectResult<T> & GenerationOutputMetadata> {
+    const { args: aiArgs, messageId } = await this.saveMessagesAndFetchContext(
+      ctx,
+      { ...args, userId, threadId }
+    );
 
-  //             content: result.object,
-  //           },
-  //         ],
-  //       },
-  //       finishReason: result.finishReason,
-  //       providerMetadata: result.providerMetadata,
-  //       usage: result.usage,
-  //       warnings: result.warnings,
-  //     },
-  //   });
-  // }
+    try {
+      const result = (await generateObject({
+        model: this.options.chat,
+        ...aiArgs,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as any)) as GenerateObjectResult<T>;
+
+      if (threadId && messageId && args.saveOutputMessages !== false) {
+        await this.saveObject(ctx, { threadId, messageId, result });
+      }
+      return { ...result, messageId };
+    } catch (error) {
+      if (threadId && messageId) {
+        await ctx.runMutation(this.component.messages.rollbackMessage, {
+          messageId,
+          error: (error as Error).message,
+        });
+      }
+      throw error;
+    }
+  }
 
   async streamObject<T>(
     ctx: RunMutationCtx,
     { userId, threadId }: { userId?: string; threadId?: string },
-    args: Omit<Parameters<typeof streamObject<T>>[0], "model"> & {
-      model?: LanguageModelV1;
-    } & { parentMessageId?: string } & ContextOptions &
-      StorageOptions
+    args: OurStreamObjectArgs<T>
   ): Promise<
     StreamObjectResult<DeepPartial<T>, T, never> & GenerationOutputMetadata
   > {
     // TODO: unify all this shared code between all the generate* and stream* functions
-    const { prompt, messages: raw, ...rest } = args;
-    const messages = promptOrMessagesToCoreMessages({ prompt, messages: raw });
-    const contextMessages = await this.fetchContextMessages(ctx, {
-      ...args,
-      userId,
-      threadId,
-      messages,
-    });
-    let messageId: string | undefined;
-    if (threadId) {
-      const saved = await this.saveMessages(ctx, {
-        threadId,
-        userId,
-        messages: args.saveAllInputMessages ? messages : messages.slice(-1),
-        pending: true,
-        parentMessageId: args.parentMessageId,
-      });
-      messageId = saved.lastMessageId;
-    }
-    const result = streamObject<T>({
-      model: this.options.thread,
-      messages: [...contextMessages, ...messages],
-      ...rest,
+    const { args: aiArgs, messageId } = await this.saveMessagesAndFetchContext(
+      ctx,
+      { ...args, userId, threadId }
+    );
+    const stream = streamObject<T>({
+      model: this.options.chat,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ...(aiArgs as any),
       onError: async (error) => {
         console.error("onError", error);
         return args.onError?.(error);
       },
       onFinish: async (result) => {
-        // console.log("onFinish", result);
+        if (threadId && messageId && args.saveOutputMessages !== false) {
+          await this.saveObject(ctx, {
+            threadId,
+            messageId,
+            result: {
+              object: result.object,
+              finishReason: "stop",
+              usage: result.usage,
+              warnings: result.warnings,
+              request: await stream.request,
+              response: result.response,
+              providerMetadata: result.providerMetadata,
+              experimental_providerMetadata:
+                result.experimental_providerMetadata,
+              logprobs: undefined,
+              toJsonResponse: stream.toTextStreamResponse,
+            },
+          });
+        }
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        return args.onFinish?.(result as any);
       },
     }) as StreamObjectResult<DeepPartial<T>, T, never>;
-    return { ...result, messageId };
+    return { ...stream, messageId };
+  }
+
+  async saveObject(
+    ctx: RunMutationCtx,
+    args: {
+      threadId: string;
+      messageId: string;
+      result: GenerateObjectResult<unknown>;
+    }
+  ): Promise<void> {
+    const step = serializeObjectResult(args.result);
+    await ctx.runMutation(this.component.messages.addStep, {
+      threadId: args.threadId,
+      messageId: args.messageId,
+      failPendingSteps: false,
+      embeddings: await this.getEmbeddings([step.messages[0].message]),
+      step,
+    });
   }
 
   mergedContextOptions(opts: ContextOptions): ContextOptions {
@@ -725,6 +749,7 @@ export class Agent<AgentTools extends ToolSet> {
         contextOptions: v.optional(vContextOptions),
         storageOptions: v.optional(vStorageOptions),
         maxRetries: v.optional(v.number()),
+        parentMessageId: v.optional(v.string()),
 
         createThread: v.optional(
           v.object({
@@ -734,18 +759,10 @@ export class Agent<AgentTools extends ToolSet> {
             summary: v.optional(v.string()),
           })
         ),
-        continueThread: v.optional(
-          v.object({
-            threadId: v.string(),
-            userId: v.optional(v.string()),
-          })
-        ),
-        generateText: v.optional(vThreadArgs),
-        streamText: v.optional(vThreadArgs),
-        generateObject: v.optional(vObjectArgs),
-        streamObject: v.optional(
-          v.object({ ...vObjectArgs.fields, schema: v.any() })
-        ),
+        generateText: v.optional(vTextArgs),
+        streamText: v.optional(vTextArgs),
+        generateObject: v.optional(vSafeObjectArgs),
+        streamObject: v.optional(vSafeObjectArgs),
       },
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       handler: async (ctx, args): Promise<any> => {
@@ -753,49 +770,48 @@ export class Agent<AgentTools extends ToolSet> {
           spec?.contextOptions &&
           this.mergedContextOptions(spec.contextOptions);
         const maxSteps = spec?.maxSteps ?? this.options.maxSteps;
-        const maxRetries = args.maxRetries;
         const commonArgs = {
           userId: args.userId,
           threadId: args.threadId,
+          parentMessageId: args.parentMessageId,
           ...contextOptions,
           ...args.storageOptions,
         };
         if (args.createThread) {
-          return this.createThread(ctx, {
+          const { threadId } = await this.createThread(ctx, {
             userId: args.createThread.userId,
             parentThreadIds: args.createThread.parentThreadIds,
             title: args.createThread.title,
             summary: args.createThread.summary,
           });
-        } else if (args.continueThread) {
-          return this.continueThread(ctx, {
-            threadId: args.continueThread.threadId,
-            userId: args.continueThread.userId,
-          });
+          return threadId;
         } else if (args.generateText) {
-          return this.generateText(ctx, commonArgs, {
+          const value = await this.generateText(ctx, commonArgs, {
             ...args.generateText,
             maxSteps: args.generateText.maxSteps ?? maxSteps,
-            maxRetries,
           });
+          return value.text;
         } else if (args.streamText) {
-          return this.streamText(ctx, commonArgs, {
+          const value = await this.streamText(ctx, commonArgs, {
             ...args.streamText,
             maxSteps: args.streamText.maxSteps ?? maxSteps,
-            maxRetries,
           });
+          return value.text;
         } else if (args.generateObject) {
-          return this.generateObject(ctx, commonArgs, {
-            ...args.generateObject,
-            output: args.generateObject.output ?? "string",
-            maxRetries,
+          const value = await this.generateObject(ctx, commonArgs, {
+            ...(args.generateObject as GenerateObjectArgs<unknown>),
           });
+          return value.object;
         } else if (args.streamObject) {
-          return this.streamObject(ctx, commonArgs, {
-            ...args.streamObject,
-            output: args.streamObject.output ?? "string",
-            maxRetries,
+          const value = await this.streamObject(ctx, commonArgs, {
+            ...(args.streamObject as StreamObjectArgs<unknown>),
           });
+          return value.object;
+        } else {
+          throw new Error(
+            "No action specified. Maybe try :" +
+              'generateText: { prompt: "Hello world" }'
+          );
         }
       },
     });
@@ -919,16 +935,80 @@ type TextArgs<
 } & ContextOptions &
   StorageOptions;
 
-type ObjectArgs<
-  T extends {
-    model: LanguageModelV1;
-  },
-> = Omit<T, "model"> & {
-  model?: LanguageModelV1;
-} & ContextOptions &
-  StorageOptions;
+type BaseGenerateObjectOptions = StorageOptions &
+  ContextOptions &
+  CallSettings & {
+    model?: LanguageModelV1;
+    parentMessageId?: string;
+    system?: string;
+    prompt?: string;
+    messages?: CoreMessage[];
+    experimental_repairText?: RepairTextFunction;
+    experimental_telemetry?: TelemetrySettings;
+    providerOptions?: ProviderOptions;
+    experimental_providerMetadata?: ProviderMetadata;
+  };
+
+type GenerateObjectObjectOptions<T extends Record<string, unknown>> =
+  BaseGenerateObjectOptions & {
+    output: "object";
+    mode?: "auto" | "json" | "tool";
+    schema: z.Schema<T>;
+    schemaName?: string;
+    schemaDescription?: string;
+  };
+
+type GenerateObjectArrayOptions<T> = BaseGenerateObjectOptions & {
+  output: "array";
+  mode?: "auto" | "json" | "tool";
+  schema: z.Schema<T>;
+  schemaName?: string;
+  schemaDescription?: string;
+};
+
+type GenerateObjectWithEnumOptions<T extends string> =
+  BaseGenerateObjectOptions & {
+    output: "enum";
+    enum: Array<T>;
+    mode?: "auto" | "json" | "tool";
+  };
+
+type GenerateObjectNoSchemaOptions = BaseGenerateObjectOptions & {
+  schema?: undefined;
+  mode?: "json";
+};
+
+type GenerateObjectArgs<T> =
+  T extends Record<string, unknown>
+    ? GenerateObjectObjectOptions<T>
+    : T extends Array<unknown>
+      ? GenerateObjectArrayOptions<T>
+      : T extends string
+        ? GenerateObjectWithEnumOptions<T>
+        : GenerateObjectNoSchemaOptions;
+
+type StreamObjectArgs<T> =
+  T extends Record<string, unknown>
+    ? GenerateObjectObjectOptions<T>
+    : T extends Array<unknown>
+      ? GenerateObjectArrayOptions<T>
+      : GenerateObjectNoSchemaOptions;
+
+type OurObjectArgs<T> = GenerateObjectArgs<T> &
+  Pick<
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    Parameters<typeof generateObject<any>>[0],
+    "experimental_repairText" | "abortSignal"
+  >;
+
+type OurStreamObjectArgs<T> = StreamObjectArgs<T> &
+  Pick<
+    Parameters<typeof streamObject<T>>[0],
+    "onError" | "onFinish" | "abortSignal"
+  >;
 
 interface Thread<AgentTools extends ToolSet> {
+  threadId: string;
   generateText<TOOLS extends ToolSet, OUTPUT = never, OUTPUT_PARTIAL = never>(
     args: TextArgs<
       AgentTools,
@@ -951,10 +1031,13 @@ interface Thread<AgentTools extends ToolSet> {
   >;
   // TODO: add all the overloads
   generateObject<T>(
-    args: ObjectArgs<Parameters<typeof generateObject>[0]>
+    args: OurObjectArgs<T>
   ): Promise<GenerateObjectResult<T> & GenerationOutputMetadata>;
+  generateObject(
+    args: GenerateObjectNoSchemaOptions
+  ): Promise<GenerateObjectResult<JSONValue> & GenerationOutputMetadata>;
   streamObject<T>(
-    args: ObjectArgs<Parameters<typeof streamObject<T>>[0]>
+    args: OurStreamObjectArgs<T>
   ): Promise<
     StreamObjectResult<DeepPartial<T>, T, never> & GenerationOutputMetadata
   >;
