@@ -11,6 +11,7 @@ import type {
   ToolChoice,
   ToolExecutionOptions,
   ToolSet,
+  Message as UIMessage,
 } from "ai";
 import { generateObject, generateText, streamObject, streamText } from "ai";
 import { assert } from "convex-helpers";
@@ -418,38 +419,20 @@ export class Agent<AgentTools extends ToolSet> {
   ): Promise<
     GenerateTextResult<TOOLS & AgentTools, OUTPUT> & GenerationOutputMetadata
   > {
-    const { prompt, messages: raw, parentMessageId, ...rest } = args;
-    const messages = promptOrMessagesToCoreMessages({ prompt, messages: raw });
-    const contextMessages = await this.fetchContextMessages(ctx, {
-      ...args,
-      userId,
-      threadId,
-      messages,
-    });
-    let messageId: string | undefined;
-    if (threadId) {
-      const saved = await this.saveMessages(ctx, {
-        threadId,
-        userId,
-        messages: args.saveAllInputMessages ? messages : messages.slice(-1),
-        pending: true,
-        // We should just fail if you pass in an ID for the message, fail those children
-        // failPendingSteps: true,
-        parentMessageId,
-      });
-      messageId = saved.lastMessageId;
-    }
+    const { args: aiArgs, messageId } = await this.saveMessagesAndFetchContext(
+      ctx,
+      { ...args, userId, threadId }
+    );
     const toolCtx = { ...ctx, userId, threadId, messageId };
     const tools = wrapTools(toolCtx, this.options.tools, args.tools) as TOOLS;
+    const maxSteps = args.maxSteps ?? this.options.maxSteps;
     try {
       const result = await generateText({
         model: this.options.chat,
-        messages: [...contextMessages, ...messages],
-        system: this.options.instructions,
-        maxSteps: this.options.maxSteps,
+        ...aiArgs,
+        maxSteps,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         toolChoice: args.toolChoice as any,
-        ...rest,
         tools,
         onStepFinish: async (step) => {
           if (threadId && messageId && args.saveOutputMessages !== false) {
@@ -490,35 +473,19 @@ export class Agent<AgentTools extends ToolSet> {
   ): Promise<
     StreamTextResult<TOOLS, PARTIAL_OUTPUT> & GenerationOutputMetadata
   > {
-    const { prompt, messages: raw, parentMessageId, ...rest } = args;
-    const messages = promptOrMessagesToCoreMessages({ prompt, messages: raw });
-    const contextMessages = await this.fetchContextMessages(ctx, {
-      ...args,
-      userId,
-      threadId,
-      messages,
-    });
-    let messageId: string | undefined;
-    if (threadId) {
-      const saved = await this.saveMessages(ctx, {
-        threadId,
-        userId,
-        messages: args.saveAllInputMessages ? messages : messages.slice(-1),
-        pending: true,
-        parentMessageId,
-      });
-      messageId = saved.lastMessageId;
-    }
+    const { args: aiArgs, messageId } = await this.saveMessagesAndFetchContext(
+      ctx,
+      { ...args, userId, threadId }
+    );
     const toolCtx = { ...ctx, userId, threadId, messageId };
     const tools = wrapTools(toolCtx, this.options.tools, args.tools) as TOOLS;
+    const maxSteps = args.maxSteps ?? this.options.maxSteps;
     const result = streamText({
       model: this.options.chat,
-      messages: [...contextMessages, ...messages],
-      system: this.options.instructions,
-      maxSteps: this.options.maxSteps,
+      ...aiArgs,
+      maxSteps,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       toolChoice: args.toolChoice as any,
-      ...rest,
       tools,
       onChunk: async (chunk) => {
         // console.log("onChunk", chunk);
@@ -550,36 +517,81 @@ export class Agent<AgentTools extends ToolSet> {
     return { ...result, messageId };
   }
 
-  // TODO: add the crazy number of overloads to get types through
-  async generateObject<T>(
-    ctx: RunActionCtx,
-    { userId, threadId }: { userId?: string; threadId?: string },
-    args: ObjectArgs<Parameters<typeof generateObject>[0], "model">
-  ): Promise<GenerateObjectResult<T> & GenerationOutputMetadata> {
-    const { prompt, messages: raw, parentMessageId, ...rest } = args;
-    const messages = promptOrMessagesToCoreMessages({ prompt, messages: raw });
-    const contextMessages = await this.fetchContextMessages(ctx, {
-      ...args,
+  async saveMessagesAndFetchContext<
+    T extends {
+      prompt?: string;
+      messages?: CoreMessage[] | Omit<UIMessage, "id">[];
+      system?: string;
+    },
+  >(
+    ctx: RunActionCtx | RunMutationCtx,
+    {
       userId,
       threadId,
+      parentMessageId,
+      saveAllInputMessages,
+      system,
+      ...args
+    }: {
+      userId: string | undefined;
+      threadId: string | undefined;
+      parentMessageId?: string;
+      saveAllInputMessages?: boolean;
+      saveAnyInputMessages?: boolean;
+    } & ContextOptions &
+      T
+  ): Promise<{
+    args: T;
+    messageId: string | undefined;
+  }> {
+    const messages = promptOrMessagesToCoreMessages(args);
+    const contextMessages = await this.fetchContextMessages(ctx, {
       messages,
+      parentMessageId,
+      userId,
+      threadId,
+      ...args,
     });
     let messageId: string | undefined;
     if (threadId) {
       const saved = await this.saveMessages(ctx, {
         threadId,
         userId,
-        messages: args.saveAllInputMessages ? messages : messages.slice(-1),
+        messages: saveAllInputMessages ? messages : messages.slice(-1),
         pending: true,
+        // We should just fail if you pass in an ID for the message, fail those children
+        // failPendingSteps: true,
         parentMessageId,
       });
       messageId = saved.lastMessageId;
     }
+    const { prompt: _, ...rest } = args;
+    return {
+      args: {
+        ...rest,
+        system: system ?? this.options.instructions,
+        messages: [...contextMessages, ...messages],
+      } as T,
+      messageId,
+    };
+  }
+
+  async generateObject<T>(
+    ctx: RunActionCtx,
+    { userId, threadId }: { userId?: string; threadId?: string },
+    args: OurObjectArgs<T>
+  ): Promise<GenerateObjectResult<T> & GenerationOutputMetadata> {
+    const { args: aiArgs, messageId } = await this.saveMessagesAndFetchContext(
+      ctx,
+      { ...args, userId, threadId }
+    );
+
     const result = (await generateObject({
       model: this.options.chat,
-      messages: [...contextMessages, ...messages],
-      ...rest,
-    })) as GenerateObjectResult<T>;
+      ...aiArgs,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any)) as GenerateObjectResult<T>;
+
     if (threadId && messageId && args.saveOutputMessages !== false) {
       await this.saveObject(ctx, { threadId, messageId, result });
     }
@@ -589,40 +601,25 @@ export class Agent<AgentTools extends ToolSet> {
   async streamObject<T>(
     ctx: RunMutationCtx,
     { userId, threadId }: { userId?: string; threadId?: string },
-    args: ObjectArgs<Parameters<typeof streamObject<T>>[0]>
+    args: OurStreamObjectArgs<T>
   ): Promise<
     StreamObjectResult<DeepPartial<T>, T, never> & GenerationOutputMetadata
   > {
     // TODO: unify all this shared code between all the generate* and stream* functions
-    const { prompt, messages: raw, parentMessageId, ...rest } = args;
-    const messages = promptOrMessagesToCoreMessages({ prompt, messages: raw });
-    const contextMessages = await this.fetchContextMessages(ctx, {
-      ...args,
-      userId,
-      threadId,
-      messages,
-    });
-    let messageId: string | undefined;
-    if (threadId) {
-      const saved = await this.saveMessages(ctx, {
-        threadId,
-        userId,
-        messages: args.saveAllInputMessages ? messages : messages.slice(-1),
-        pending: true,
-        parentMessageId,
-      });
-      messageId = saved.lastMessageId;
-    }
+    const { args: aiArgs, messageId } = await this.saveMessagesAndFetchContext(
+      ctx,
+      { ...args, userId, threadId }
+    );
     const stream = streamObject<T>({
       model: this.options.chat,
-      messages: [...contextMessages, ...messages],
-      ...rest,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ...(aiArgs as any),
       onError: async (error) => {
         console.error("onError", error);
         return args.onError?.(error);
       },
       onFinish: async (result) => {
-        if (threadId && messageId) {
+        if (threadId && messageId && args.saveOutputMessages !== false) {
           await this.saveObject(ctx, {
             threadId,
             messageId,
@@ -641,7 +638,8 @@ export class Agent<AgentTools extends ToolSet> {
             },
           });
         }
-        return args.onFinish?.(result);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        return args.onFinish?.(result as any);
       },
     }) as StreamObjectResult<DeepPartial<T>, T, never>;
     return { ...stream, messageId };
@@ -782,15 +780,11 @@ export class Agent<AgentTools extends ToolSet> {
           });
         } else if (args.generateObject) {
           return this.generateObject(ctx, commonArgs, {
-            ...(args.generateObject as ObjectArgs<
-              Parameters<typeof generateObject>[0]
-            >),
+            ...(args.generateObject as GenerateObjectArgs<unknown>),
           });
         } else if (args.streamObject) {
           return this.streamObject(ctx, commonArgs, {
-            ...(args.streamObject as ObjectArgs<
-              Parameters<typeof streamObject<unknown>>[0]
-            >),
+            ...(args.streamObject as StreamObjectArgs<unknown>),
           });
         }
       },
