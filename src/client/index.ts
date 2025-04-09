@@ -26,7 +26,7 @@ import {
 import { internalActionGeneric } from "convex/server";
 import { Infer, v, Validator } from "convex/values";
 import { z } from "zod";
-import { api } from "../component/_generated/api";
+import { api, Mounts } from "../component/_generated/api";
 import {
   validateVectorDimension,
   VectorDimension,
@@ -110,7 +110,7 @@ type CoreMessageMaybeWithId = CoreMessage & { id?: string | undefined };
 
 export class Agent<AgentTools extends ToolSet> {
   constructor(
-    public component: UseApi<typeof api>,
+    public component: UseApi<Mounts>,
     public options: {
       name?: string;
       chat: LanguageModelV1;

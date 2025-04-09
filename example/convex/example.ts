@@ -123,7 +123,7 @@ export const generateObject = action({
   args: { prompt: v.string() },
   handler: async (ctx, { prompt }) => {
     const { threadId, thread } = await supportAgent.createThread(ctx, {});
-    const result = await thread.generateObject({
+    const result = await thread.streamObject({
       output: "object",
       schema: z.object({
         name: z.string(),
