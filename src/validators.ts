@@ -299,18 +299,88 @@ export const vStorageOptions = v.object({
   saveAllOutputMessages: v.optional(v.boolean()),
 });
 
-export const vThreadArgs = v.object({
-  maxSteps: v.optional(v.number()),
+const vPromptFields = {
+  system: v.optional(v.string()),
   prompt: v.optional(v.string()),
   messages: v.optional(v.array(vMessage)),
-});
+};
 
-export const vObjectArgs = v.object({
-  output: v.optional(v.any()),
-  mode: v.optional(v.literal("json")),
-  prompt: v.optional(v.string()),
-  messages: v.optional(v.array(vMessage)),
+export const vCallSettingsFields = {
+  maxTokens: v.optional(v.number()),
+  temperature: v.optional(v.number()),
+  topP: v.optional(v.number()),
+  topK: v.optional(v.number()),
+  presencePenalty: v.optional(v.number()),
+  frequencyPenalty: v.optional(v.number()),
+  seed: v.optional(v.number()),
+  maxRetries: v.optional(v.number()),
+  headers: v.optional(v.record(v.string(), v.string())),
+};
+
+export const vTextArgs = v.object({
+  ...vCallSettingsFields,
+  ...vPromptFields,
+  toolChoice: v.optional(
+    v.union(
+      v.literal("auto"),
+      v.literal("none"),
+      v.literal("required"),
+      v.object({
+        type: v.literal("tool"),
+        toolName: v.string(),
+      })
+    )
+  ),
+  maxSteps: v.optional(v.number()),
+  experimental_continueSteps: v.optional(v.boolean()),
+  providerOptions,
+  experimental_providerMetadata,
 });
+export type TextArgs = Infer<typeof vTextArgs>;
+
+const objectArgsCommonFields = {
+  ...vCallSettingsFields,
+  ...vPromptFields,
+  providerOptions,
+  experimental_providerMetadata,
+};
+
+export const vSafeObjectArgs = v.union(
+  v.object({
+    ...objectArgsCommonFields,
+    output: v.optional(v.literal("object")),
+    schema: v.any(), // JSON schema
+    schemaName: v.optional(v.string()),
+    schemaDescription: v.optional(v.string()),
+    mode: v.optional(
+      v.union(v.literal("auto"), v.literal("json"), v.literal("tool"))
+    ),
+  }),
+  v.object({
+    ...objectArgsCommonFields,
+    output: v.optional(v.literal("array")),
+    schema: v.any(), // JSON schema
+    schemaName: v.optional(v.string()),
+    schemaDescription: v.optional(v.string()),
+    mode: v.optional(
+      v.union(v.literal("auto"), v.literal("json"), v.literal("tool"))
+    ),
+  }),
+  v.object({
+    ...objectArgsCommonFields,
+    output: v.optional(v.literal("enum")),
+    enum: v.array(v.string()),
+    mode: v.optional(
+      v.union(v.literal("auto"), v.literal("json"), v.literal("tool"))
+    ),
+  }),
+  v.object({
+    ...objectArgsCommonFields,
+    output: v.literal("no-schema"),
+    mode: v.optional(v.literal("json")),
+  })
+);
+export type SafeObjectArgs = Infer<typeof vSafeObjectArgs>;
 
 export const vEmbeddingsWithMetadata = v.object({
   vectors: v.array(v.union(v.array(v.number()), v.null())),

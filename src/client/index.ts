@@ -33,9 +33,9 @@ import { DEFAULT_MESSAGE_RANGE, extractText } from "../shared";
 import {
   SearchOptions,
   vContextOptions,
-  vObjectArgs,
+  vSafeObjectArgs,
   vStorageOptions,
-  vThreadArgs,
+  vTextArgs,
 } from "../validators";
 import { RunActionCtx, RunMutationCtx, RunQueryCtx, UseApi } from "./types";
 
@@ -745,12 +745,10 @@ export class Agent<AgentTools extends ToolSet> {
             userId: v.optional(v.string()),
           })
         ),
-        generateText: v.optional(vThreadArgs),
-        streamText: v.optional(vThreadArgs),
-        generateObject: v.optional(vObjectArgs),
-        streamObject: v.optional(
-          v.object({ ...vObjectArgs.fields, schema: v.any() })
-        ),
+        generateText: v.optional(vTextArgs),
+        streamText: v.optional(vTextArgs),
+        generateObject: v.optional(vSafeObjectArgs),
+        streamObject: v.optional(vSafeObjectArgs),
       },
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       handler: async (ctx, args): Promise<any> => {
@@ -758,10 +756,10 @@ export class Agent<AgentTools extends ToolSet> {
           spec?.contextOptions &&
           this.mergedContextOptions(spec.contextOptions);
         const maxSteps = spec?.maxSteps ?? this.options.maxSteps;
-        const maxRetries = args.maxRetries;
         const commonArgs = {
           userId: args.userId,
           threadId: args.threadId,
+          parentMessageId: args.parentMessageId,
           ...contextOptions,
           ...args.storageOptions,
         };
@@ -781,25 +779,23 @@ export class Agent<AgentTools extends ToolSet> {
           return this.generateText(ctx, commonArgs, {
             ...args.generateText,
             maxSteps: args.generateText.maxSteps ?? maxSteps,
-            maxRetries,
           });
         } else if (args.streamText) {
           return this.streamText(ctx, commonArgs, {
             ...args.streamText,
             maxSteps: args.streamText.maxSteps ?? maxSteps,
-            maxRetries,
           });
         } else if (args.generateObject) {
           return this.generateObject(ctx, commonArgs, {
-            ...args.generateObject,
-            output: args.generateObject.output ?? "string",
-            maxRetries,
+            ...(args.generateObject as ObjectArgs<
+              Parameters<typeof generateObject>[0]
+            >),
           });
         } else if (args.streamObject) {
           return this.streamObject(ctx, commonArgs, {
-            ...args.streamObject,
-            output: args.streamObject.output ?? "string",
-            maxRetries,
+            ...(args.streamObject as ObjectArgs<
+              Parameters<typeof streamObject<unknown>>[0]
+            >),
           });
         }
       },
@@ -930,6 +926,7 @@ type ObjectArgs<
   },
 > = Omit<T, "model"> & {
   model?: LanguageModelV1;
+  parentMessageId?: string;
 } & ContextOptions &
   StorageOptions;
 
