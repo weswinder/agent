@@ -1,6 +1,7 @@
 import {
   convertToCoreMessages,
   coreMessageSchema,
+  GenerateObjectResult,
   type AssistantContent,
   type CoreMessage,
   type DataContent,
@@ -11,8 +12,12 @@ import {
   type Message as UIMessage,
   type UserContent,
 } from "ai";
-import { MessageWithFileAndId, Step } from "./validators";
 import { assert } from "convex-helpers";
+import {
+  MessageWithFileAndId,
+  Step,
+  StepWithMessagesWithFileAndId,
+} from "./validators";
 
 export type SerializeUrlsAndUint8Arrays<T> = T extends URL
   ? string
@@ -111,6 +116,41 @@ export function serializeNewMessagesInStep<TOOLS extends ToolSet>(
     );
   }
   return messages;
+}
+
+export function serializeObjectResult(
+  result: GenerateObjectResult<unknown>
+): StepWithMessagesWithFileAndId {
+  const text = JSON.stringify(result.object);
+  const serializedMessage = serializeMessageWithId({
+    role: "assistant" as const,
+    content: text,
+    id: result.response.id,
+  });
+
+  const messages = [serializedMessage];
+
+  return {
+    messages,
+    step: {
+      text,
+      isContinued: false,
+      stepType: "initial",
+      toolCalls: [],
+      toolResults: [],
+      usage: result.usage,
+      warnings: result.warnings,
+      finishReason: result.finishReason,
+      request: result.request,
+      response: {
+        ...result.response,
+        timestamp: result.response.timestamp.getTime(),
+        messages,
+      },
+      providerMetadata: result.providerMetadata,
+      experimental_providerMetadata: result.experimental_providerMetadata,
+    },
+  };
 }
 
 export function deserializeContent(content: SerializedContent): Content {

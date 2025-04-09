@@ -13,19 +13,11 @@ import type {
   ToolSet,
 } from "ai";
 import { generateObject, generateText, streamObject, streamText } from "ai";
-import { api } from "../component/_generated/api";
-import {
-  SearchOptions,
-  vContextOptions,
-  vObjectArgs,
-  vStorageOptions,
-  vThreadArgs,
-} from "../validators";
-import { RunActionCtx, RunMutationCtx, RunQueryCtx, UseApi } from "./types";
 import { assert } from "convex-helpers";
 import { ConvexToZod, convexToZod } from "convex-helpers/server/zod";
 import { internalActionGeneric } from "convex/server";
 import { Infer, v, Validator } from "convex/values";
+import { api } from "../component/_generated/api";
 import {
   validateVectorDimension,
   VectorDimension,
@@ -34,9 +26,18 @@ import {
   promptOrMessagesToCoreMessages,
   serializeMessageWithId,
   serializeNewMessagesInStep,
+  serializeObjectResult,
   serializeStep,
 } from "../mapping";
 import { DEFAULT_MESSAGE_RANGE, extractText } from "../shared";
+import {
+  SearchOptions,
+  vContextOptions,
+  vObjectArgs,
+  vStorageOptions,
+  vThreadArgs,
+} from "../validators";
+import { RunActionCtx, RunMutationCtx, RunQueryCtx, UseApi } from "./types";
 
 export type ContextOptions = {
   /**
@@ -432,6 +433,8 @@ export class Agent<AgentTools extends ToolSet> {
         userId,
         messages: args.saveAllInputMessages ? messages : messages.slice(-1),
         pending: true,
+        // We should just fail if you pass in an ID for the message, fail those children
+        // failPendingSteps: true,
         parentMessageId: args.parentMessageId,
       });
       messageId = saved.lastMessageId;
@@ -531,14 +534,9 @@ export class Agent<AgentTools extends ToolSet> {
         }
         return args.onError?.(error);
       },
-      onFinish: async (result) => {
-        result.response.messages.forEach((message) => {
-          // console.log("onFinish", message);
-        });
-        return args.onFinish?.(result);
-      },
       onStepFinish: async (step) => {
         // console.log("onStepFinish", step);
+        // TODO: compare delta to the output. internally drop the deltas when committing
         if (threadId && messageId) {
           await this.saveStep(ctx, {
             threadId,
@@ -586,40 +584,10 @@ export class Agent<AgentTools extends ToolSet> {
       ...rest,
     })) as GenerateObjectResult<T>;
     if (threadId && messageId && args.saveOutputMessages !== false) {
-      // await this.saveObject(ctx, { threadId, messageId, result });
+      await this.saveObject(ctx, { threadId, messageId, result });
     }
     return { ...result, messageId };
   }
-
-  // async saveObject<T>(
-  //   ctx: RunMutationCtx,
-  //   args: {
-  //     threadId: string;
-  //     messageId: string;
-  //     result: GenerateObjectResult<T>;
-  //   }
-  // ): Promise<void> {
-  //   await ctx.runMutation(this.component.messages.addObject, {
-  //     threadId: args.threadId,
-  //     step: {
-  //       request: result.request,
-  //       response: {
-  //         ...result.response,
-  //         messages: [
-  //           {
-  //             role: "assistant",
-
-  //             content: result.object,
-  //           },
-  //         ],
-  //       },
-  //       finishReason: result.finishReason,
-  //       providerMetadata: result.providerMetadata,
-  //       usage: result.usage,
-  //       warnings: result.warnings,
-  //     },
-  //   });
-  // }
 
   async streamObject<T>(
     ctx: RunMutationCtx,
@@ -651,7 +619,7 @@ export class Agent<AgentTools extends ToolSet> {
       });
       messageId = saved.lastMessageId;
     }
-    const result = streamObject<T>({
+    const stream = streamObject<T>({
       model: this.options.thread,
       messages: [...contextMessages, ...messages],
       ...rest,
@@ -660,10 +628,47 @@ export class Agent<AgentTools extends ToolSet> {
         return args.onError?.(error);
       },
       onFinish: async (result) => {
-        // console.log("onFinish", result);
+        if (threadId && messageId) {
+          await this.saveObject(ctx, {
+            threadId,
+            messageId,
+            result: {
+              object: result.object,
+              finishReason: "stop",
+              usage: result.usage,
+              warnings: result.warnings,
+              request: await stream.request,
+              response: result.response,
+              providerMetadata: result.providerMetadata,
+              experimental_providerMetadata:
+                result.experimental_providerMetadata,
+              logprobs: undefined,
+              toJsonResponse: stream.toTextStreamResponse,
+            },
+          });
+        }
+        return args.onFinish?.(result);
       },
     }) as StreamObjectResult<DeepPartial<T>, T, never>;
-    return { ...result, messageId };
+    return { ...stream, messageId };
+  }
+
+  async saveObject(
+    ctx: RunMutationCtx,
+    args: {
+      threadId: string;
+      messageId: string;
+      result: GenerateObjectResult<unknown>;
+    }
+  ): Promise<void> {
+    const step = serializeObjectResult(args.result);
+    await ctx.runMutation(this.component.messages.addStep, {
+      threadId: args.threadId,
+      messageId: args.messageId,
+      failPendingSteps: false,
+      embeddings: await this.getEmbeddings([step.messages[0].message]),
+      step,
+    });
   }
 
   mergedContextOptions(opts: ContextOptions): ContextOptions {

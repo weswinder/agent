@@ -186,6 +186,14 @@ export const vResponse = v.object({
   body: v.optional(v.any()),
 });
 
+export const vResponseWithoutMessages = v.object({
+  id: v.string(),
+  timestamp: v.number(),
+  modelId: v.string(),
+  headers: v.optional(v.record(v.string(), v.string())), // clear these?
+  body: v.optional(v.any()),
+});
+
 export const vFinishReason = v.union(
   v.literal("stop"),
   v.literal("length"),
@@ -250,6 +258,18 @@ export const vStepWithMessages = v.object({
 });
 export type StepWithMessagesWithFileAndId = Infer<typeof vStepWithMessages>;
 
+export const vObjectResult = v.object({
+  request: vRequest,
+  response: vResponseWithoutMessages,
+  finishReason: vFinishReason,
+  usage: v.optional(v.any()),
+  object: v.any(),
+  error: v.optional(v.string()),
+  warnings: v.optional(v.array(vLanguageModelV1CallWarning)),
+  providerMetadata: providerOptions,
+  experimental_providerMetadata,
+});
+export type ObjectResult = Infer<typeof vObjectResult>;
 export const vSearchOptions = v.object({
   vector: v.optional(v.array(v.number())),
   vectorModel: v.optional(v.string()),
