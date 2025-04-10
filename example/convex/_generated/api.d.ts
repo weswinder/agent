@@ -1212,7 +1212,7 @@ export declare const components: {
         "internal",
         {
           order?: "asc" | "desc";
-          paginationOpts: {
+          paginationOpts?: {
             cursor: string | null;
             endCursor?: string | null;
             id?: number;

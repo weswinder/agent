@@ -50,14 +50,14 @@ export const getThreadsByUserId = query({
   args: {
     userId: v.string(),
     order: v.optional(v.union(v.literal("asc"), v.literal("desc"))),
-    paginationOpts: paginationOptsValidator,
+    paginationOpts: v.optional(paginationOptsValidator),
   },
   handler: async (ctx, args) => {
     const threads = await paginator(ctx.db, schema)
       .query("threads")
       .withIndex("userId_order", (q) => q.eq("userId", args.userId))
       .order(args.order ?? "desc")
-      .paginate(args.paginationOpts);
+      .paginate(args.paginationOpts ?? { cursor: null, numItems: 100 });
     return threads;
   },
   returns: paginationResultValidator(v.doc("threads")),

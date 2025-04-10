@@ -1170,7 +1170,7 @@ export type Mounts = {
       "public",
       {
         order?: "asc" | "desc";
-        paginationOpts: {
+        paginationOpts?: {
           cursor: string | null;
           endCursor?: string | null;
           id?: number;
