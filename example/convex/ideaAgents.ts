@@ -1,3 +1,6 @@
+/**
+ * This example is a bit of a work in progress, but shows how to chain together calls to agents.
+ */
 import { action, ActionCtx, query } from "./_generated/server";
 import { api, components } from "./_generated/api";
 import { Agent } from "@convex-dev/agent";
@@ -5,10 +8,8 @@ import { v } from "convex/values";
 import { openai } from "@ai-sdk/openai";
 
 import { createTool } from "@convex-dev/agent";
-import { Doc, Id } from "./_generated/dataModel";
+import { Id } from "./_generated/dataModel";
 import { MessageDoc } from "../../src/client/types";
-import { paginationOptsValidator, PaginationResult } from "convex/server";
-import { z } from "zod";
 
 /**
  * TOOLS
@@ -18,13 +19,29 @@ export const ideaSearch = createTool({
   args: v.object({
     query: v.string(),
   }),
-  handler: async (ctx, { query }): Promise<Doc<"ideas">[]> =>
-    ctx.runQuery(api.ideas.searchIdeas, { query }),
+  handler: async (
+    ctx,
+    { query },
+  ): Promise<
+    Array<{
+      title: string;
+      summary: string;
+      tags: string[];
+      ideaId: Id<"ideas">;
+      createdAt: string;
+      lastUpdated: string;
+    }>
+  > => {
+    console.log("searching for ideas", query);
+    const ideas = await ctx.runQuery(api.ideas.searchIdeas, { query });
+    console.log("found ideas", ideas);
+    return ideas;
+  },
 });
 
 export const ideaCreation = createTool({
   description:
-    "Create an idea, optionally merging with an existing idea. " +
+    "Create a new idea with an initial entryId. " +
     "You can pass in the entryId of what inspired the idea.",
   args: v.object({
     title: v.string(),
@@ -32,33 +49,41 @@ export const ideaCreation = createTool({
     tags: v.array(v.string()),
     entryId: v.union(v.id("entries"), v.null()),
   }),
-  handler: async (ctx, args): Promise<Id<"ideas">> =>
-    ctx.runMutation(api.ideas.createIdea, args),
+  handler: async (ctx, args): Promise<Id<"ideas">> => {
+    console.log("creating idea", args);
+    return ctx.runMutation(api.ideas.createIdea, args);
+  },
 });
 
 export const ideaUpdate = createTool({
-  description: "Update an idea's title, summary, or tags",
+  description:
+    "Update an idea identified by ideaId to include an entryId, and update the title, summary, and tags accordingly",
   args: v.object({
-    id: v.id("ideas"),
+    ideaId: v.id("ideas"),
     title: v.union(v.string(), v.null()),
     summary: v.union(v.string(), v.null()),
     tags: v.union(v.array(v.string()), v.null()),
+    entryId: v.id("entries"),
   }),
-  handler: (ctx, args): Promise<null> =>
-    ctx.runMutation(api.ideas.updateIdea, args),
+  handler: async (ctx, args) => {
+    console.log("updating idea", args);
+    await ctx.runMutation(api.ideas.updateIdea, args);
+  },
 });
 
 export const ideaMerge = createTool({
   description:
     "Merge two ideas, deleting the source and adding its entries to the target",
   args: v.object({
-    sourceId: v.id("ideas"),
-    targetId: v.id("ideas"),
+    sourceIdeaId: v.id("ideas"),
+    targetIdeaId: v.id("ideas"),
     newTargetTitle: v.string(),
     newTargetSummary: v.string(),
   }),
-  handler: (ctx, args): Promise<null> =>
-    ctx.runMutation(api.ideas.mergeIdeas, args),
+  handler: (ctx, args): Promise<null> => {
+    console.log("merging ideas", args);
+    return ctx.runMutation(api.ideas.mergeIdeas, args);
+  },
 });
 
 export const attachEntryToIdea = createTool({
@@ -67,8 +92,10 @@ export const attachEntryToIdea = createTool({
     ideaId: v.id("ideas"),
     entryId: v.id("entries"),
   }),
-  handler: (ctx, args): Promise<null> =>
-    ctx.runMutation(api.ideas.attachEntryToIdea, args),
+  handler: (ctx, args): Promise<null> => {
+    console.log("attaching entry to idea", args);
+    return ctx.runMutation(api.ideas.attachEntryToIdea, args);
+  },
 });
 
 /**
@@ -80,13 +107,13 @@ const ideaManagerAgent = new Agent(components.agent, {
   chat: openai.chat("gpt-4o"), // Fancier model for discerning between ideas
   textEmbedding: openai.embedding("text-embedding-3-small"),
   instructions:
-    "You are a helpful assistant that helps manage ideas. " +
+    "You are a helpful assistant that helps manage ideas identified by ideaId. " +
     "You can search, create, and merge ideas. " +
     "You can search for existing ideas by space-delimited keywords. " +
     "Over time you should take feedback on how to categorize and merge ideas. " +
-    "Be willing to undo mistakes and get better. When in doubt, make separate " +
-    "ideas until asked to merge them." +
+    "Be willing to undo mistakes and get better. When in doubt, merge ideas. " +
     "When passing IDs, you MUST pass a real ID verbatim. " +
+    "entryId is for random thoughts, and ideaId is for ideas which have associated entryIds. " +
     "If you don't have one, search for one first.",
   tools: { ideaCreation, ideaUpdate, ideaMerge, ideaSearch },
   contextOptions: {
@@ -94,6 +121,7 @@ const ideaManagerAgent = new Agent(components.agent, {
     searchOtherThreads: true,
     includeToolCalls: true,
   },
+  maxSteps: 10,
 });
 
 const ideaDevelopmentAgent = new Agent(components.agent, {
@@ -116,6 +144,7 @@ const ideaDevelopmentAgent = new Agent(components.agent, {
       vectorSearch: true,
     },
   },
+  maxSteps: 10,
 });
 
 /**
@@ -135,15 +164,22 @@ export const submitRandomThought = action({
       content: args.entry,
       ideaId: null,
     });
+    console.log("entryId", entryId);
 
-    const result = await thread.generateText({
-      prompt: `
+    try {
+      const result = await thread.generateText({
+        prompt: `
       I'm just had a random thought: ${args.entry}.
       The entryId for this is ${entryId}.
       Please help me organize it with existing ideas.
       `,
-    });
-    return result.text;
+      });
+      console.log("result", result.text);
+      return result.text;
+    } catch (e) {
+      console.error("error while organizing thought", e);
+      return "Error: " + (e as Error).message;
+    }
     // const result = await thread.generateObject({
     //   prompt: `
     //   I'm just had a random thought: ${args.entry}.
@@ -164,8 +200,7 @@ export const submitRandomThought = action({
     //   Please help me develop this idea.
     //   `,
     // });
-
-    return result.text;
+    // return developerResult.text;
   },
 });
 

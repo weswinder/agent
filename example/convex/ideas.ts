@@ -51,18 +51,33 @@ export const searchIdeas = query({
       )
       .take(10);
 
-    return [
-      ...ideasByTitle,
-      ...ideasBySummary.filter(
-        (i) => !ideasByTitle.find((t) => t._id === i._id),
-      ),
-    ];
+    return await Promise.all(
+      [
+        ...ideasByTitle,
+        ...ideasBySummary.filter(
+          (i) => !ideasByTitle.find((t) => t._id === i._id),
+        ),
+      ].map(async (idea) => {
+        const tags = await ctx.db
+          .query("ideaTags")
+          .withIndex("by_ideaId", (q) => q.eq("ideaId", idea._id))
+          .collect();
+        return {
+          title: idea.title,
+          summary: idea.summary,
+          tags: tags.map((t) => t.tag),
+          ideaId: idea._id,
+          createdAt: new Date(idea._creationTime).toISOString(),
+          lastUpdated: new Date(idea.lastUpdated).toISOString(),
+        };
+      }),
+    );
   },
 });
 
 export const updateIdea = mutation({
   args: {
-    id: v.id("ideas"),
+    ideaId: v.id("ideas"),
     title: v.union(v.string(), v.null()),
     summary: v.union(v.string(), v.null()),
     tags: v.union(v.array(v.string()), v.null()),
@@ -77,12 +92,12 @@ export const updateIdea = mutation({
     if (args.summary) {
       patch.summary = args.summary;
     }
-    await ctx.db.patch(args.id, patch);
+    await ctx.db.patch(args.ideaId, patch);
 
     if (args.tags) {
       const existingTags = await ctx.db
         .query("ideaTags")
-        .withIndex("by_ideaId", (q) => q.eq("ideaId", args.id))
+        .withIndex("by_ideaId", (q) => q.eq("ideaId", args.ideaId))
         .collect();
 
       for (const tag of existingTags) {
@@ -91,7 +106,7 @@ export const updateIdea = mutation({
 
       for (const tag of args.tags) {
         await ctx.db.insert("ideaTags", {
-          ideaId: args.id,
+          ideaId: args.ideaId,
           tag,
         });
       }
@@ -101,36 +116,36 @@ export const updateIdea = mutation({
 
 export const mergeIdeas = mutation({
   args: {
-    sourceId: v.id("ideas"),
-    targetId: v.id("ideas"),
+    sourceIdeaId: v.id("ideas"),
+    targetIdeaId: v.id("ideas"),
     newTargetTitle: v.union(v.string(), v.null()),
     newTargetSummary: v.union(v.string(), v.null()),
   },
   handler: async (ctx, args) => {
-    await ctx.db.patch(args.sourceId, {
-      mergedInto: args.targetId,
+    await ctx.db.patch(args.sourceIdeaId, {
+      mergedInto: args.targetIdeaId,
       lastUpdated: Date.now(),
     });
 
     if (args.newTargetTitle) {
-      await ctx.db.patch(args.targetId, {
+      await ctx.db.patch(args.targetIdeaId, {
         title: args.newTargetTitle,
       });
     }
 
     if (args.newTargetSummary) {
-      await ctx.db.patch(args.targetId, {
+      await ctx.db.patch(args.targetIdeaId, {
         summary: args.newTargetSummary,
       });
     }
 
     const entries = await ctx.db
       .query("entries")
-      .withIndex("by_ideaId", (q) => q.eq("ideaId", args.sourceId))
+      .withIndex("by_ideaId", (q) => q.eq("ideaId", args.sourceIdeaId))
       .collect();
 
     for (const entry of entries) {
-      await ctx.db.patch(entry._id, { ideaId: args.targetId });
+      await ctx.db.patch(entry._id, { ideaId: args.targetIdeaId });
     }
   },
 });
