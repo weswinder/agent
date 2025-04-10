@@ -9,6 +9,7 @@ export const getGeocoding = tool({
       .describe("The location to get the geocoding for, e.g. 'San Francisco'"),
   }),
   execute: async ({ location }) => {
+    console.log("getting geocoding for location", location);
     const geocodingUrl = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(location)}&count=1`;
     const geocodingResponse = await fetch(geocodingUrl);
     const geocodingData = (await geocodingResponse.json()) as {
@@ -24,6 +25,7 @@ export const getGeocoding = tool({
     }
 
     const { latitude, longitude, name } = geocodingData.results[0];
+    console.log("got geocoding for location", name, latitude, longitude);
     return { latitude, longitude, name };
   },
 });
@@ -35,6 +37,7 @@ export const getWeather = tool({
     longitude: z.number(),
   }),
   execute: async (args) => {
+    console.log("getting weather for location", args);
     const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${args.latitude}&longitude=${args.longitude}&current=temperature_2m,apparent_temperature,relative_humidity_2m,wind_speed_10m,wind_gusts_10m,weather_code`;
 
     const response = await fetch(weatherUrl);
@@ -46,6 +49,7 @@ export const getWeather = tool({
         wind_gusts_10m: number;
       };
     };
+    console.log("got weather for location", data);
     return {
       temperature: data.current.temperature_2m,
       windSpeed: data.current.wind_speed_10m,

@@ -3,7 +3,7 @@ import { WorkflowManager } from "@convex-dev/workflow";
 import { Agent, createTool } from "@convex-dev/agent";
 import { components, internal } from "./_generated/api";
 import { openai } from "@ai-sdk/openai";
-import { action, httpAction, query } from "./_generated/server";
+import { action, httpAction, mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import { z } from "zod";
 import { ThreadDoc } from "../../src/client/types";
@@ -33,6 +33,7 @@ const fashionAgent = new Agent(components.agent, {
         search: v.string(),
       }),
       handler: async (ctx, args) => {
+        console.log("getting user preferences", args);
         return {
           userId: ctx.userId,
           threadId: ctx.threadId,
@@ -42,6 +43,7 @@ const fashionAgent = new Agent(components.agent, {
       },
     }),
   },
+  maxSteps: 5,
 });
 
 // Use the agent from within a normal action:
@@ -73,8 +75,8 @@ export const continueThread = action({
 /**
  * Expose the agents as actions
  */
-export const weatherAgentStep = weatherAgent.asAction({ maxSteps: 10 });
-export const fashionAgentStep = fashionAgent.asAction();
+export const weatherAgentAction = weatherAgent.asAction({ maxSteps: 10 });
+export const fashionAgentAction = fashionAgent.asAction();
 
 /**
  * Use agent actions in a workflow
@@ -87,20 +89,32 @@ const s = internal.example; // where steps are defined
 export const weatherAgentWorkflow = workflow.define({
   args: { location: v.string() },
   handler: async (step, { location }): Promise<string> => {
-    const { threadId } = await step.runAction(s.weatherAgentStep, {
+    const threadId = await step.runAction(s.weatherAgentAction, {
       createThread: {},
     });
-    const weather = await step.runAction(s.weatherAgentStep, {
+    console.log("threadId", threadId);
+    const weather = await step.runAction(s.weatherAgentAction, {
       threadId,
       generateText: { prompt: `What is the weather in ${location}?` },
     });
-    const fashionSuggestion = await step.runAction(s.fashionAgentStep, {
+    console.log("weather", weather);
+    const fashionSuggestion = await step.runAction(s.fashionAgentAction, {
+      threadId,
       generateText: {
         prompt: `What should I wear in ${location} if the weather is ${weather}?`,
       },
     });
-    console.log(fashionSuggestion);
+    console.log("fashionSuggestion", fashionSuggestion);
     return fashionSuggestion;
+  },
+});
+
+export const startWorkflow = mutation({
+  args: { location: v.string() },
+  handler: async (ctx, { location }) => {
+    await workflow.start(ctx, internal.example.weatherAgentWorkflow, {
+      location,
+    });
   },
 });
 
