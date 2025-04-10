@@ -7,6 +7,8 @@ import { openai } from "@ai-sdk/openai";
 import { createTool } from "@convex-dev/agent";
 import { Doc, Id } from "./_generated/dataModel";
 import { MessageDoc } from "../../src/client/types";
+import { paginationOptsValidator, PaginationResult } from "convex/server";
+import { z } from "zod";
 
 /**
  * TOOLS
@@ -117,65 +119,8 @@ const ideaDevelopmentAgent = new Agent(components.agent, {
 });
 
 /**
- * AGENTS AS TOOLS TO OTHER AGENTS
+ * USING AGENTS TOGETHER
  */
-
-const ideaManager = ideaManagerAgent.asTool({
-  description:
-    "Call on me to organize and create ideas. " +
-    "Tell me the what you need, and I'll tell you what I did. " +
-    "If you want me to do something with a specific existing idea, " +
-    "tell me the ID of the idea verbatim.",
-  args: v.object({
-    id: v.optional(v.id("ideas")),
-    command: v.string(),
-  }),
-  maxSteps: 10,
-});
-
-const ideaDeveloper = ideaDevelopmentAgent.asTool({
-  description:
-    "Call on me to develop ideas. " +
-    "Tell me what the idea's ID is, and I'll tell you what I did. " +
-    "The ID should be from a real existing idea, not fabricated.",
-  args: v.object({
-    id: v.id("ideas"),
-    command: v.string(),
-  }),
-  maxSteps: 5,
-});
-
-/**
- * AGENTS AS STANDALONE ACTIONS
- */
-
-export const ideaManagerAction = ideaManagerAgent.asAction();
-export const ideaDeveloperAction = ideaDevelopmentAgent.asAction({
-  maxSteps: 5,
-});
-
-/**
- * AGENT DISPATCHERS
- */
-
-const ideaTriageAgent = new Agent(components.agent, {
-  name: "Idea Triage Agent",
-  chat: openai.chat("gpt-4o-mini"),
-  textEmbedding: openai.embedding("text-embedding-3-small"),
-  instructions:
-    "You are a helpful assistant that helps triage ideas. " +
-    "You should delegate to the manager or developer agents to help you. " +
-    "You can search for existing ideas to help triage. " +
-    "If you are given an entryId, that is different from an ideaId, " +
-    "you should delegate to the ideaManager to create an idea from the entry. " +
-    "Be willing to undo mistakes and get better.",
-  tools: { ideaSearch, ideaManager, ideaDeveloper },
-  contextOptions: {
-    recentMessages: 5,
-    searchOtherThreads: false,
-  },
-  maxSteps: 20,
-});
 
 export const submitRandomThought = action({
   args: {
@@ -184,7 +129,7 @@ export const submitRandomThought = action({
   },
   handler: async (ctx, args): Promise<string> => {
     // Get or create a thread
-    const { thread } = await getOrCreateThread(ctx, args.userId);
+    const { thread } = await getOrCreateManagerThread(ctx, args.userId);
 
     const entryId = await ctx.runMutation(api.ideas.createEntry, {
       content: args.entry,
@@ -199,48 +144,115 @@ export const submitRandomThought = action({
       `,
     });
     return result.text;
+    // const result = await thread.generateObject({
+    //   prompt: `
+    //   I'm just had a random thought: ${args.entry}.
+    //   The entryId for this is ${entryId}.
+    //   Please help me organize it with existing ideas.
+    //   `,
+    //   schema: z.object({
+    //     ideaId: v.id("ideas").describe("The ID of the idea that exists or was updated"),
+    //   }),
+    // });
+    // const { thread: developerThread } = await ideaDevelopmentAgent.continueThread(ctx, {
+    //   threadId: thread.threadId,
+    //   userId: args.userId,
+    // });
+
+    // const developerResult = await developerThread.generateText({
+    //   prompt: `
+    //   Please help me develop this idea.
+    //   `,
+    // });
+
+    return result.text;
   },
 });
 
-async function getOrCreateThread(ctx: ActionCtx, userId: string) {
-  const page = await ctx.runQuery(
+async function getOrCreateManagerThread(ctx: ActionCtx, userId: string) {
+  const { page } = await ctx.runQuery(
     components.agent.messages.getThreadsByUserId,
-    {
-      userId,
-    },
+    { userId, paginationOpts: { numItems: 1, cursor: null } },
   );
-  const threadId = page.threads[0]?._id;
+  const threadId = page[0]?._id;
   if (threadId) {
-    const { thread } = await ideaTriageAgent.continueThread(ctx, {
+    const { thread } = await ideaManagerAgent.continueThread(ctx, {
       threadId,
       userId,
     });
     return { thread, threadId };
   }
-  return await ideaTriageAgent.createThread(ctx, { userId });
+  return await ideaManagerAgent.createThread(ctx, { userId });
 }
+
+/**
+ * AGENTS AS TOOLS TO OTHER AGENTS
+ * Note: This isn't working well yet.
+ */
+
+// const ideaManager = ideaManagerAgent.asTool({
+//   description:
+//     "Call on me to organize and create ideas. " +
+//     "Tell me the what you need, and I'll tell you what I did. " +
+//     "If you want me to do something with a specific existing idea, " +
+//     "tell me the ID of the idea verbatim.",
+//   args: v.object({
+//     id: v.optional(v.id("ideas")),
+//     command: v.string(),
+//   }),
+//   maxSteps: 10,
+// });
+
+// const ideaDeveloper = ideaDevelopmentAgent.asTool({
+//   description:
+//     "Call on me to develop ideas. " +
+//     "Tell me what the idea's ID is, and I'll tell you what I did. " +
+//     "The ID should be from a real existing idea, not fabricated.",
+//   args: v.object({
+//     id: v.id("ideas"),
+//     command: v.string(),
+//   }),
+//   maxSteps: 5,
+// });
+
+/**
+ * AGENT DISPATCHERS
+ */
+
+// const ideaTriageAgent = new Agent(components.agent, {
+//   name: "Idea Triage Agent",
+//   chat: openai.chat("gpt-4o-mini"),
+//   textEmbedding: openai.embedding("text-embedding-3-small"),
+//   instructions:
+//     "You are a helpful assistant that helps triage ideas. " +
+//     "You should delegate to the manager or developer agents to help you. " +
+//     "You can search for existing ideas to help triage. " +
+//     "If you are given an entryId, that is different from an ideaId, " +
+//     "you should delegate to the ideaManager to create an idea from the entry. " +
+//     "Be willing to undo mistakes and get better.",
+//   tools: { ideaSearch, ideaManager, ideaDeveloper },
+//   contextOptions: {
+//     recentMessages: 5,
+//     searchOtherThreads: false,
+//   },
+//   maxSteps: 20,
+// });
 
 export const inProgressMessages = query({
   args: { userId: v.string() },
-  handler: async (
-    ctx,
-    { userId },
-  ): Promise<{
-    messages: MessageDoc[];
-    continueCursor: string;
-    isDone: boolean;
-  }> => {
-    const threadPager = await ctx.runQuery(
+  handler: async (ctx, { userId }): Promise<Array<MessageDoc>> => {
+    const { page } = await ctx.runQuery(
       components.agent.messages.getThreadsByUserId,
       { userId },
     );
-    const threadId = threadPager.threads[0]?._id;
+    const threadId = page[0]?._id;
     if (!threadId) {
-      return { messages: [], continueCursor: "", isDone: false };
+      return [];
     }
-    return await ctx.runQuery(components.agent.messages.getThreadMessages, {
-      threadId,
-      statuses: ["pending"],
-    });
+    const messages = await ctx.runQuery(
+      components.agent.messages.getThreadMessages,
+      { threadId, statuses: ["pending"] },
+    );
+    return messages.page;
   },
 });
