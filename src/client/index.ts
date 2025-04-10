@@ -26,7 +26,7 @@ import {
 import { internalActionGeneric } from "convex/server";
 import { Infer, v, Validator } from "convex/values";
 import { z } from "zod";
-import { api, Mounts } from "../component/_generated/api";
+import { Mounts } from "../component/_generated/api";
 import {
   validateVectorDimension,
   VectorDimension,
@@ -38,7 +38,11 @@ import {
   serializeObjectResult,
   serializeStep,
 } from "../mapping";
-import { DEFAULT_MESSAGE_RANGE, extractText } from "../shared";
+import {
+  DEFAULT_MESSAGE_RANGE,
+  DEFAULT_RECENT_MESSAGES,
+  extractText,
+} from "../shared";
 import {
   CallSettings,
   ProviderMetadata,
@@ -279,19 +283,25 @@ export class Agent<AgentTools extends ToolSet> {
       contextMessages.push(...searchMessages.map((m) => m.message!));
     }
     if (args.threadId) {
-      const { messages } = await ctx.runQuery(
+      const { page } = await ctx.runQuery(
         this.component.messages.getThreadMessages,
         {
           threadId: args.threadId,
           isTool: args.includeToolCalls ?? false,
-          limit: args.recentMessages,
+          paginationOpts: {
+            numItems:
+              args.recentMessages ??
+              this.options.contextOptions?.recentMessages ??
+              DEFAULT_RECENT_MESSAGES,
+            cursor: null,
+          },
           parentMessageId: args.parentMessageId,
           order: "desc",
           statuses: ["success"],
         }
       );
       contextMessages.push(
-        ...messages.filter((m) => !included?.has(m._id)).map((m) => m.message!)
+        ...page.filter((m) => !included?.has(m._id)).map((m) => m.message!)
       );
     }
     return contextMessages;

@@ -1,6 +1,8 @@
 import { CoreMessage } from "ai";
 import { Message } from "./validators";
 
+export const DEFAULT_RECENT_MESSAGES = 100;
+
 export function isTool(message: Message | CoreMessage) {
   return (
     message.role === "tool" ||

@@ -1,4 +1,4 @@
-import { Infer, ObjectType, v } from "convex/values";
+import { Infer, ObjectType, v, Validator, Value } from "convex/values";
 import { vVectorDimension } from "./component/vector/tables";
 
 // const deprecated = v.optional(v.any()) as unknown as VNull<unknown, "optional">;
@@ -10,7 +10,8 @@ export type ProviderMetadata = Infer<typeof experimental_providerMetadata>;
 
 export const vThreadStatus = v.union(
   v.literal("active"),
-  v.literal("archived")
+  v.literal("hidden"),
+  v.literal("archived") // unused
 );
 export const vMessageStatus = v.union(
   v.literal("pending"),
@@ -391,3 +392,21 @@ export const vEmbeddingsWithMetadata = v.object({
   model: v.string(),
 });
 export type EmbeddingsWithMetadata = Infer<typeof vEmbeddingsWithMetadata>;
+
+export function paginationResultValidator<
+  T extends Validator<Value, "required", string>,
+>(itemValidator: T) {
+  return v.object({
+    page: v.array(itemValidator),
+    continueCursor: v.string(),
+    isDone: v.boolean(),
+    splitCursor: v.optional(v.union(v.string(), v.null())),
+    pageStatus: v.optional(
+      v.union(
+        v.literal("SplitRecommended"),
+        v.literal("SplitRequired"),
+        v.null()
+      )
+    ),
+  });
+}

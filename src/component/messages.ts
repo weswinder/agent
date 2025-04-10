@@ -3,14 +3,19 @@ import { paginator } from "convex-helpers/server/pagination";
 import { mergedStream, stream } from "convex-helpers/server/stream";
 import { nullable, partial } from "convex-helpers/validators";
 import { ObjectType } from "convex/values";
-import { DEFAULT_MESSAGE_RANGE, extractText, isTool } from "../shared.js";
 import {
+  DEFAULT_MESSAGE_RANGE,
+  DEFAULT_RECENT_MESSAGES,
+  extractText,
+  isTool,
+} from "../shared.js";
+import {
+  paginationResultValidator,
   vEmbeddingsWithMetadata,
   vMessageStatus,
   vMessageWithFileAndId,
   vSearchOptions,
   vStepWithMessages,
-  vThreadStatus,
 } from "../validators.js";
 import { api, internal } from "./_generated/api.js";
 import { Doc, Id } from "./_generated/dataModel.js";
@@ -31,6 +36,7 @@ import {
   VectorTableId,
   vVectorId,
 } from "./vector/tables.js";
+import { paginationOptsValidator } from "convex/server";
 
 export const getThread = query({
   args: { threadId: v.id("threads") },
@@ -43,38 +49,22 @@ export const getThread = query({
 export const getThreadsByUserId = query({
   args: {
     userId: v.string(),
-    // Note: the other arguments cannot change from when the cursor was created.
-    cursor: v.optional(v.union(v.string(), v.null())),
-    limit: v.optional(v.number()),
-    offset: v.optional(v.number()),
-    statuses: v.optional(vThreadStatus),
+    order: v.optional(v.union(v.literal("asc"), v.literal("desc"))),
+    paginationOpts: paginationOptsValidator,
+    hidden: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
-    const status = args.statuses ?? "active";
+    const status = args.hidden ? "hidden" : "active";
     const threads = await paginator(ctx.db, schema)
       .query("threads")
       .withIndex("userId_status_order", (q) =>
-        q
-          .eq("userId", args.userId)
-          .eq("status", status)
-          .gte("order", args.offset ?? 0)
+        q.eq("userId", args.userId).eq("status", status)
       )
-      .order("desc")
-      .paginate({
-        numItems: args.limit ?? 100,
-        cursor: args.cursor ?? null,
-      });
-    return {
-      threads: threads.page,
-      continueCursor: threads.continueCursor,
-      isDone: threads.isDone,
-    };
+      .order(args.order ?? "desc")
+      .paginate(args.paginationOpts);
+    return threads;
   },
-  returns: v.object({
-    threads: v.array(v.doc("threads")),
-    continueCursor: v.string(),
-    isDone: v.boolean(),
-  }),
+  returns: paginationResultValidator(v.doc("threads")),
 });
 
 const vThread = schema.tables.threads.validator;
@@ -123,16 +113,17 @@ export const updateThread = mutation({
   returns: v.doc("threads"),
 });
 
-export const archiveThread = mutation({
-  args: { threadId: v.id("threads") },
-  handler: async (ctx, args) => {
-    const thread = await ctx.db.get(args.threadId);
-    assert(thread, `Thread ${args.threadId} not found`);
-    await ctx.db.patch(args.threadId, { status: "archived" });
-    return (await ctx.db.get(args.threadId))!;
-  },
-  returns: v.doc("threads"),
-});
+// When we expose this, we need to also hide all the messages and steps
+// export const archiveThread = mutation({
+//   args: { threadId: v.id("threads") },
+//   handler: async (ctx, args) => {
+//     const thread = await ctx.db.get(args.threadId);
+//     assert(thread, `Thread ${args.threadId} not found`);
+//     await ctx.db.patch(args.threadId, { status: "archived" });
+//     return (await ctx.db.get(args.threadId))!;
+//   },
+//   returns: v.doc("threads"),
+// });
 
 export const deleteAllForUserId = action({
   args: { userId: v.string() },
@@ -651,9 +642,7 @@ export const getThreadMessages = query({
     threadId: v.id("threads"),
     isTool: v.optional(v.boolean()),
     order: v.optional(v.union(v.literal("asc"), v.literal("desc"))),
-    limit: v.optional(v.number()),
-    // Note: the other arguments cannot change from when the cursor was created.
-    cursor: v.optional(v.string()),
+    paginationOpts: v.optional(paginationOptsValidator),
     statuses: v.optional(v.array(vMessageStatus)),
     parentMessageId: v.optional(v.id("messages")),
   },
@@ -684,21 +673,15 @@ export const getThreadMessages = query({
     const messages = await mergedStream(streams, [
       "order",
       "stepOrder",
-    ]).paginate({
-      numItems: args.limit ?? 100,
-      cursor: args.cursor ?? null,
-    });
-    return {
-      messages: messages.page,
-      continueCursor: messages.continueCursor,
-      isDone: messages.isDone,
-    };
+    ]).paginate(
+      args.paginationOpts ?? {
+        numItems: DEFAULT_RECENT_MESSAGES,
+        cursor: null,
+      }
+    );
+    return messages;
   },
-  returns: v.object({
-    messages: v.array(v.doc("messages")),
-    continueCursor: v.string(),
-    isDone: v.boolean(),
-  }),
+  returns: paginationResultValidator(v.doc("messages")),
 });
 
 export const searchMessages = action({

@@ -1,3 +1,4 @@
+import { paginationOptsValidator, PaginationResult } from "convex/server";
 import { WorkflowManager } from "@convex-dev/workflow";
 import { Agent } from "@convex-dev/agent";
 import { components, internal } from "./_generated/api";
@@ -5,6 +6,7 @@ import { openai } from "@ai-sdk/openai";
 import { action, query } from "./_generated/server";
 import { v } from "convex/values";
 import { z } from "zod";
+import { ThreadDoc } from "../../src/client/types";
 
 // Define an agent similarly to the AI SDK
 const supportAgent = new Agent(components.agent, {
@@ -36,8 +38,8 @@ export const continueThread = action({
   handler: async (ctx, { prompt, threadId }) => {
     // This includes previous message history from the thread automatically.
     const { thread } = await supportAgent.continueThread(ctx, { threadId });
-    const result = await thread.generateText({ prompt });
-    return result.text;
+    const { text, messageId } = await thread.generateText({ prompt });
+    return { text, messageId };
   },
 });
 
@@ -66,12 +68,26 @@ export const supportAgentWorkflow = workflow.define({
   },
 });
 
+export const getThreads = query({
+  args: { userId: v.string(), paginationOpts: paginationOptsValidator },
+  handler: async (
+    ctx,
+    { userId, paginationOpts },
+  ): Promise<PaginationResult<ThreadDoc>> => {
+    const results = await ctx.runQuery(
+      components.agent.messages.getThreadsByUserId,
+      { userId, paginationOpts },
+    );
+    return results;
+  },
+});
+
 export const getThreadMessages = query({
-  args: { threadId: v.string() },
-  handler: async (ctx, { threadId }) => {
+  args: { threadId: v.string(), paginationOpts: paginationOptsValidator },
+  handler: async (ctx, { threadId, paginationOpts }) => {
     return await ctx.runQuery(components.agent.messages.getThreadMessages, {
       threadId,
-      limit: 100,
+      paginationOpts,
     });
   },
 });
@@ -79,11 +95,11 @@ export const getThreadMessages = query({
 export const getInProgressMessages = query({
   args: { threadId: v.string() },
   handler: async (ctx, { threadId }) => {
-    const { messages } = await ctx.runQuery(
+    const { page } = await ctx.runQuery(
       components.agent.messages.getThreadMessages,
       { threadId, statuses: ["pending"] },
     );
-    return messages;
+    return page;
   },
 });
 

@@ -931,22 +931,6 @@ export type Mounts = {
         threadId: string;
       }>
     >;
-    archiveThread: FunctionReference<
-      "mutation",
-      "public",
-      { threadId: string },
-      {
-        _creationTime: number;
-        _id: string;
-        defaultSystemPrompt?: string;
-        order?: number;
-        parentThreadIds?: Array<string>;
-        status: "active" | "archived";
-        summary?: string;
-        title?: string;
-        userId?: string;
-      }
-    >;
     commitMessage: FunctionReference<
       "mutation",
       "public",
@@ -969,7 +953,7 @@ export type Mounts = {
         defaultSystemPrompt?: string;
         order?: number;
         parentThreadIds?: Array<string>;
-        status: "active" | "archived";
+        status: "active" | "hidden" | "archived";
         summary?: string;
         title?: string;
         userId?: string;
@@ -1025,7 +1009,7 @@ export type Mounts = {
         defaultSystemPrompt?: string;
         order?: number;
         parentThreadIds?: Array<string>;
-        status: "active" | "archived";
+        status: "active" | "hidden" | "archived";
         summary?: string;
         title?: string;
         userId?: string;
@@ -1035,10 +1019,16 @@ export type Mounts = {
       "query",
       "public",
       {
-        cursor?: string;
         isTool?: boolean;
-        limit?: number;
         order?: "asc" | "desc";
+        paginationOpts?: {
+          cursor: string | null;
+          endCursor?: string | null;
+          id?: number;
+          maximumBytesRead?: number;
+          maximumRowsRead?: number;
+          numItems: number;
+        };
         parentMessageId?: string;
         statuses?: Array<"pending" | "success" | "failed">;
         threadId: string;
@@ -1046,7 +1036,7 @@ export type Mounts = {
       {
         continueCursor: string;
         isDone: boolean;
-        messages: Array<{
+        page: Array<{
           _creationTime: number;
           _id: string;
           agentName?: string;
@@ -1171,32 +1161,42 @@ export type Mounts = {
           tool: boolean;
           userId?: string;
         }>;
+        pageStatus?: "SplitRecommended" | "SplitRequired" | null;
+        splitCursor?: string | null;
       }
     >;
     getThreadsByUserId: FunctionReference<
       "query",
       "public",
       {
-        cursor?: string | null;
-        limit?: number;
-        offset?: number;
-        statuses?: "active" | "archived";
+        hidden?: boolean;
+        order?: "asc" | "desc";
+        paginationOpts: {
+          cursor: string | null;
+          endCursor?: string | null;
+          id?: number;
+          maximumBytesRead?: number;
+          maximumRowsRead?: number;
+          numItems: number;
+        };
         userId: string;
       },
       {
         continueCursor: string;
         isDone: boolean;
-        threads: Array<{
+        page: Array<{
           _creationTime: number;
           _id: string;
           defaultSystemPrompt?: string;
           order?: number;
           parentThreadIds?: Array<string>;
-          status: "active" | "archived";
+          status: "active" | "hidden" | "archived";
           summary?: string;
           title?: string;
           userId?: string;
         }>;
+        pageStatus?: "SplitRecommended" | "SplitRequired" | null;
+        splitCursor?: string | null;
       }
     >;
     rollbackMessage: FunctionReference<
@@ -1481,7 +1481,7 @@ export type Mounts = {
       {
         patch: {
           defaultSystemPrompt?: string;
-          status?: "active" | "archived";
+          status?: "active" | "hidden" | "archived";
           summary?: string;
           title?: string;
         };
@@ -1493,7 +1493,7 @@ export type Mounts = {
         defaultSystemPrompt?: string;
         order?: number;
         parentThreadIds?: Array<string>;
-        status: "active" | "archived";
+        status: "active" | "hidden" | "archived";
         summary?: string;
         title?: string;
         userId?: string;

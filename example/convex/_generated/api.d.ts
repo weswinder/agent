@@ -969,22 +969,6 @@ export declare const components: {
           threadId: string;
         }>
       >;
-      archiveThread: FunctionReference<
-        "mutation",
-        "internal",
-        { threadId: string },
-        {
-          _creationTime: number;
-          _id: string;
-          defaultSystemPrompt?: string;
-          order?: number;
-          parentThreadIds?: Array<string>;
-          status: "active" | "archived";
-          summary?: string;
-          title?: string;
-          userId?: string;
-        }
-      >;
       commitMessage: FunctionReference<
         "mutation",
         "internal",
@@ -1007,7 +991,7 @@ export declare const components: {
           defaultSystemPrompt?: string;
           order?: number;
           parentThreadIds?: Array<string>;
-          status: "active" | "archived";
+          status: "active" | "hidden" | "archived";
           summary?: string;
           title?: string;
           userId?: string;
@@ -1063,7 +1047,7 @@ export declare const components: {
           defaultSystemPrompt?: string;
           order?: number;
           parentThreadIds?: Array<string>;
-          status: "active" | "archived";
+          status: "active" | "hidden" | "archived";
           summary?: string;
           title?: string;
           userId?: string;
@@ -1073,10 +1057,16 @@ export declare const components: {
         "query",
         "internal",
         {
-          cursor?: string;
           isTool?: boolean;
-          limit?: number;
           order?: "asc" | "desc";
+          paginationOpts?: {
+            cursor: string | null;
+            endCursor?: string | null;
+            id?: number;
+            maximumBytesRead?: number;
+            maximumRowsRead?: number;
+            numItems: number;
+          };
           parentMessageId?: string;
           statuses?: Array<"pending" | "success" | "failed">;
           threadId: string;
@@ -1084,7 +1074,7 @@ export declare const components: {
         {
           continueCursor: string;
           isDone: boolean;
-          messages: Array<{
+          page: Array<{
             _creationTime: number;
             _id: string;
             agentName?: string;
@@ -1209,32 +1199,42 @@ export declare const components: {
             tool: boolean;
             userId?: string;
           }>;
+          pageStatus?: "SplitRecommended" | "SplitRequired" | null;
+          splitCursor?: string | null;
         }
       >;
       getThreadsByUserId: FunctionReference<
         "query",
         "internal",
         {
-          cursor?: string | null;
-          limit?: number;
-          offset?: number;
-          statuses?: "active" | "archived";
+          hidden?: boolean;
+          order?: "asc" | "desc";
+          paginationOpts: {
+            cursor: string | null;
+            endCursor?: string | null;
+            id?: number;
+            maximumBytesRead?: number;
+            maximumRowsRead?: number;
+            numItems: number;
+          };
           userId: string;
         },
         {
           continueCursor: string;
           isDone: boolean;
-          threads: Array<{
+          page: Array<{
             _creationTime: number;
             _id: string;
             defaultSystemPrompt?: string;
             order?: number;
             parentThreadIds?: Array<string>;
-            status: "active" | "archived";
+            status: "active" | "hidden" | "archived";
             summary?: string;
             title?: string;
             userId?: string;
           }>;
+          pageStatus?: "SplitRecommended" | "SplitRequired" | null;
+          splitCursor?: string | null;
         }
       >;
       rollbackMessage: FunctionReference<
@@ -1519,7 +1519,7 @@ export declare const components: {
         {
           patch: {
             defaultSystemPrompt?: string;
-            status?: "active" | "archived";
+            status?: "active" | "hidden" | "archived";
             summary?: string;
             title?: string;
           };
@@ -1531,7 +1531,7 @@ export declare const components: {
           defaultSystemPrompt?: string;
           order?: number;
           parentThreadIds?: Array<string>;
-          status: "active" | "archived";
+          status: "active" | "hidden" | "archived";
           summary?: string;
           title?: string;
           userId?: string;
