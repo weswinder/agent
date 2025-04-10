@@ -10,7 +10,6 @@ export type ProviderMetadata = Infer<typeof experimental_providerMetadata>;
 
 export const vThreadStatus = v.union(
   v.literal("active"),
-  v.literal("hidden"),
   v.literal("archived") // unused
 );
 export const vMessageStatus = v.union(

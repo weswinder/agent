@@ -953,7 +953,7 @@ export type Mounts = {
         defaultSystemPrompt?: string;
         order?: number;
         parentThreadIds?: Array<string>;
-        status: "active" | "hidden" | "archived";
+        status: "active" | "archived";
         summary?: string;
         title?: string;
         userId?: string;
@@ -1009,7 +1009,7 @@ export type Mounts = {
         defaultSystemPrompt?: string;
         order?: number;
         parentThreadIds?: Array<string>;
-        status: "active" | "hidden" | "archived";
+        status: "active" | "archived";
         summary?: string;
         title?: string;
         userId?: string;
@@ -1169,7 +1169,6 @@ export type Mounts = {
       "query",
       "public",
       {
-        hidden?: boolean;
         order?: "asc" | "desc";
         paginationOpts: {
           cursor: string | null;
@@ -1190,7 +1189,7 @@ export type Mounts = {
           defaultSystemPrompt?: string;
           order?: number;
           parentThreadIds?: Array<string>;
-          status: "active" | "hidden" | "archived";
+          status: "active" | "archived";
           summary?: string;
           title?: string;
           userId?: string;
@@ -1481,7 +1480,7 @@ export type Mounts = {
       {
         patch: {
           defaultSystemPrompt?: string;
-          status?: "active" | "hidden" | "archived";
+          status?: "active" | "archived";
           summary?: string;
           title?: string;
         };
@@ -1493,7 +1492,7 @@ export type Mounts = {
         defaultSystemPrompt?: string;
         order?: number;
         parentThreadIds?: Array<string>;
-        status: "active" | "hidden" | "archived";
+        status: "active" | "archived";
         summary?: string;
         title?: string;
         userId?: string;

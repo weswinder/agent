@@ -991,7 +991,7 @@ export declare const components: {
           defaultSystemPrompt?: string;
           order?: number;
           parentThreadIds?: Array<string>;
-          status: "active" | "hidden" | "archived";
+          status: "active" | "archived";
           summary?: string;
           title?: string;
           userId?: string;
@@ -1047,7 +1047,7 @@ export declare const components: {
           defaultSystemPrompt?: string;
           order?: number;
           parentThreadIds?: Array<string>;
-          status: "active" | "hidden" | "archived";
+          status: "active" | "archived";
           summary?: string;
           title?: string;
           userId?: string;
@@ -1207,7 +1207,6 @@ export declare const components: {
         "query",
         "internal",
         {
-          hidden?: boolean;
           order?: "asc" | "desc";
           paginationOpts: {
             cursor: string | null;
@@ -1228,7 +1227,7 @@ export declare const components: {
             defaultSystemPrompt?: string;
             order?: number;
             parentThreadIds?: Array<string>;
-            status: "active" | "hidden" | "archived";
+            status: "active" | "archived";
             summary?: string;
             title?: string;
             userId?: string;
@@ -1519,7 +1518,7 @@ export declare const components: {
         {
           patch: {
             defaultSystemPrompt?: string;
-            status?: "active" | "hidden" | "archived";
+            status?: "active" | "archived";
             summary?: string;
             title?: string;
           };
@@ -1531,7 +1530,7 @@ export declare const components: {
           defaultSystemPrompt?: string;
           order?: number;
           parentThreadIds?: Array<string>;
-          status: "active" | "hidden" | "archived";
+          status: "active" | "archived";
           summary?: string;
           title?: string;
           userId?: string;

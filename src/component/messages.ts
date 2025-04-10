@@ -51,15 +51,11 @@ export const getThreadsByUserId = query({
     userId: v.string(),
     order: v.optional(v.union(v.literal("asc"), v.literal("desc"))),
     paginationOpts: paginationOptsValidator,
-    hidden: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
-    const status = args.hidden ? "hidden" : "active";
     const threads = await paginator(ctx.db, schema)
       .query("threads")
-      .withIndex("userId_status_order", (q) =>
-        q.eq("userId", args.userId).eq("status", status)
-      )
+      .withIndex("userId_order", (q) => q.eq("userId", args.userId))
       .order(args.order ?? "desc")
       .paginate(args.paginationOpts);
     return threads;
@@ -74,9 +70,7 @@ export const createThread = mutation({
   handler: async (ctx, args) => {
     const latestThread = await ctx.db
       .query("threads")
-      .withIndex("userId_status_order", (q) =>
-        q.eq("userId", args.userId).eq("status", "active")
-      )
+      .withIndex("userId_order", (q) => q.eq("userId", args.userId))
       .order("desc")
       .first();
     const order = (latestThread?.order ?? -1) + 1;
@@ -213,7 +207,7 @@ async function deletePageForUserId(
 ): Promise<DeleteAllReturns> {
   const threads = await paginator(ctx.db, schema)
     .query("threads")
-    .withIndex("userId_status_order", (q) => q.eq("userId", args.userId))
+    .withIndex("userId_order", (q) => q.eq("userId", args.userId))
     .order("desc")
     .paginate({
       numItems: 100,
