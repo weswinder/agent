@@ -114,10 +114,13 @@ export const weatherAgentWorkflow = workflow.define({
 
 export const startWorkflow = mutation({
   args: { location: v.string() },
-  handler: async (ctx, { location }) => {
-    await workflow.start(ctx, internal.example.weatherAgentWorkflow, {
-      location,
-    });
+  handler: async (ctx, { location }): Promise<string> => {
+    const workflowId = await workflow.start(
+      ctx,
+      internal.example.weatherAgentWorkflow,
+      { location },
+    );
+    return workflowId;
   },
 });
 
