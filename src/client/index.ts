@@ -14,7 +14,6 @@ import type {
   ToolChoice,
   ToolExecutionOptions,
   ToolSet,
-  Message as UIMessage,
 } from "ai";
 import {
   generateObject,
@@ -38,6 +37,7 @@ import {
   VectorDimension,
 } from "../component/vector/tables";
 import {
+  AIMessageWithoutId,
   promptOrMessagesToCoreMessages,
   serializeMessageWithId,
   serializeNewMessagesInStep,
@@ -552,7 +552,7 @@ export class Agent<AgentTools extends ToolSet> {
   async saveMessagesAndFetchContext<
     T extends {
       prompt?: string;
-      messages?: CoreMessage[] | Omit<UIMessage, "id">[];
+      messages?: CoreMessage[] | AIMessageWithoutId[];
       system?: string;
     },
   >(
