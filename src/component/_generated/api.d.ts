@@ -8,7 +8,6 @@
  * @module
  */
 
-import type * as lib from "../lib.js";
 import type * as messages from "../messages.js";
 import type * as vector_index from "../vector/index.js";
 import type * as vector_tables from "../vector/tables.js";
@@ -28,7 +27,6 @@ import type {
  * ```
  */
 declare const fullApi: ApiFromModules<{
-  lib: typeof lib;
   messages: typeof messages;
   "vector/index": typeof vector_index;
   "vector/tables": typeof vector_tables;
