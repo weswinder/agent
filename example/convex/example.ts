@@ -245,10 +245,10 @@ export const generateObject = action({
   },
 });
 
-export const t = action({
+export const runAgentAsTool = action({
   args: {},
   handler: async (ctx) => {
-    const fastAgent = new Agent(components.agent, {
+    const agentWithTools = new Agent(components.agent, {
       chat: openai.chat("gpt-4o-mini"),
       textEmbedding: openai.embedding("text-embedding-3-small"),
       instructions: "You are a helpful assistant.",
@@ -256,37 +256,53 @@ export const t = action({
         doSomething: tool({
           description: "Call this function when asked to do something",
           parameters: z.object({}),
-          execute: async (args) => {
-            console.log("doSomething", args);
+          execute: async (args, options) => {
+            console.log("doingSomething", options.toolCallId);
             return "hello";
           },
         }),
         doSomethingElse: tool({
           description: "Call this function when asked to do something else",
           parameters: z.object({}),
-          execute: async (args) => {
-            console.log("doSomethingElse", args);
+          execute: async (args, options) => {
+            console.log("doSomethingElse", options.toolCallId);
             return "hello";
           },
         }),
       },
       maxSteps: 20,
     });
-
-    // // eslint-disable-next-line @typescript-eslint/no-floating-promises
-    await Promise.all(
-      Array.from({ length: 10 }).map(async (i) => {
-        const { threadId, thread } = await fastAgent.createThread(ctx, {
-          userId: "123",
-        });
-        const s = await thread.streamText({
-          prompt: "Do something twice",
-        });
-        console.log("agent", i);
-        await s.response;
+    const agentWithToolsAsTool = agentWithTools.asTool({
+      description:
+        "agentWithTools which can either doSomething or doSomethingElse",
+      args: v.object({
+        whatToDo: v.union(
+          v.literal("doSomething"),
+          v.literal("doSomethingElse"),
+        ),
       }),
-    );
-    console.log("done");
-    // return result.text;
+    });
+    const dispatchAgent = new Agent(components.agent, {
+      chat: openai.chat("gpt-4o-mini"),
+      textEmbedding: openai.embedding("text-embedding-3-small"),
+      instructions:
+        "You can call agentWithToolsAsTool as many times as told with the argument whatToDo.",
+      tools: { agentWithToolsAsTool },
+      maxSteps: 5,
+    });
+
+    const { thread } = await dispatchAgent.createThread(ctx);
+    console.time("overall");
+    const result = await thread.generateText({
+      messages: [
+        {
+          role: "user",
+          content:
+            "Call fastAgent with whatToDo set to doSomething three times and doSomethingElse one time",
+        },
+      ],
+    });
+    console.timeEnd("overall");
+    return result.text;
   },
 });
