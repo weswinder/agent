@@ -20,7 +20,7 @@ export default function App() {
         </header>
         <main className="flex-1 p-8">
           <Routes>
-            {/* <Route path="/" element={<Home />} /> */}
+            <Route path="/" element={<IdeasPage />} />
             <Route path="/ideas" element={<IdeasPage />} />
             <Route path="/ideas/:id" element={<IdeaDetail />} />
           </Routes>

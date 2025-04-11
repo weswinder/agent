@@ -43,7 +43,7 @@ export function IdeaDetail() {
             {idea.related.map((related) => (
               <Link
                 key={related._id}
-                to={`/${related._id}`}
+                to={`/idea/${related._id}`}
                 className="p-4 rounded-lg border hover:border-indigo-500"
               >
                 <h3 className="font-semibold">{related.title}</h3>
