@@ -9,7 +9,7 @@ import { openai } from "@ai-sdk/openai";
 
 import { createTool } from "@convex-dev/agent";
 import { Id } from "./_generated/dataModel";
-import { MessageDoc } from "../../src/client/types";
+import type { MessageDoc } from "@convex-dev/agent";
 
 /**
  * TOOLS

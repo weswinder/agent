@@ -1,12 +1,12 @@
 import { paginationOptsValidator, PaginationResult } from "convex/server";
 import { WorkflowManager } from "@convex-dev/workflow";
 import { Agent, createTool } from "@convex-dev/agent";
+import type { ThreadDoc } from "@convex-dev/agent";
 import { components, internal } from "./_generated/api";
 import { openai } from "@ai-sdk/openai";
 import { action, httpAction, mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import { z } from "zod";
-import { ThreadDoc } from "../../src/client/types";
 import { getGeocoding, getWeather } from "./weather";
 import { tool } from "ai";
 
