@@ -59,9 +59,10 @@ import {
   vStorageOptions,
   vTextArgs,
 } from "../validators";
-import { RunActionCtx, RunMutationCtx, RunQueryCtx, UseApi } from "./types";
+import { RunActionCtx, RunMutationCtx, RunQueryCtx, UseApi } from "./types.js";
 
 export { convexToZod, zodToConvex };
+export type { ThreadDoc, MessageDoc } from "./types.js";
 
 export type ContextOptions = {
   /**
