@@ -834,7 +834,7 @@ export class Agent<AgentTools extends ToolSet> {
             ...rest,
             schema: jsonSchema(schema),
           } as unknown as OurStreamObjectArgs<unknown>);
-          for await (const chunk of value.fullStream) {
+          for await (const _ of value.fullStream) {
             // no-op, just consume the stream
           }
           return value.object;
@@ -859,10 +859,11 @@ export class Agent<AgentTools extends ToolSet> {
     args: Validator<unknown, "required", string>;
     contextOptions?: ContextOptions;
     maxSteps?: number;
+    provideMessageHistory?: boolean;
   }) {
     return createTool({
       ...spec,
-      handler: async (ctx, args) => {
+      handler: async (ctx, args, options) => {
         const maxSteps = spec.maxSteps ?? this.options.maxSteps;
         const contextOptions =
           spec.contextOptions && this.mergedContextOptions(spec.contextOptions);
@@ -870,8 +871,13 @@ export class Agent<AgentTools extends ToolSet> {
           parentThreadIds: ctx.threadId ? [ctx.threadId] : undefined,
           userId: ctx.userId,
         });
+        const messages = spec.provideMessageHistory ? options.messages : [];
+        messages.push({
+          role: "user",
+          content: JSON.stringify(args),
+        });
         const value = await thread.generateText({
-          prompt: JSON.stringify(args),
+          messages,
           maxSteps,
           ...contextOptions,
         });
