@@ -10,11 +10,11 @@ AI Agent framework built on Convex.
 - RAG for chat context, via hybrid text & vector search, with configuration options.
   Or use the API to query the history yourself and do it your way.
 - Opt-in search for messages from other threads (for the same specified user).
-- Support for generating and storing objects in messages (as JSON).
+- Support for generating / streaming objects and storing them in messages (as JSON).
 - Tool calls via the AI SDK, along with Convex-specific helpers.
 - Easy workflow integration with the [Workflow component](https://convex.dev/components/workflow).
 - Reactive & realtime updates to asynchronous threads.
-- Support for streaming text and storing the result in the database.
+- Support for streaming text and storing the final result.
 - Optionally filter tool calls out of the thread history.
 
 [Read the associated Stack post here](https://stack.convex.dev/ai-agents).
@@ -72,11 +72,6 @@ export const supportAgentWorkflow = workflow.define({
 ```
 
 Also see the [Stack article](https://stack.convex.dev/ai-agents).
-
-Coming soon:
-
-- Generate and stream objects
-- Nested agent configuration, with agents as tools to other agents.
 
 Found a bug? Feature request? [File it here](https://github.com/get-convex/agent/issues).
 
