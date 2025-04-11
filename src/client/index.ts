@@ -866,16 +866,15 @@ export class Agent<AgentTools extends ToolSet> {
         const maxSteps = spec.maxSteps ?? this.options.maxSteps;
         const contextOptions =
           spec.contextOptions && this.mergedContextOptions(spec.contextOptions);
-        const value = await this.generateText(
-          ctx,
-          { userId: ctx.userId, threadId: ctx.threadId },
-          {
-            prompt: JSON.stringify(args),
-            parentMessageId: ctx.messageId,
-            maxSteps,
-            ...contextOptions,
-          }
-        );
+        const { thread } = await this.createThread(ctx, {
+          parentThreadIds: ctx.threadId ? [ctx.threadId] : undefined,
+          userId: ctx.userId,
+        });
+        const value = await thread.generateText({
+          prompt: JSON.stringify(args),
+          maxSteps,
+          ...contextOptions,
+        });
         return value.text;
       },
     });
