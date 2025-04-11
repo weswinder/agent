@@ -270,20 +270,23 @@ export const t = action({
           },
         }),
       },
-      maxSteps: 5,
+      maxSteps: 20,
     });
 
-    const { threadId, thread } = await fastAgent.createThread(ctx, {});
-    // eslint-disable-next-line @typescript-eslint/no-floating-promises
-    const s = await thread.streamText({
-      prompt:
-        "Do something four times, then do something else, then do something else again",
-    });
-    console.log("s", s);
-
-    for await (const chunk of s.textStream) {
-      console.log(chunk);
-    }
+    // // eslint-disable-next-line @typescript-eslint/no-floating-promises
+    await Promise.all(
+      Array.from({ length: 10 }).map(async (i) => {
+        const { threadId, thread } = await fastAgent.createThread(ctx, {
+          userId: "123",
+        });
+        const s = await thread.streamText({
+          prompt: "Do something twice",
+        });
+        console.log("agent", i);
+        await s.response;
+      }),
+    );
+    console.log("done");
     // return result.text;
   },
 });

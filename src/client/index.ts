@@ -14,7 +14,6 @@ import type {
   ToolChoice,
   ToolExecutionOptions,
   ToolSet,
-  Message as UIMessage,
 } from "ai";
 import {
   generateObject,
@@ -38,6 +37,7 @@ import {
   VectorDimension,
 } from "../component/vector/tables";
 import {
+  AIMessageWithoutId,
   promptOrMessagesToCoreMessages,
   serializeMessageWithId,
   serializeNewMessagesInStep,
@@ -288,17 +288,14 @@ export class Agent<AgentTools extends ToolSet> {
       included = new Set(searchMessages.map((m) => m._id));
       contextMessages.push(...searchMessages.map((m) => m.message!));
     }
-    if (args.threadId) {
+    if (args.threadId && opts.recentMessages !== 0) {
       const { page } = await ctx.runQuery(
         this.component.messages.getThreadMessages,
         {
           threadId: args.threadId,
           isTool: args.includeToolCalls ?? false,
           paginationOpts: {
-            numItems:
-              args.recentMessages ??
-              this.options.contextOptions?.recentMessages ??
-              DEFAULT_RECENT_MESSAGES,
+            numItems: opts.recentMessages ?? DEFAULT_RECENT_MESSAGES,
             cursor: null,
           },
           parentMessageId: args.parentMessageId,
@@ -555,7 +552,7 @@ export class Agent<AgentTools extends ToolSet> {
   async saveMessagesAndFetchContext<
     T extends {
       prompt?: string;
-      messages?: CoreMessage[] | Omit<UIMessage, "id">[];
+      messages?: CoreMessage[] | AIMessageWithoutId[];
       system?: string;
     },
   >(
@@ -834,7 +831,7 @@ export class Agent<AgentTools extends ToolSet> {
             ...rest,
             schema: jsonSchema(schema),
           } as unknown as OurStreamObjectArgs<unknown>);
-          for await (const chunk of value.fullStream) {
+          for await (const _ of value.fullStream) {
             // no-op, just consume the stream
           }
           return value.object;
@@ -859,23 +856,28 @@ export class Agent<AgentTools extends ToolSet> {
     args: Validator<unknown, "required", string>;
     contextOptions?: ContextOptions;
     maxSteps?: number;
+    provideMessageHistory?: boolean;
   }) {
     return createTool({
       ...spec,
-      handler: async (ctx, args) => {
+      handler: async (ctx, args, options) => {
         const maxSteps = spec.maxSteps ?? this.options.maxSteps;
         const contextOptions =
           spec.contextOptions && this.mergedContextOptions(spec.contextOptions);
-        const value = await this.generateText(
-          ctx,
-          { userId: ctx.userId, threadId: ctx.threadId },
-          {
-            prompt: JSON.stringify(args),
-            parentMessageId: ctx.messageId,
-            maxSteps,
-            ...contextOptions,
-          }
-        );
+        const { thread } = await this.createThread(ctx, {
+          parentThreadIds: ctx.threadId ? [ctx.threadId] : undefined,
+          userId: ctx.userId,
+        });
+        const messages = spec.provideMessageHistory ? options.messages : [];
+        messages.push({
+          role: "user",
+          content: JSON.stringify(args),
+        });
+        const value = await thread.generateText({
+          messages,
+          maxSteps,
+          ...contextOptions,
+        });
         return value.text;
       },
     });

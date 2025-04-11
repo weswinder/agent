@@ -1,12 +1,11 @@
 import { httpRouter } from "convex/server";
-import { httpAction } from "./_generated/server";
 import { streamHttpAction } from "./example";
 
 const http = httpRouter();
 
 http.route({
   path: "/streamText",
-  method: "GET",
+  method: "POST",
   handler: streamHttpAction,
 });
 

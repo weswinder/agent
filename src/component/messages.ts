@@ -55,7 +55,7 @@ export const getThreadsByUserId = query({
   handler: async (ctx, args) => {
     const threads = await paginator(ctx.db, schema)
       .query("threads")
-      .withIndex("userId_order", (q) => q.eq("userId", args.userId))
+      .withIndex("userId", (q) => q.eq("userId", args.userId))
       .order(args.order ?? "desc")
       .paginate(args.paginationOpts ?? { cursor: null, numItems: 100 });
     return threads;
@@ -68,15 +68,8 @@ const vThread = schema.tables.threads.validator;
 export const createThread = mutation({
   args: omit(vThread.fields, ["order", "status"]),
   handler: async (ctx, args) => {
-    const latestThread = await ctx.db
-      .query("threads")
-      .withIndex("userId_order", (q) => q.eq("userId", args.userId))
-      .order("desc")
-      .first();
-    const order = (latestThread?.order ?? -1) + 1;
     const threadId = await ctx.db.insert("threads", {
       ...args,
-      order,
       status: "active",
     });
     return (await ctx.db.get(threadId))!;
@@ -207,7 +200,7 @@ async function deletePageForUserId(
 ): Promise<DeleteAllReturns> {
   const threads = await paginator(ctx.db, schema)
     .query("threads")
-    .withIndex("userId_order", (q) => q.eq("userId", args.userId))
+    .withIndex("userId", (q) => q.eq("userId", args.userId))
     .order("desc")
     .paginate({
       numItems: 100,

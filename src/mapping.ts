@@ -5,11 +5,10 @@ import {
   type AssistantContent,
   type CoreMessage,
   type DataContent,
-  type GenerateTextResult,
   type StepResult,
   type ToolContent,
   type ToolSet,
-  type Message as UIMessage,
+  type Message as AIMessage,
   type UserContent,
 } from "ai";
 import { assert } from "convex-helpers";
@@ -18,6 +17,8 @@ import {
   Step,
   StepWithMessagesWithFileAndId,
 } from "./validators";
+
+export type AIMessageWithoutId = Omit<AIMessage, "id">;
 
 export type SerializeUrlsAndUint8Arrays<T> = T extends URL
   ? string
@@ -195,7 +196,7 @@ function deserializeUrl(urlOrString: string | ArrayBuffer): URL | DataContent {
 export function promptOrMessagesToCoreMessages(args: {
   system?: string;
   prompt?: string;
-  messages?: CoreMessage[] | Omit<UIMessage, "id">[];
+  messages?: CoreMessage[] | AIMessageWithoutId[];
 }): CoreMessage[] {
   const messages: CoreMessage[] = [];
   if (args.system) {
@@ -214,7 +215,7 @@ export function promptOrMessagesToCoreMessages(args: {
             "experimental_attachments" in m)
       )
     ) {
-      messages.push(...convertToCoreMessages(args.messages as UIMessage[]));
+      messages.push(...convertToCoreMessages(args.messages as AIMessage[]));
     } else {
       messages.push(...coreMessageSchema.array().parse(args.messages));
     }
