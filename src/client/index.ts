@@ -454,7 +454,7 @@ export class Agent<AgentTools extends ToolSet> {
     const tools = wrapTools(toolCtx, this.options.tools, args.tools) as TOOLS;
     const maxSteps = args.maxSteps ?? this.options.maxSteps;
     try {
-      const result = await generateText({
+      const result = (await generateText({
         model: this.options.chat,
         ...aiArgs,
         maxSteps,
@@ -471,8 +471,9 @@ export class Agent<AgentTools extends ToolSet> {
           }
           return args.onStepFinish?.(step);
         },
-      });
-      return { ...result, messageId };
+      })) as GenerateTextResult<TOOLS, OUTPUT> & GenerationOutputMetadata;
+      result.messageId = messageId;
+      return result;
     } catch (error) {
       if (threadId && messageId) {
         console.error("RollbackMessage", messageId);
@@ -540,8 +541,9 @@ export class Agent<AgentTools extends ToolSet> {
         }
         return args.onStepFinish?.(step);
       },
-    });
-    return { ...result, messageId };
+    }) as StreamTextResult<TOOLS, PARTIAL_OUTPUT> & GenerationOutputMetadata;
+    result.messageId = messageId;
+    return result;
   }
 
   async saveMessagesAndFetchContext<
@@ -618,12 +620,13 @@ export class Agent<AgentTools extends ToolSet> {
         model: this.options.chat,
         ...aiArgs,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      } as any)) as GenerateObjectResult<T>;
+      } as any)) as GenerateObjectResult<T> & GenerationOutputMetadata;
 
       if (threadId && messageId && args.saveOutputMessages !== false) {
         await this.saveObject(ctx, { threadId, messageId, result });
       }
-      return { ...result, messageId };
+      result.messageId = messageId;
+      return result;
     } catch (error) {
       if (threadId && messageId) {
         await ctx.runMutation(this.component.messages.rollbackMessage, {
@@ -678,8 +681,10 @@ export class Agent<AgentTools extends ToolSet> {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         return args.onFinish?.(result as any);
       },
-    }) as StreamObjectResult<DeepPartial<T>, T, never>;
-    return { ...stream, messageId };
+    }) as StreamObjectResult<DeepPartial<T>, T, never> &
+      GenerationOutputMetadata;
+    stream.messageId = messageId;
+    return stream;
   }
 
   async saveObject(
@@ -806,7 +811,8 @@ export class Agent<AgentTools extends ToolSet> {
             ...args.streamText,
             maxSteps: args.streamText.maxSteps ?? maxSteps,
           });
-          return value.text;
+          await value.consumeStream();
+          return await value.text;
         } else if (args.generateObject) {
           const value = await this.generateObject(ctx, commonArgs, {
             ...(args.generateObject as GenerateObjectArgs<unknown>),
