@@ -8,6 +8,7 @@ import { v } from "convex/values";
 import { z } from "zod";
 import { ThreadDoc } from "../../src/client/types";
 import { getGeocoding, getWeather } from "./weather";
+import { tool } from "ai";
 
 // Define an agent similarly to the AI SDK
 const weatherAgent = new Agent(components.agent, {
@@ -19,6 +20,7 @@ const weatherAgent = new Agent(components.agent, {
     getWeather,
     getGeocoding,
   },
+  maxSteps: 3,
 });
 
 const fashionAgent = new Agent(components.agent, {
@@ -52,6 +54,7 @@ export const createThread = action({
   handler: async (ctx, { location, userId }) => {
     const { threadId, thread } = await weatherAgent.createThread(ctx, {
       userId,
+      title: `Weather in ${location}`,
     });
     const result = await thread.generateText({
       prompt: `What is the weather in ${location}?`,
@@ -61,12 +64,12 @@ export const createThread = action({
 });
 
 export const continueThread = action({
-  args: { location: v.string(), threadId: v.string() },
-  handler: async (ctx, { location, threadId }) => {
+  args: { threadId: v.string() },
+  handler: async (ctx, { threadId }) => {
     // This includes previous message history from the thread automatically.
     const { thread } = await fashionAgent.continueThread(ctx, { threadId });
     const { text, messageId } = await thread.generateText({
-      prompt: `What is the weather in ${location}?`,
+      prompt: `What should I wear  based on the weather?`,
     });
     return { text, messageId };
   },
@@ -75,7 +78,7 @@ export const continueThread = action({
 /**
  * Expose the agents as actions
  */
-export const weatherAgentAction = weatherAgent.asAction({ maxSteps: 10 });
+export const weatherAgentAction = weatherAgent.asAction({ maxSteps: 3 });
 export const fashionAgentAction = fashionAgent.asAction();
 
 /**
@@ -142,6 +145,7 @@ export const getThreadMessages = query({
     return await ctx.runQuery(components.agent.messages.getThreadMessages, {
       threadId,
       paginationOpts,
+      isTool: false,
     });
   },
 });
@@ -169,7 +173,12 @@ export const streamText = action({
     for await (const chunk of result.textStream) {
       console.log(chunk);
     }
-    return { threadId, text: result.text };
+    return {
+      threadId,
+      text: await result.text,
+      toolCalls: await result.toolCalls,
+      toolResults: await result.toolResults,
+    };
   },
 });
 
@@ -233,5 +242,48 @@ export const generateObject = action({
       console.log(chunk);
     }
     return { threadId, object: result.object };
+  },
+});
+
+export const t = action({
+  args: {},
+  handler: async (ctx) => {
+    const fastAgent = new Agent(components.agent, {
+      chat: openai.chat("gpt-4o-mini"),
+      textEmbedding: openai.embedding("text-embedding-3-small"),
+      instructions: "You are a helpful assistant.",
+      tools: {
+        doSomething: tool({
+          description: "Call this function when asked to do something",
+          parameters: z.object({}),
+          execute: async (args) => {
+            console.log("doSomething", args);
+            return "hello";
+          },
+        }),
+        doSomethingElse: tool({
+          description: "Call this function when asked to do something else",
+          parameters: z.object({}),
+          execute: async (args) => {
+            console.log("doSomethingElse", args);
+            return "hello";
+          },
+        }),
+      },
+      maxSteps: 5,
+    });
+
+    const { threadId, thread } = await fastAgent.createThread(ctx, {});
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
+    const s = await thread.streamText({
+      prompt:
+        "Do something four times, then do something else, then do something else again",
+    });
+    console.log("s", s);
+
+    for await (const chunk of s.textStream) {
+      console.log(chunk);
+    }
+    // return result.text;
   },
 });

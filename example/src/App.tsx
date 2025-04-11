@@ -2,7 +2,7 @@ import { BrowserRouter, Routes, Route, Link } from "react-router-dom";
 import { IdeasPage } from "./pages/Ideas";
 import { IdeaDetail } from "./pages/IdeaDetail";
 import { Toaster } from "./components/ui/toaster";
-
+import { Home } from "./pages/Home";
 export default function App() {
   return (
     <BrowserRouter>
@@ -20,7 +20,7 @@ export default function App() {
         </header>
         <main className="flex-1 p-8">
           <Routes>
-            <Route path="/" element={<IdeasPage />} />
+            <Route path="/" element={<Home />} />
             <Route path="/ideas" element={<IdeasPage />} />
             <Route path="/ideas/:id" element={<IdeaDetail />} />
           </Routes>
