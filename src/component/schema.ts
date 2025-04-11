@@ -7,7 +7,7 @@ import vectorTables, { vVectorId } from "./vector/tables";
 export const schema = defineSchema({
   threads: defineTable({
     userId: v.optional(v.string()), // Unset for anonymous
-    order: v.optional(v.number()), // within a domain
+    order: v.optional(v.number()), // DEPRECATED
     // TODO: is this bubbling up in continue?
     defaultSystemPrompt: v.optional(v.string()),
     title: v.optional(v.string()),
@@ -17,7 +17,7 @@ export const schema = defineSchema({
     // the parent thread(s). There are multiple if the thread is a merging of
     // multiple threads.
     parentThreadIds: v.optional(v.array(v.id("threads"))),
-  }).index("userId_order", ["userId", "order"]),
+  }).index("userId", ["userId"]),
   // TODO: text search on title/ summary
   messages: defineTable({
     id: v.optional(v.string()), // external id, e.g. from Vercel AI SDK
