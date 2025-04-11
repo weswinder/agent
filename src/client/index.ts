@@ -16,7 +16,13 @@ import type {
   ToolSet,
   Message as UIMessage,
 } from "ai";
-import { generateObject, generateText, streamObject, streamText } from "ai";
+import {
+  generateObject,
+  generateText,
+  jsonSchema,
+  streamObject,
+  streamText,
+} from "ai";
 import { assert } from "convex-helpers";
 import {
   ConvexToZod,
@@ -814,14 +820,23 @@ export class Agent<AgentTools extends ToolSet> {
           await value.consumeStream();
           return await value.text;
         } else if (args.generateObject) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const { schema, ...rest } = args.generateObject as { schema?: any };
           const value = await this.generateObject(ctx, commonArgs, {
-            ...(args.generateObject as GenerateObjectArgs<unknown>),
-          });
+            ...rest,
+            schema: jsonSchema(schema),
+          } as unknown as OurObjectArgs<unknown>);
           return value.object;
         } else if (args.streamObject) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const { schema, ...rest } = args.streamObject as { schema?: any };
           const value = await this.streamObject(ctx, commonArgs, {
-            ...(args.streamObject as StreamObjectArgs<unknown>),
-          });
+            ...rest,
+            schema: jsonSchema(schema),
+          } as unknown as OurStreamObjectArgs<unknown>);
+          for await (const chunk of value.fullStream) {
+            // no-op, just consume the stream
+          }
           return value.object;
         } else {
           throw new Error(
