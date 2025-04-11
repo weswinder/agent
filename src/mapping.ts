@@ -92,21 +92,13 @@ export function serializeStep<TOOLS extends ToolSet>(
 export function serializeNewMessagesInStep<TOOLS extends ToolSet>(
   step: StepResult<TOOLS>
 ): MessageWithFileAndId[] {
-  const messages: MessageWithFileAndId[] = [];
-  if (step.text) {
-    messages.push(serializeMessageWithId(step.response.messages.at(-1)!));
-  }
-  // TODO: get ID from regular messages
-  if (step.toolCalls || step.toolResults) {
-    messages.push(
-      ...step.response.messages
-        .slice(
-          0,
-          -((step.toolCalls?.length ?? 0) + (step.toolResults?.length ?? 0))
-        )
-        .map((m) => serializeMessageWithId(m))
-    );
-  }
+  // If there are tool results, there's another message with the tool results
+  // ref: https://github.com/vercel/ai/blob/main/packages/ai/core/generate-text/to-response-messages.ts
+  const messages: MessageWithFileAndId[] = (
+    step.toolResults.length > 0
+      ? step.response.messages.slice(0, -2)
+      : step.response.messages.slice(0, -1)
+  ).map(serializeMessageWithId);
   return messages;
 }
 
