@@ -288,17 +288,14 @@ export class Agent<AgentTools extends ToolSet> {
       included = new Set(searchMessages.map((m) => m._id));
       contextMessages.push(...searchMessages.map((m) => m.message!));
     }
-    if (args.threadId) {
+    if (args.threadId && opts.recentMessages !== 0) {
       const { page } = await ctx.runQuery(
         this.component.messages.getThreadMessages,
         {
           threadId: args.threadId,
           isTool: args.includeToolCalls ?? false,
           paginationOpts: {
-            numItems:
-              args.recentMessages ??
-              this.options.contextOptions?.recentMessages ??
-              DEFAULT_RECENT_MESSAGES,
+            numItems: opts.recentMessages ?? DEFAULT_RECENT_MESSAGES,
             cursor: null,
           },
           parentMessageId: args.parentMessageId,
