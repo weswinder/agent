@@ -109,8 +109,11 @@ export default app;
 ### Configuring the agent
 
 ```ts
+import { v } from "convex/values";
 import { components } from "./_generated/api";
-import { Agent } from "@convex-dev/agent";
+import { Agent, createTool } from "@convex-dev/agent";
+import { openai } from "@ai-sdk/openai";
+import { tool } from "ai";
 
 // Define an agent similarly to the AI SDK
 const supportAgent = new Agent(components.agent, {
