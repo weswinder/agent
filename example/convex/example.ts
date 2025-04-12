@@ -145,11 +145,11 @@ export const getThreads = query({
 export const getThreadMessages = query({
   args: { threadId: v.string(), paginationOpts: paginationOptsValidator },
   handler: async (ctx, { threadId, paginationOpts }) => {
-    return await ctx.runQuery(components.agent.messages.getThreadMessages, {
-      threadId,
-      paginationOpts,
-      isTool: false,
-    });
+    const messages = await ctx.runQuery(
+      components.agent.messages.getThreadMessages,
+      { threadId, paginationOpts, isTool: false },
+    );
+    return messages;
   },
 });
 
