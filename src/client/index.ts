@@ -64,6 +64,10 @@ import { RunActionCtx, RunMutationCtx, RunQueryCtx, UseApi } from "./types.js";
 export { convexToZod, zodToConvex };
 export type { ThreadDoc, MessageDoc } from "./types.js";
 
+/**
+ * Options to configure what messages are fetched as context,
+ * automatically with thread.generateText, or directly via search.
+ */
 export type ContextOptions = {
   /**
    * Whether to include tool messages in the context.
@@ -104,14 +108,20 @@ export type ContextOptions = {
   searchOtherThreads?: boolean;
 };
 
+/**
+ * Options to configure the automatic saving of messages
+ * when generating text / objects in a thread.
+ */
 export type StorageOptions = {
-  // Defaults to false, allowing you to pass in arbitrary context that will
-  // be in addition to automatically fetched content.
-  // Pass true to have all input messages saved to the thread history.
+  /**
+   * Defaults to false, allowing you to pass in arbitrary context that will
+   * be in addition to automatically fetched content.
+   * Pass true to have all input messages saved to the thread history.
+   */
   saveAllInputMessages?: boolean;
-  // Defaults to true, saving the prompt, or last message passed to generateText.
+  /** Defaults to true, saving the prompt, or last message passed to generateText. */
   saveAnyInputMessages?: boolean;
-  // Defaults to true.
+  /** Defaults to true. Whether to save messages generated while chatting. */
   saveOutputMessages?: boolean;
 };
 
@@ -123,15 +133,65 @@ export class Agent<AgentTools extends ToolSet> {
   constructor(
     public component: UseApi<Mounts>,
     public options: {
+      /**
+       * The name for the agent. This will be attributed on each message
+       * created by this agent.
+       */
       name?: string;
+      /**
+       * The LLM model to use for generating / streaming text and objects.
+       * e.g.
+       * import { openai } from "@ai-sdk/openai"
+       * const myAgent = new Agent(components.agent, {
+       *   chat: openai.chat("gpt-4o-mini"),
+       */
       chat: LanguageModelV1;
+      /**
+       * The model to use for text embeddings. Optional.
+       * If specified, it will use this for generating vector embeddings
+       * of chats, and can opt-in to doing vector search for automatic context
+       * on generateText, etc.
+       * e.g.
+       * import { openai } from "@ai-sdk/openai"
+       * const myAgent = new Agent(components.agent, {
+       *   textEmbedding: openai.embedding("text-embedding-3-small")
+       */
       textEmbedding?: EmbeddingModelV1<string>;
+      /**
+       * The default system prompt to put in each request.
+       * Override per-prompt by passing the "system" parameter.
+       */
       instructions?: string;
+      /**
+       * Tools that the agent can call out to and get responses from.
+       * They can be AI SDK tools (import {tool} from "ai")
+       * or tools that have Convex context
+       * (import { createTool } from "@convex-dev/agent")
+       * Note: Convex tools can't currently annotate the parameters
+       * with descriptions, so the names should be self-evident from naming.
+       */
       tools?: AgentTools;
+      /**
+       * Options to determine what messages are included as context in message
+       * generation. To disable any messages automatically being added, pass:
+       * { recentMessages: 0 }
+       */
       contextOptions?: ContextOptions;
-      // TODO: storageOptions?: StorageOptions;
+      /**
+       * Determines whether messages are automatically stored when passed as
+       * arguments or generated.
+       */
+      storageOptions?: StorageOptions;
+      /**
+       * When generating or streaming text with tools available, this
+       * determines the default max number of iterations.
+       */
       maxSteps?: number;
-      // TODO: maxRetries?: number;
+      /**
+       * The maximum number of calls to make to an LLM in case it fails.
+       * This can be overridden at each generate/stream callsite.
+       */
+      maxRetries?: number;
     }
   ) {}
 
@@ -397,14 +457,12 @@ export class Agent<AgentTools extends ToolSet> {
   }
 
   // If you manually create a message, call this to either commit or reset it.
-  async completeMessage<TOOLS extends ToolSet>(
+  async completeMessage(
     ctx: RunMutationCtx,
     args: {
       threadId: string;
       messageId: string;
-      result:
-        | { kind: "error"; error: string }
-        | { kind: "success"; value: { steps: StepResult<TOOLS>[] } };
+      result: { kind: "error"; error: string } | { kind: "success" };
     }
   ): Promise<void> {
     const result = args.result;
@@ -421,12 +479,15 @@ export class Agent<AgentTools extends ToolSet> {
   }
 
   /**
-   * This behaves like {@link generateText} except that it add context based on
-   * the userId and threadId. It saves the input and resulting messages to the
-   * thread, if specified.
-   * however. To do that, use {@link continueThread} or {@link saveMessages}.
-   * @param ctx The context of the agent.
-   * @param args The arguments to the generateText function.
+   * This behaves like {@link generateText} from the "ai" package except that
+   * it add context based on the userId and threadId andt saves the input and
+   * resulting messages to the thread, if specified.
+   * Use {@link continueThread} to get a version of this function already scoped
+   * to a thread (and optionally userId).
+   * @param ctx The context passed from the action function calling this.
+   * @param { userId, threadId }: The user and thread to associate the message with
+   * @param args The arguments to the generateText function, along with extra controls
+   * for the {@link ContextOptions} and {@link StorageOptions}.
    * @returns The result of the generateText function.
    */
   async generateText<
@@ -456,17 +517,21 @@ export class Agent<AgentTools extends ToolSet> {
     );
     const toolCtx = { ...ctx, userId, threadId, messageId };
     const tools = wrapTools(toolCtx, this.options.tools, args.tools) as TOOLS;
-    const maxSteps = args.maxSteps ?? this.options.maxSteps;
+    const saveOutputMessages =
+      args.saveOutputMessages ??
+      this.options.storageOptions?.saveOutputMessages;
     try {
       const result = (await generateText({
+        // Can be overridden
         model: this.options.chat,
+        maxSteps: this.options.maxSteps,
+        maxRetries: this.options.maxRetries,
         ...aiArgs,
-        maxSteps,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         toolChoice: args.toolChoice as any,
         tools,
         onStepFinish: async (step) => {
-          if (threadId && messageId && args.saveOutputMessages !== false) {
+          if (threadId && messageId && saveOutputMessages !== false) {
             await this.saveStep(ctx, {
               threadId,
               messageId,
@@ -511,11 +576,15 @@ export class Agent<AgentTools extends ToolSet> {
     );
     const toolCtx = { ...ctx, userId, threadId, messageId };
     const tools = wrapTools(toolCtx, this.options.tools, args.tools) as TOOLS;
-    const maxSteps = args.maxSteps ?? this.options.maxSteps;
+    const saveOutputMessages =
+      args.saveOutputMessages ??
+      this.options.storageOptions?.saveOutputMessages;
     const result = streamText({
+      // Can be overridden
       model: this.options.chat,
+      maxSteps: this.options.maxSteps,
+      maxRetries: this.options.maxRetries,
       ...aiArgs,
-      maxSteps,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       toolChoice: args.toolChoice as any,
       tools,
@@ -525,7 +594,7 @@ export class Agent<AgentTools extends ToolSet> {
       },
       onError: async (error) => {
         console.error("onError", error);
-        if (threadId && messageId && args.saveOutputMessages !== false) {
+        if (threadId && messageId && saveOutputMessages !== false) {
           await ctx.runMutation(this.component.messages.rollbackMessage, {
             messageId,
             error: (error.error as Error).message,
@@ -562,7 +631,6 @@ export class Agent<AgentTools extends ToolSet> {
       userId,
       threadId,
       parentMessageId,
-      saveAllInputMessages,
       system,
       ...args
     }: {
@@ -577,6 +645,12 @@ export class Agent<AgentTools extends ToolSet> {
     args: T;
     messageId: string | undefined;
   }> {
+    const saveAny =
+      args.saveAnyInputMessages ??
+      this.options.storageOptions?.saveAnyInputMessages;
+    const saveAll =
+      args.saveAllInputMessages ??
+      this.options.storageOptions?.saveAllInputMessages;
     const messages = promptOrMessagesToCoreMessages(args);
     const contextMessages = await this.fetchContextMessages(ctx, {
       messages,
@@ -586,11 +660,11 @@ export class Agent<AgentTools extends ToolSet> {
       ...args,
     });
     let messageId: string | undefined;
-    if (threadId) {
+    if (threadId && saveAny !== false) {
       const saved = await this.saveMessages(ctx, {
         threadId,
         userId,
-        messages: saveAllInputMessages ? messages : messages.slice(-1),
+        messages: saveAll ? messages : messages.slice(-1),
         pending: true,
         // We should just fail if you pass in an ID for the message, fail those children
         // failPendingSteps: true,
@@ -619,14 +693,19 @@ export class Agent<AgentTools extends ToolSet> {
       { ...args, userId, threadId }
     );
 
+    const saveOutputMessages =
+      args.saveOutputMessages ??
+      this.options.storageOptions?.saveOutputMessages;
     try {
       const result = (await generateObject({
+        // Can be overridden
         model: this.options.chat,
+        maxRetries: this.options.maxRetries,
         ...aiArgs,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } as any)) as GenerateObjectResult<T> & GenerationOutputMetadata;
 
-      if (threadId && messageId && args.saveOutputMessages !== false) {
+      if (threadId && messageId && saveOutputMessages !== false) {
         await this.saveObject(ctx, { threadId, messageId, result });
       }
       result.messageId = messageId;
@@ -654,8 +733,13 @@ export class Agent<AgentTools extends ToolSet> {
       ctx,
       { ...args, userId, threadId }
     );
+    const saveOutputMessages =
+      args.saveOutputMessages ??
+      this.options.storageOptions?.saveOutputMessages;
     const stream = streamObject<T>({
+      // Can be overridden
       model: this.options.chat,
+      maxRetries: this.options.maxRetries,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       ...(aiArgs as any),
       onError: async (error) => {
@@ -663,7 +747,7 @@ export class Agent<AgentTools extends ToolSet> {
         return args.onError?.(error);
       },
       onFinish: async (result) => {
-        if (threadId && messageId && args.saveOutputMessages !== false) {
+        if (threadId && messageId && saveOutputMessages !== false) {
           await this.saveObject(ctx, {
             threadId,
             messageId,
@@ -1042,7 +1126,16 @@ type OurStreamObjectArgs<T> = StreamObjectArgs<T> &
   >;
 
 interface Thread<AgentTools extends ToolSet> {
+  /**
+   * The target threadId, from the startThread or continueThread initializers.
+   */
   threadId: string;
+  /**
+   *
+   * @param args The same args that you'd pass to AI SDK, with these changes:
+   * - model is optional (defaults to the agent's model)
+   * - you can specify the {@link StorageOptions}
+   */
   generateText<TOOLS extends ToolSet, OUTPUT = never, OUTPUT_PARTIAL = never>(
     args: TextArgs<
       AgentTools,
@@ -1063,7 +1156,6 @@ interface Thread<AgentTools extends ToolSet> {
     StreamTextResult<TOOLS & AgentTools, PARTIAL_OUTPUT> &
       GenerationOutputMetadata
   >;
-  // TODO: add all the overloads
   generateObject<T>(
     args: OurObjectArgs<T>
   ): Promise<GenerateObjectResult<T> & GenerationOutputMetadata>;

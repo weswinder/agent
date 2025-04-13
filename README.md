@@ -289,7 +289,11 @@ const messages = await agent.saveSteps(ctx, { threadId, userId, step });
 
 // Update the message from pending to complete, along with any associated steps.
 ```ts
-const messages = await agent.completeMessage(ctx, { threadId, userId, messageId });
+const messages = await agent.completeMessage(ctx, {
+  threadId,
+  messageId,
+  result: { kind: "success" }
+});
 ```
 
 ### Manage embeddings
