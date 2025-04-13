@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useAction, usePaginatedQuery, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import ReactMarkdown from "react-markdown";
-
+import { useStreamingText } from "@convex-dev/agent/react";
 const userId = "test_user"; // You'd use auth to access this on the server in a real app
 
 export function Home() {
@@ -23,12 +23,16 @@ export function Home() {
   );
   const getWeather = useAction(api.example.createThread);
   const getOutfit = useAction(api.example.continueThread);
-
+  const [followUpContent, setFollowUpContent] = useState("");
+  // const token = useAuthToken();
+  const [{ text, loading }, submitFollowUp] = useStreamingText(
+    import.meta.env.VITE_CONVEX_URL.replace(".cloud", ".site") + "/streamText",
+    threadId,
+  );
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!content.trim()) return;
 
-    console.log("submitting thought", content);
     void getWeather({
       userId,
       location: content,
@@ -114,6 +118,28 @@ export function Home() {
               <div key={"pending-" + message.id}>{message.text}</div>
             ))}
           </div>
+        )}
+        <h2>Follow-up questions</h2>
+        {loading && text && <div>{text}</div>}
+        {messages.results.find((m) => m.agentName === "Fashion Agent") && (
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              const prompt = followUpContent;
+              setFollowUpContent("");
+              void submitFollowUp(prompt).catch(() => {
+                setFollowUpContent(prompt);
+              });
+            }}
+          >
+            <textarea
+              value={followUpContent}
+              onChange={(e) => {
+                setFollowUpContent(e.target.value);
+              }}
+            />
+            <button type="submit">Submit</button>
+          </form>
         )}
       </div>
       <h2>Threads</h2>

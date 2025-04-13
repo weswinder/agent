@@ -12,6 +12,7 @@ import { tool } from "ai";
 
 // Define an agent similarly to the AI SDK
 const weatherAgent = new Agent(components.agent, {
+  name: "Weather Agent",
   chat: openai.chat("gpt-4o-mini"),
   textEmbedding: openai.embedding("text-embedding-3-small"),
   instructions:
@@ -24,6 +25,7 @@ const weatherAgent = new Agent(components.agent, {
 });
 
 const fashionAgent = new Agent(components.agent, {
+  name: "Fashion Agent",
   chat: openai.chat("gpt-4o-mini"),
   textEmbedding: openai.embedding("text-embedding-3-small"),
   instructions:

@@ -4,6 +4,17 @@ if (typeof window === "undefined") {
   throw new Error("this is frontend code, but it's running somewhere else!");
 }
 
+/**
+ * Use this hook to stream text from a server action, using the
+ * toTextStreamResponse or equivalent HTTP streaming endpoint returning text.
+ * @param url The URL of the server action to stream text from.
+ *   e.g. https://....convex.site/yourendpoint
+ * @param threadId The ID of the thread to stream text from.
+ * @param token The auth token to use for the request.
+ *   e.g. useAuthToken() from @convex-dev/auth/react
+ * @returns A tuple containing the {text, loading, error} and a function to call the endpoint
+ * with a given prompt, passing up { prompt, threadId } as the body in JSON.
+ */
 export function useStreamingText(
   url: string,
   threadId: string | null,
