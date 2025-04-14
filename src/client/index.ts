@@ -287,12 +287,23 @@ export class Agent<AgentTools extends ToolSet> {
     };
   }
 
+  /**
+   * Continues a thread using this agent. Note: threads can be continued
+   * by different agents. This is a convenience around calling the various
+   * generate and stream functions with explicit userId and threadId parameters.
+   * @param ctx The ctx object passed to the action handler
+   * @param { threadId, userId }: the thread and user to associate the messages with.
+   * @returns Functions bound to the userId and threadId on a `{thread}` object.
+   */
   async continueThread(
     ctx: RunActionCtx,
     {
       threadId,
       userId,
     }: {
+      /**
+       * The associated thread created by {@link createThread}
+       */
       threadId: string;
       /**
        * If supplied, the userId can be used to search across other threads for
@@ -303,7 +314,6 @@ export class Agent<AgentTools extends ToolSet> {
   ): Promise<{
     thread: Thread<AgentTools>;
   }> {
-    // return this.component.continueThread(ctx, args);
     return {
       thread: {
         threadId,
@@ -318,6 +328,14 @@ export class Agent<AgentTools extends ToolSet> {
     };
   }
 
+  /**
+   *
+   * @param ctx Either a query, mutation, or action ctx.
+   *   If it is not an action context, you can't do text or
+   *   vector search.
+   * @param args The associated thread, user, message
+   * @returns
+   */
   async fetchContextMessages(
     ctx: RunQueryCtx | RunActionCtx,
     args: {
@@ -410,14 +428,31 @@ export class Agent<AgentTools extends ToolSet> {
     return embeddings;
   }
 
+  /**
+   * Explicitly save messages associated with the thread (& user if provided)
+   * @param ctx The ctx parameter to a mutation or action.
+   * @param args The messages and context to save
+   * @returns
+   */
   async saveMessages(
     ctx: RunMutationCtx,
     args: {
       threadId: string;
       userId?: string;
       messages: CoreMessageMaybeWithId[];
+      /**
+       * If false, it will "commit" the messages immediately.
+       * If true, it will mark them as pending until the final step has finished.
+       */
       pending?: boolean;
+      /**
+       * The message that this is responding to.
+       */
       parentMessageId?: string;
+      /**
+       * Whether to mark all pending messages in the thread as failed.
+       * This is used to recover from a failure via a retry that wipes the slate clean.
+       */
       failPendingSteps?: boolean;
     }
   ): Promise<{
@@ -441,9 +476,24 @@ export class Agent<AgentTools extends ToolSet> {
     };
   }
 
+  /**
+   * Explicitly save a "step" created by the AI SDK.
+   * @param ctx The ctx argument to a mutation or action.
+   * @param args What to save
+   */
   async saveStep<TOOLS extends ToolSet>(
     ctx: RunMutationCtx,
-    args: { threadId: string; messageId: string; step: StepResult<TOOLS> }
+    args: {
+      threadId: string;
+      /**
+       * The message this step is in response to.
+       */
+      messageId: string;
+      /**
+       * The step to save, possibly including multiple tool calls.
+       */
+      step: StepResult<TOOLS>;
+    }
   ): Promise<void> {
     const step = serializeStep(args.step as StepResult<ToolSet>);
     const messages = serializeNewMessagesInStep(args.step);
@@ -456,7 +506,14 @@ export class Agent<AgentTools extends ToolSet> {
     });
   }
 
-  // If you manually create a message, call this to either commit or reset it.
+  /**
+   * Commit or rollback a message that was pending.
+   * This is done automatically when saving messages by default.
+   * If creating pending messages, you can call this when the full "transaction" is done.
+   * @param ctx The ctx argument to your mutation or action.
+   * @param args What message to save. Generally the parent message sent into
+   *   the generateText call.
+   */
   async completeMessage(
     ctx: RunMutationCtx,
     args: {
@@ -555,6 +612,18 @@ export class Agent<AgentTools extends ToolSet> {
     }
   }
 
+  /**
+   * This behaves like {@link streamText} from the "ai" package except that
+   * it add context based on the userId and threadId andt saves the input and
+   * resulting messages to the thread, if specified.
+   * Use {@link continueThread} to get a version of this function already scoped
+   * to a thread (and optionally userId).
+   * @param ctx The context passed from the action function calling this.
+   * @param { userId, threadId }: The user and thread to associate the message with
+   * @param args The arguments to the streamText function, along with extra controls
+   * for the {@link ContextOptions} and {@link StorageOptions}.
+   * @returns The result of the streamText function.
+   */
   async streamText<
     TOOLS extends ToolSet,
     OUTPUT = never,
@@ -931,7 +1000,7 @@ export class Agent<AgentTools extends ToolSet> {
   }
 
   /**
-   * Create a tool that can call this agent.
+   * Create a tool out of this agent so other agents can call this one.
    * @param spec The specification for the arguments to this agent.
    *   They will be encoded as JSON and passed to the agent.
    * @returns The agent as a tool that can be passed to other agents.
