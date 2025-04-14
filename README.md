@@ -24,7 +24,7 @@ Example usage:
 ```ts
 // Define an agent similarly to the AI SDK
 const supportAgent = new Agent(components.agent, {
-  thread: openai.chat("gpt-4o-mini"),
+  chat: openai.chat("gpt-4o-mini"),
   textEmbedding: openai.embedding("text-embedding-3-small"),
   instructions: "You are a helpful assistant.",
   tools: { accountLookup, fileTicket, sendEmail },
@@ -118,7 +118,7 @@ import { tool } from "ai";
 // Define an agent similarly to the AI SDK
 const supportAgent = new Agent(components.agent, {
   // Note: all of these are optional.
-  thread: openai.chat("gpt-4o-mini"),
+  chat: openai.chat("gpt-4o-mini"),
   // Used for vector search (RAG).
   textEmbedding: openai.embedding("text-embedding-3-small"),
   // Will be the default system prompt if not overriden.
