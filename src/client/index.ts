@@ -295,12 +295,23 @@ export class Agent<AgentTools extends ToolSet> {
    * @param { threadId, userId }: the thread and user to associate the messages with.
    * @returns Functions bound to the userId and threadId on a `{thread}` object.
    */
+  /**
+   * Continues a thread using this agent. Note: threads can be continued
+   * by different agents. This is a convenience around calling the various
+   * generate and stream functions with explicit userId and threadId parameters.
+   * @param ctx The ctx object passed to the action handler
+   * @param { threadId, userId }: the thread and user to associate the messages with.
+   * @returns Functions bound to the userId and threadId on a `{thread}` object.
+   */
   async continueThread(
     ctx: RunActionCtx,
     {
       threadId,
       userId,
     }: {
+      /**
+       * The associated thread created by {@link createThread}
+       */
       /**
        * The associated thread created by {@link createThread}
        */
@@ -328,6 +339,14 @@ export class Agent<AgentTools extends ToolSet> {
     };
   }
 
+  /**
+   *
+   * @param ctx Either a query, mutation, or action ctx.
+   *   If it is not an action context, you can't do text or
+   *   vector search.
+   * @param args The associated thread, user, message
+   * @returns
+   */
   /**
    *
    * @param ctx Either a query, mutation, or action ctx.
@@ -434,6 +453,12 @@ export class Agent<AgentTools extends ToolSet> {
    * @param args The messages and context to save
    * @returns
    */
+  /**
+   * Explicitly save messages associated with the thread (& user if provided)
+   * @param ctx The ctx parameter to a mutation or action.
+   * @param args The messages and context to save
+   * @returns
+   */
   async saveMessages(
     ctx: RunMutationCtx,
     args: {
@@ -444,11 +469,22 @@ export class Agent<AgentTools extends ToolSet> {
        * If false, it will "commit" the messages immediately.
        * If true, it will mark them as pending until the final step has finished.
        */
+      /**
+       * If false, it will "commit" the messages immediately.
+       * If true, it will mark them as pending until the final step has finished.
+       */
       pending?: boolean;
       /**
        * The message that this is responding to.
        */
+      /**
+       * The message that this is responding to.
+       */
       parentMessageId?: string;
+      /**
+       * Whether to mark all pending messages in the thread as failed.
+       * This is used to recover from a failure via a retry that wipes the slate clean.
+       */
       /**
        * Whether to mark all pending messages in the thread as failed.
        * This is used to recover from a failure via a retry that wipes the slate clean.
@@ -481,8 +517,24 @@ export class Agent<AgentTools extends ToolSet> {
    * @param ctx The ctx argument to a mutation or action.
    * @param args What to save
    */
+  /**
+   * Explicitly save a "step" created by the AI SDK.
+   * @param ctx The ctx argument to a mutation or action.
+   * @param args What to save
+   */
   async saveStep<TOOLS extends ToolSet>(
     ctx: RunMutationCtx,
+    args: {
+      threadId: string;
+      /**
+       * The message this step is in response to.
+       */
+      messageId: string;
+      /**
+       * The step to save, possibly including multiple tool calls.
+       */
+      step: StepResult<TOOLS>;
+    }
     args: {
       threadId: string;
       /**
@@ -514,6 +566,14 @@ export class Agent<AgentTools extends ToolSet> {
    * @param args What message to save. Generally the parent message sent into
    *   the generateText call.
    */
+  /**
+   * Commit or rollback a message that was pending.
+   * This is done automatically when saving messages by default.
+   * If creating pending messages, you can call this when the full "transaction" is done.
+   * @param ctx The ctx argument to your mutation or action.
+   * @param args What message to save. Generally the parent message sent into
+   *   the generateText call.
+   */
   async completeMessage(
     ctx: RunMutationCtx,
     args: {
@@ -537,7 +597,7 @@ export class Agent<AgentTools extends ToolSet> {
 
   /**
    * This behaves like {@link generateText} from the "ai" package except that
-   * it add context based on the userId and threadId andt saves the input and
+   * it add context based on the userId and threadId and saves the input and
    * resulting messages to the thread, if specified.
    * Use {@link continueThread} to get a version of this function already scoped
    * to a thread (and optionally userId).
@@ -614,7 +674,7 @@ export class Agent<AgentTools extends ToolSet> {
 
   /**
    * This behaves like {@link streamText} from the "ai" package except that
-   * it add context based on the userId and threadId andt saves the input and
+   * it add context based on the userId and threadId and saves the input and
    * resulting messages to the thread, if specified.
    * Use {@link continueThread} to get a version of this function already scoped
    * to a thread (and optionally userId).
@@ -752,6 +812,18 @@ export class Agent<AgentTools extends ToolSet> {
     };
   }
 
+  /**
+   * This behaves like {@link generateObject} from the "ai" package except that
+   * it add context based on the userId and threadId and saves the input and
+   * resulting messages to the thread, if specified.
+   * Use {@link continueThread} to get a version of this function already scoped
+   * to a thread (and optionally userId).
+   * @param ctx The context passed from the action function calling this.
+   * @param { userId, threadId }: The user and thread to associate the message with
+   * @param args The arguments to the generateObject function, along with extra controls
+   * for the {@link ContextOptions} and {@link StorageOptions}.
+   * @returns The result of the generateObject function.
+   */
   async generateObject<T>(
     ctx: RunActionCtx,
     { userId, threadId }: { userId?: string; threadId?: string },
@@ -790,6 +862,18 @@ export class Agent<AgentTools extends ToolSet> {
     }
   }
 
+  /**
+   * This behaves like {@link streamObject} from the "ai" package except that
+   * it add context based on the userId and threadId and saves the input and
+   * resulting messages to the thread, if specified.
+   * Use {@link continueThread} to get a version of this function already scoped
+   * to a thread (and optionally userId).
+   * @param ctx The context passed from the action function calling this.
+   * @param { userId, threadId }: The user and thread to associate the message with
+   * @param args The arguments to the streamObject function, along with extra controls
+   * for the {@link ContextOptions} and {@link StorageOptions}.
+   * @returns The result of the streamObject function.
+   */
   async streamObject<T>(
     ctx: RunMutationCtx,
     { userId, threadId }: { userId?: string; threadId?: string },
@@ -844,6 +928,13 @@ export class Agent<AgentTools extends ToolSet> {
     return stream;
   }
 
+  /**
+   * Manually save the result of a generateObject call to the thread.
+   * This happens automatically when using {@link generateObject} or {@link streamObject}
+   * from the `thread` object created by {@link continueThread} or {@link createThread}.
+   * @param ctx The context passed from the mutation or action function calling this.
+   * @param args The arguments to the saveObject function.
+   */
   async saveObject(
     ctx: RunMutationCtx,
     args: {
@@ -911,7 +1002,11 @@ export class Agent<AgentTools extends ToolSet> {
   }
 
   /**
-   *
+   * Create an action out of this agent so you can call it from workflows or other actions
+   * without a wrapping function.
+   * Note: currently this is not well typed. The return type of the action is always `any`.
+   * @param spec Configuration for the agent acting as an action, including
+   *   {@link ContextOptions} and maxSteps.
    */
   asAction(spec?: { contextOptions?: ContextOptions; maxSteps?: number }) {
     return internalActionGeneric({
@@ -1000,6 +1095,7 @@ export class Agent<AgentTools extends ToolSet> {
   }
 
   /**
+   * Create a tool out of this agent so other agents can call this one.
    * Create a tool out of this agent so other agents can call this one.
    * @param spec The specification for the arguments to this agent.
    *   They will be encoded as JSON and passed to the agent.
@@ -1200,10 +1296,14 @@ interface Thread<AgentTools extends ToolSet> {
    */
   threadId: string;
   /**
-   *
-   * @param args The same args that you'd pass to AI SDK, with these changes:
-   * - model is optional (defaults to the agent's model)
-   * - you can specify the {@link StorageOptions}
+   * This behaves like {@link generateText} from the "ai" package except that
+   * it add context based on the userId and threadId and saves the input and
+   * resulting messages to the thread, if specified.
+   * Use {@link continueThread} to get a version of this function already scoped
+   * to a thread (and optionally userId).
+   * @param args The arguments to the generateText function, along with extra controls
+   * for the {@link ContextOptions} and {@link StorageOptions}.
+   * @returns The result of the generateText function.
    */
   generateText<TOOLS extends ToolSet, OUTPUT = never, OUTPUT_PARTIAL = never>(
     args: TextArgs<
@@ -1215,6 +1315,16 @@ interface Thread<AgentTools extends ToolSet> {
     GenerateTextResult<TOOLS & AgentTools, OUTPUT> & GenerationOutputMetadata
   >;
 
+  /**
+   * This behaves like {@link streamText} from the "ai" package except that
+   * it add context based on the userId and threadId and saves the input and
+   * resulting messages to the thread, if specified.
+   * Use {@link continueThread} to get a version of this function already scoped
+   * to a thread (and optionally userId).
+   * @param args The arguments to the streamText function, along with extra controls
+   * for the {@link ContextOptions} and {@link StorageOptions}.
+   * @returns The result of the streamText function.
+   */
   streamText<TOOLS extends ToolSet, OUTPUT = never, PARTIAL_OUTPUT = never>(
     args: TextArgs<
       AgentTools,
@@ -1225,12 +1335,42 @@ interface Thread<AgentTools extends ToolSet> {
     StreamTextResult<TOOLS & AgentTools, PARTIAL_OUTPUT> &
       GenerationOutputMetadata
   >;
+  /**
+   * This behaves like {@link generateObject} from the "ai" package except that
+   * it add context based on the userId and threadId and saves the input and
+   * resulting messages to the thread, if specified. This overload is for objects, arrays, and enums.
+   * Use {@link continueThread} to get a version of this function already scoped
+   * to a thread (and optionally userId).
+   * @param args The arguments to the generateObject function, along with extra controls
+   * for the {@link ContextOptions} and {@link StorageOptions}.
+   * @returns The result of the generateObject function.
+   */
   generateObject<T>(
     args: OurObjectArgs<T>
   ): Promise<GenerateObjectResult<T> & GenerationOutputMetadata>;
+  /**
+   * This behaves like {@link generateObject} from the "ai" package except that
+   * it add context based on the userId and threadId and saves the input and
+   * resulting messages to the thread, if specified. This overload is for when there's no schema.
+   * Use {@link continueThread} to get a version of this function already scoped
+   * to a thread (and optionally userId).
+   * @param args The arguments to the generateObject function, along with extra controls
+   * for the {@link ContextOptions} and {@link StorageOptions}.
+   * @returns The result of the generateObject function.
+   */
   generateObject(
     args: GenerateObjectNoSchemaOptions
   ): Promise<GenerateObjectResult<JSONValue> & GenerationOutputMetadata>;
+  /**
+   * This behaves like {@link streamObject} from the "ai" package except that
+   * it add context based on the userId and threadId and saves the input and
+   * resulting messages to the thread, if specified.
+   * Use {@link continueThread} to get a version of this function already scoped
+   * to a thread (and optionally userId).
+   * @param args The arguments to the streamObject function, along with extra controls
+   * for the {@link ContextOptions} and {@link StorageOptions}.
+   * @returns The result of the streamObject function.
+   */
   streamObject<T>(
     args: OurStreamObjectArgs<T>
   ): Promise<
