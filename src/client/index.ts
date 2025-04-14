@@ -535,17 +535,6 @@ export class Agent<AgentTools extends ToolSet> {
        */
       step: StepResult<TOOLS>;
     }
-    args: {
-      threadId: string;
-      /**
-       * The message this step is in response to.
-       */
-      messageId: string;
-      /**
-       * The step to save, possibly including multiple tool calls.
-       */
-      step: StepResult<TOOLS>;
-    }
   ): Promise<void> {
     const step = serializeStep(args.step as StepResult<ToolSet>);
     const messages = serializeNewMessagesInStep(args.step);
