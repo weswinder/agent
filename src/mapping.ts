@@ -53,21 +53,11 @@ export function serializeMessageWithId(
   return { message: serializeMessage(messageWithId), id: messageWithId.id };
 }
 
-export function serializeContent(content: Content): SerializedContent {
-  if (typeof content === "string") {
-    return content;
-  }
-  const serialized = content.map((part) => {
-    switch (part.type) {
-      case "image":
-        return { ...part, image: serializeDataOrUrl(part.image) };
-      case "file":
-        return { ...part, file: serializeDataOrUrl(part.data) };
-      default:
-        return part;
-    }
-  });
-  return serialized as SerializedContent;
+export function deserializeMessage(message: SerializedMessage): CoreMessage {
+  return {
+    ...message,
+    content: deserializeContent(message.content),
+  } as CoreMessage;
 }
 
 export function serializeStep<TOOLS extends ToolSet>(
@@ -137,6 +127,23 @@ export function serializeObjectResult(
   };
 }
 
+export function serializeContent(content: Content): SerializedContent {
+  if (typeof content === "string") {
+    return content;
+  }
+  const serialized = content.map((part) => {
+    switch (part.type) {
+      case "image":
+        return { ...part, image: serializeDataOrUrl(part.image) };
+      case "file":
+        return { ...part, file: serializeDataOrUrl(part.data) };
+      default:
+        return part;
+    }
+  });
+  return serialized as SerializedContent;
+}
+
 export function deserializeContent(content: SerializedContent): Content {
   if (typeof content === "string") {
     return content;
@@ -144,7 +151,7 @@ export function deserializeContent(content: SerializedContent): Content {
   return content.map((part) => {
     switch (part.type) {
       case "image":
-        return { ...part, file: deserializeUrl(part.image) };
+        return { ...part, image: deserializeUrl(part.image) };
       case "file":
         return { ...part, file: deserializeUrl(part.data) };
       default:

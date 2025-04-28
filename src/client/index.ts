@@ -38,6 +38,7 @@ import {
 } from "../component/vector/tables";
 import {
   AIMessageWithoutId,
+  deserializeMessage,
   promptOrMessagesToCoreMessages,
   serializeMessageWithId,
   serializeNewMessagesInStep,
@@ -384,7 +385,9 @@ export class Agent<AgentTools extends ToolSet> {
       );
       // TODO: track what messages we used for context
       included = new Set(searchMessages.map((m) => m._id));
-      contextMessages.push(...searchMessages.map((m) => m.message!));
+      contextMessages.push(
+        ...searchMessages.map((m) => deserializeMessage(m.message!))
+      );
     }
     if (args.threadId && opts.recentMessages !== 0) {
       const { page } = await ctx.runQuery(
@@ -402,7 +405,9 @@ export class Agent<AgentTools extends ToolSet> {
         }
       );
       contextMessages.push(
-        ...page.filter((m) => !included?.has(m._id)).map((m) => m.message!)
+        ...page
+          .filter((m) => !included?.has(m._id))
+          .map((m) => deserializeMessage(m.message!))
       );
     }
     return contextMessages;
