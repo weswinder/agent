@@ -236,7 +236,6 @@ export const generateObject = action({
   handler: async (ctx, { prompt }) => {
     const { threadId, thread } = await weatherAgent.createThread(ctx, {});
     const result = await thread.streamObject({
-      output: "object",
       schema: z.object({
         location: z.string(),
         weather: z.string(),

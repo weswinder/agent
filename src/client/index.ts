@@ -1228,7 +1228,7 @@ type BaseGenerateObjectOptions = StorageOptions &
 
 type GenerateObjectObjectOptions<T extends Record<string, unknown>> =
   BaseGenerateObjectOptions & {
-    output: "object";
+    output?: "object";
     mode?: "auto" | "json" | "tool";
     schema: z.Schema<T>;
     schemaName?: string;
