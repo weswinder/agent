@@ -1284,6 +1284,10 @@ type OurStreamObjectArgs<T> = StreamObjectArgs<T> &
     "onError" | "onFinish" | "abortSignal"
   >;
 
+type ThreadOutputMetadata = GenerationOutputMetadata & {
+  messageId: string;
+};
+
 interface Thread<AgentTools extends ToolSet> {
   /**
    * The target threadId, from the startThread or continueThread initializers.
@@ -1306,7 +1310,7 @@ interface Thread<AgentTools extends ToolSet> {
       Parameters<typeof generateText<TOOLS, OUTPUT, OUTPUT_PARTIAL>>[0]
     >
   ): Promise<
-    GenerateTextResult<TOOLS & AgentTools, OUTPUT> & GenerationOutputMetadata
+    GenerateTextResult<TOOLS & AgentTools, OUTPUT> & ThreadOutputMetadata
   >;
 
   /**
@@ -1326,8 +1330,7 @@ interface Thread<AgentTools extends ToolSet> {
       Parameters<typeof streamText<TOOLS, OUTPUT, PARTIAL_OUTPUT>>[0]
     >
   ): Promise<
-    StreamTextResult<TOOLS & AgentTools, PARTIAL_OUTPUT> &
-      GenerationOutputMetadata
+    StreamTextResult<TOOLS & AgentTools, PARTIAL_OUTPUT> & ThreadOutputMetadata
   >;
   /**
    * This behaves like {@link generateObject} from the "ai" package except that
@@ -1341,7 +1344,7 @@ interface Thread<AgentTools extends ToolSet> {
    */
   generateObject<T>(
     args: OurObjectArgs<T>
-  ): Promise<GenerateObjectResult<T> & GenerationOutputMetadata>;
+  ): Promise<GenerateObjectResult<T> & ThreadOutputMetadata>;
   /**
    * This behaves like {@link generateObject} from the "ai" package except that
    * it add context based on the userId and threadId and saves the input and
@@ -1354,7 +1357,7 @@ interface Thread<AgentTools extends ToolSet> {
    */
   generateObject(
     args: GenerateObjectNoSchemaOptions
-  ): Promise<GenerateObjectResult<JSONValue> & GenerationOutputMetadata>;
+  ): Promise<GenerateObjectResult<JSONValue> & ThreadOutputMetadata>;
   /**
    * This behaves like {@link streamObject} from the "ai" package except that
    * it add context based on the userId and threadId and saves the input and
@@ -1368,6 +1371,6 @@ interface Thread<AgentTools extends ToolSet> {
   streamObject<T>(
     args: OurStreamObjectArgs<T>
   ): Promise<
-    StreamObjectResult<DeepPartial<T>, T, never> & GenerationOutputMetadata
+    StreamObjectResult<DeepPartial<T>, T, never> & ThreadOutputMetadata
   >;
 }
