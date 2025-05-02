@@ -772,7 +772,10 @@ export const _fetchVectorMessages = internalQuery({
       )
     ).filter(
       (m): m is Doc<"messages"> =>
-        m !== undefined && m !== null && (!parent || m.order <= parent.order)
+        m !== undefined &&
+        m !== null &&
+        !m.tool &&
+        (!parent || m.order <= parent.order)
     );
     messages.push(...(args.textSearchMessages ?? []));
     // TODO: prioritize more recent messages
@@ -873,6 +876,8 @@ export const textSearch = query({
           ? q.search("text", args.text).eq("userId", args.userId)
           : q.search("text", args.text).eq("threadId", args.threadId!)
       )
+      // Just in case tool messages slip through
+      .filter((q) => q.eq(q.field("tool"), false))
       .take(args.limit);
     return messages;
   },
