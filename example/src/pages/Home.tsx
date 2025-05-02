@@ -97,19 +97,42 @@ export function Home() {
           </form>
         </div>
         <div className="space-y-6">
-          {[...messages.results].reverse().map((message) => (
-            <div
-              key={message._id}
-              className="p-6 rounded-xl border border-indigo-100 shadow-sm"
-            >
-              <div className="prose prose-lg prose-indigo max-w-none prose-p:mt-2 prose-p:mb-2">
-                <ReactMarkdown>{message.text}</ReactMarkdown>
+          {[...messages.results].reverse().map((message) =>
+            message.tool ? (
+              message.message ? (
+                message.message.role === "tool" ? (
+                  <div key={message._id}>
+                    <pre>
+                      {JSON.stringify(message.message.content, null, 2)}
+                    </pre>
+                  </div>
+                ) : (
+                  <div key={message._id}>
+                    <pre>
+                      {JSON.stringify(message.message?.content, null, 2)}
+                    </pre>
+                  </div>
+                )
+              ) : (
+                <div key={message._id}>
+                  Pending...
+                  <pre>{JSON.stringify(message, null, 2)}</pre>
+                </div>
+              )
+            ) : (
+              <div
+                key={message._id}
+                className="p-6 rounded-xl border border-indigo-100 shadow-sm"
+              >
+                <div className="prose prose-lg prose-indigo max-w-none prose-p:mt-2 prose-p:mb-2">
+                  <ReactMarkdown>{message.text}</ReactMarkdown>
+                </div>
+                <div className="text-sm text-indigo-500/70 mt-4">
+                  {new Date(message._creationTime).toLocaleString()}
+                </div>
               </div>
-              <div className="text-sm text-indigo-500/70 mt-4">
-                {new Date(message._creationTime).toLocaleString()}
-              </div>
-            </div>
-          ))}
+            ),
+          )}
         </div>
         <h2>In Progress</h2>
         {inProgressMessages && (
