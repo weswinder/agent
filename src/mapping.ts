@@ -86,8 +86,8 @@ export function serializeNewMessagesInStep<TOOLS extends ToolSet>(
   // ref: https://github.com/vercel/ai/blob/main/packages/ai/core/generate-text/to-response-messages.ts
   const messages: MessageWithFileAndId[] = (
     step.toolResults.length > 0
-      ? step.response.messages.slice(0, -2)
-      : step.response.messages.slice(0, -1)
+      ? step.response.messages.slice(-2)
+      : step.response.messages.slice(-1)
   ).map(serializeMessageWithId);
   return messages;
 }
