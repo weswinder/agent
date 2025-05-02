@@ -72,11 +72,13 @@ export type { ThreadDoc, MessageDoc } from "./types.js";
 export type ContextOptions = {
   /**
    * Whether to include tool messages in the context.
+   * By default, tool calls and results are not included.
    */
   includeToolCalls?: boolean;
   /**
    * How many recent messages to include. These are added after the search
    * messages, and do not count against the search limit.
+   * Default: 100
    */
   recentMessages?: number;
   /**
@@ -84,21 +86,24 @@ export type ContextOptions = {
    */
   searchOptions?: {
     /**
-     * The maximum number of messages to fetch.
+     * The maximum number of messages to fetch. Default is 10.
      */
     limit: number;
     /**
-     * Whether to use text search to find messages.
+     * Whether to use text search to find messages. Default is false.
      */
     textSearch?: boolean;
     /**
-     * Whether to use vector search to find messages.
+     * Whether to use vector search to find messages. Default is false.
+     * At least one of textSearch or vectorSearch must be true.
      */
     vectorSearch?: boolean;
     /**
+     * What messages around the search results to include.
+     * Default: { before: 2, after: 1 }
+     * (two before, and one after each message found in the search)
      * Note, this is after the limit is applied.
      * By default this will quadruple the number of messages fetched.
-     * (two before, and one after each message found in the search)
      */
     messageRange?: { before: number; after: number };
   };
