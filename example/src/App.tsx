@@ -9,7 +9,7 @@ export default function App() {
       <div className="min-h-screen flex flex-col">
         <header className="sticky top-0 z-10 bg-white/80 backdrop-blur-sm p-4 flex justify-between items-center border-b">
           <nav className="flex gap-4 items-center">
-            <h2 className="text-xl font-semibold accent-text">Ideas Pile</h2>
+            <h2 className="text-xl font-semibold accent-text">Agent Example</h2>
             <Link to="/" className="hover:text-indigo-600">
               Home
             </Link>
