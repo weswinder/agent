@@ -60,7 +60,13 @@ import {
   vStorageOptions,
   vTextArgs,
 } from "../validators";
-import { RunActionCtx, RunMutationCtx, RunQueryCtx, UseApi } from "./types.js";
+import {
+  MessageDoc,
+  RunActionCtx,
+  RunMutationCtx,
+  RunQueryCtx,
+  UseApi,
+} from "./types.js";
 
 export { convexToZod, zodToConvex };
 export type { ThreadDoc, MessageDoc } from "./types.js";
@@ -372,7 +378,7 @@ export class Agent<AgentTools extends ToolSet> {
   ): Promise<CoreMessage[]> {
     assert(args.userId || args.threadId, "Specify userId or threadId");
     // Fetch the latest messages from the thread
-    const contextMessages: CoreMessage[] = [];
+    const contextMessages: MessageDoc[] = [];
     let included: Set<string> | undefined;
     const opts = this.mergedContextOptions(args);
     if (opts.searchOptions?.textSearch || opts.searchOptions?.vectorSearch) {
@@ -390,16 +396,14 @@ export class Agent<AgentTools extends ToolSet> {
       );
       // TODO: track what messages we used for context
       included = new Set(searchMessages.map((m) => m._id));
-      contextMessages.push(
-        ...searchMessages.map((m) => deserializeMessage(m.message!))
-      );
+      contextMessages.push(...searchMessages);
     }
     if (args.threadId && opts.recentMessages !== 0) {
       const { page } = await ctx.runQuery(
         this.component.messages.getThreadMessages,
         {
           threadId: args.threadId,
-          isTool: args.includeToolCalls ?? false,
+          isTool: opts.includeToolCalls ? undefined : false,
           paginationOpts: {
             numItems: opts.recentMessages ?? DEFAULT_RECENT_MESSAGES,
             cursor: null,
@@ -409,13 +413,13 @@ export class Agent<AgentTools extends ToolSet> {
           statuses: ["success"],
         }
       );
-      contextMessages.push(
-        ...page
-          .filter((m) => !included?.has(m._id))
-          .map((m) => deserializeMessage(m.message!))
-      );
+      contextMessages.push(...page.filter((m) => !included?.has(m._id)));
     }
-    return contextMessages;
+    return contextMessages
+      .sort((a, b) =>
+        a.order === b.order ? a.stepOrder - b.stepOrder : a.order - b.order
+      )
+      .map((m) => deserializeMessage(m.message!));
   }
 
   async getEmbeddings(messages: CoreMessage[]) {
