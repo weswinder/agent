@@ -193,14 +193,10 @@ function deserializeUrl(urlOrString: string | ArrayBuffer): URL | DataContent {
 }
 
 export function promptOrMessagesToCoreMessages(args: {
-  system?: string;
   prompt?: string;
   messages?: CoreMessage[] | AIMessageWithoutId[];
 }): CoreMessage[] {
   const messages: CoreMessage[] = [];
-  if (args.system) {
-    messages.push({ role: "system", content: args.system });
-  }
   assert(args.prompt || args.messages, "messages or prompt is required");
   if (args.messages) {
     if (
