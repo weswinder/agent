@@ -300,21 +300,21 @@ const messages = await agent.completeMessage(ctx, {
 
 ```ts
 const messages = await ctx.runQuery(
-  components.agent.embeddings.paginate,
+  components.agent.vector.paginate,
   { vectorDimension: 1536, cursor: null, limit: 10 }
 );
 ```
 
 ```ts
 const messages = await ctx.runQuery(
-  components.agent.embeddings.deleteBatchForThread,
+  components.agent.vector.deleteBatchForThread,
   { vectorDimension: 1536, targetModel: "gpt-4o-mini", threadId: "123", cursor: null, limit: 10 }
 );
 ```
 
 ```ts
 const messages = await ctx.runQuery(
-  components.agent.embeddings.insertBatch, {
+  components.agent.vector.insertBatch, {
     vectorDimension: 1536,
     vectors: [
       { model: "gpt-4o-mini", kind: "thread", userId: "123", threadId: "123", vector: embedding, },
@@ -324,7 +324,7 @@ const messages = await ctx.runQuery(
 ```
 
 ```ts
-const messages = await ctx.runQuery(components.agent.embeddings.updateBatch, {
+const messages = await ctx.runQuery(components.agent.vector.updateBatch, {
   vectors: [
     { model: "gpt-4o-mini", vector: embedding, id: msg.embeddingId },
   ],
@@ -332,7 +332,7 @@ const messages = await ctx.runQuery(components.agent.embeddings.updateBatch, {
 ```
 
 ```ts
-const messages = await ctx.runQuery(components.agent.embeddings.deleteBatch, {
+const messages = await ctx.runQuery(components.agent.vector.deleteBatch, {
   ids: [embeddingId1, embeddingId2],
 });
 ```
