@@ -6,6 +6,7 @@ import type {
   GenerateTextResult,
   JSONValue,
   RepairTextFunction,
+  Schema,
   StepResult,
   StreamObjectResult,
   StreamTextResult,
@@ -21,23 +22,19 @@ import {
   jsonSchema,
   streamObject,
   streamText,
+  tool,
 } from "ai";
 import { assert } from "convex-helpers";
-import {
-  ConvexToZod,
-  convexToZod,
-  zodToConvex,
-} from "convex-helpers/server/zod";
 import { internalActionGeneric } from "convex/server";
-import { Infer, v, Validator } from "convex/values";
+import { v } from "convex/values";
 import { z } from "zod";
 import { Mounts } from "../component/_generated/api";
 import {
   validateVectorDimension,
-  VectorDimension,
+  type VectorDimension,
 } from "../component/vector/tables";
 import {
-  AIMessageWithoutId,
+  type AIMessageWithoutId,
   deserializeMessage,
   promptOrMessagesToCoreMessages,
   serializeMessageWithId,
@@ -68,7 +65,6 @@ import {
   UseApi,
 } from "./types.js";
 
-export { convexToZod, zodToConvex };
 export type { ThreadDoc, MessageDoc } from "./types.js";
 
 /**
@@ -1104,32 +1100,63 @@ export type ToolCtx = RunActionCtx & {
   messageId?: string;
 };
 
+// Vendoring in from "ai" package since it wasn't exported
+type ToolParameters = z.ZodTypeAny | Schema<unknown>;
+type inferParameters<PARAMETERS extends ToolParameters> =
+  PARAMETERS extends Schema<unknown>
+    ? PARAMETERS["_type"]
+    : PARAMETERS extends z.ZodTypeAny
+      ? z.infer<PARAMETERS>
+      : never;
+
 /**
- * This is a wrapper around the ai.tool function that adds support for
- * userId and threadId to the tool, if they're called within a thread from an agent.
- * @param tool The AI tool. See https://sdk.vercel.ai/docs/ai-sdk-core/tools-and-tool-calling
- * @returns The same tool, but with userId and threadId args support added.
+ * This is a wrapper around the ai.tool function that adds extra context to the
+ * tool call, including the action context, userId, threadId, and messageId.
+ * @param tool The tool. See https://sdk.vercel.ai/docs/ai-sdk-core/tools-and-tool-calling
+ * but swap parameters for args and handler for execute.
+ * @returns A tool to be used with the AI SDK.
  */
-export function createTool<
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  V extends Validator<any, any, any>,
-  RESULT,
->(convexTool: {
-  args: V;
+export function createTool<PARAMETERS extends ToolParameters, RESULT>(t: {
+  /**
+  An optional description of what the tool does.
+  Will be used by the language model to decide whether to use the tool.
+  Not used for provider-defined tools.
+     */
   description?: string;
+  /**
+  The schema of the input that the tool expects. The language model will use this to generate the input.
+  It is also used to validate the output of the language model.
+  Use descriptions to make the input understandable for the language model.
+     */
+  args: PARAMETERS;
+  /**
+  An async function that is called with the arguments from the tool call and produces a result.
+  If not provided, the tool will not be executed automatically.
+
+  @args is the input of the tool call.
+  @options.abortSignal is a signal that can be used to abort the tool call.
+     */
   handler: (
     ctx: ToolCtx,
-    args: Infer<V>,
+    args: inferParameters<PARAMETERS>,
     options: ToolExecutionOptions
   ) => PromiseLike<RESULT>;
   ctx?: ToolCtx;
-}): Tool<ConvexToZod<V>, RESULT> {
-  const tool = {
+}): Tool<PARAMETERS, RESULT> & {
+  execute: (
+    args: inferParameters<PARAMETERS>,
+    options: ToolExecutionOptions
+  ) => PromiseLike<RESULT>;
+} {
+  const args = {
     __acceptsCtx: true,
-    ctx: convexTool.ctx,
-    description: convexTool.description,
-    parameters: convexToZod(convexTool.args),
-    async execute(args: Infer<V>, options: ToolExecutionOptions) {
+    ctx: t.ctx,
+    description: t.description,
+    parameters: t.args,
+    async execute(
+      args: inferParameters<PARAMETERS>,
+      options: ToolExecutionOptions
+    ) {
       if (!this.ctx) {
         throw new Error(
           "To use a Convex tool, you must either provide the ctx" +
@@ -1137,10 +1164,10 @@ export function createTool<
             " call it (which injects the ctx, userId and threadId)"
         );
       }
-      return convexTool.handler(this.ctx, args, options);
+      return t.handler(this.ctx, args, options);
     },
   };
-  return tool;
+  return tool(args);
 }
 
 function wrapTools(

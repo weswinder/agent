@@ -33,8 +33,8 @@ const fashionAgent = new Agent(components.agent, {
   tools: {
     getUserPreferences: createTool({
       description: "Get clothing preferences for a user",
-      args: v.object({
-        search: v.string(),
+      args: z.object({
+        search: z.string(),
       }),
       handler: async (ctx, args) => {
         console.log("getting user preferences", args);
@@ -279,11 +279,11 @@ export const runAgentAsTool = action({
     const agentWithToolsAsTool = createTool({
       description:
         "agentWithTools which can either doSomething or doSomethingElse",
-      args: v.object({
-        whatToDo: v.union(
-          v.literal("doSomething"),
-          v.literal("doSomethingElse"),
-        ),
+      args: z.object({
+        whatToDo: z.union([
+          z.literal("doSomething"),
+          z.literal("doSomethingElse"),
+        ]),
       }),
       handler: async (ctx, args) => {
         // Create a nested thread to call the agent with tools
