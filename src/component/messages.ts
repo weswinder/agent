@@ -850,7 +850,7 @@ export const _fetchVectorMessages = internalQuery({
       }
     }
     for (const r of Object.values(ranges).flat()) {
-      if (!messages.includes(r)) {
+      if (!messages.some((m) => m._id === r._id)) {
         messages.push(r);
       }
     }
