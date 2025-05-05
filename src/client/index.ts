@@ -48,24 +48,26 @@ import {
   extractText,
 } from "../shared";
 import {
-  CallSettings,
-  ProviderMetadata,
-  ProviderOptions,
-  SearchOptions,
+  type CallSettings,
+  type ProviderMetadata,
+  type ProviderOptions,
+  type SearchOptions,
   vContextOptions,
   vSafeObjectArgs,
   vStorageOptions,
   vTextArgs,
 } from "../validators";
-import {
-  MessageDoc,
+import type {
+  OpaqueIds,
   RunActionCtx,
   RunMutationCtx,
   RunQueryCtx,
   UseApi,
 } from "./types.js";
+import type { Doc } from "../component/_generated/dataModel";
 
-export type { ThreadDoc, MessageDoc } from "./types.js";
+export type ThreadDoc = OpaqueIds<Doc<"threads">>;
+export type MessageDoc = OpaqueIds<Doc<"messages">>;
 
 /**
  * Options to configure what messages are fetched as context,
