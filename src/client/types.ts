@@ -7,7 +7,6 @@ import {
   GenericActionCtx,
 } from "convex/server";
 import { GenericId } from "convex/values";
-import type { Doc } from "../component/_generated/dataModel";
 
 
 /* Type utils follow */

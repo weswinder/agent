@@ -1,8 +1,13 @@
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
-import { vThreadStatus, vMessage, vMessageStatus, vStep } from "../validators";
+import {
+  vThreadStatus,
+  vMessage,
+  vMessageStatus,
+  vStep,
+} from "../validators.js";
 import { typedV } from "convex-helpers/validators";
-import vectorTables, { vVectorId } from "./vector/tables";
+import vectorTables, { vVectorId } from "./vector/tables.js";
 
 export const schema = defineSchema({
   threads: defineTable({

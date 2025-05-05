@@ -26,13 +26,13 @@ import {
 } from "ai";
 import { assert } from "convex-helpers";
 import { internalActionGeneric } from "convex/server";
-import { v } from "convex/values";
+import { Infer, v } from "convex/values";
 import { z } from "zod";
-import { Mounts } from "../component/_generated/api";
+import { Mounts } from "../component/_generated/api.js";
 import {
   validateVectorDimension,
   type VectorDimension,
-} from "../component/vector/tables";
+} from "../component/vector/tables.js";
 import {
   type AIMessageWithoutId,
   deserializeMessage,
@@ -41,12 +41,12 @@ import {
   serializeNewMessagesInStep,
   serializeObjectResult,
   serializeStep,
-} from "../mapping";
+} from "../mapping.js";
 import {
   DEFAULT_MESSAGE_RANGE,
   DEFAULT_RECENT_MESSAGES,
   extractText,
-} from "../shared";
+} from "../shared.js";
 import {
   type CallSettings,
   type ProviderMetadata,
@@ -56,7 +56,7 @@ import {
   vSafeObjectArgs,
   vStorageOptions,
   vTextArgs,
-} from "../validators";
+} from "../validators.js";
 import type {
   OpaqueIds,
   RunActionCtx,
@@ -64,10 +64,18 @@ import type {
   RunQueryCtx,
   UseApi,
 } from "./types.js";
-import type { Doc } from "../component/_generated/dataModel";
+import schema from "../component/schema.js";
 
-export type ThreadDoc = OpaqueIds<Doc<"threads">>;
-export type MessageDoc = OpaqueIds<Doc<"messages">>;
+export type ThreadDoc = OpaqueIds<
+  { _id: string; _creationTime: number } & Infer<
+    typeof schema.tables.threads.validator
+  >
+>;
+export type MessageDoc = OpaqueIds<
+  { _id: string; _creationTime: number } & Infer<
+    typeof schema.tables.messages.validator
+  >
+>;
 
 /**
  * Options to configure what messages are fetched as context,
