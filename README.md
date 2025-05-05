@@ -111,7 +111,7 @@ export default app;
 ```ts
 import { v } from "convex/values";
 import { components } from "./_generated/api";
-import { Agent } from "@convex-dev/agent";
+import { Agent, createTool } from "@convex-dev/agent";
 import { openai } from "@ai-sdk/openai";
 import { tool } from "ai";
 
@@ -126,6 +126,14 @@ const supportAgent = new Agent(components.agent, {
   tools: {
     // Standard AI SDK tool
     myTool: tool({ description, parameters, execute: () => {}}),
+    // Convex tool
+    myConvexTool: createTool({
+      description: "My Convex tool",
+      args: v.object({...}),
+      handler: async (ctx, args) => {
+        return "Hello, world!";
+      },
+    }),
   },
   // Used for fetching context messages.
   contextOptions: {

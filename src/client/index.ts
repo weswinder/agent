@@ -10,7 +10,9 @@ import type {
   StreamObjectResult,
   StreamTextResult,
   TelemetrySettings,
+  Tool,
   ToolChoice,
+  ToolExecutionOptions,
   ToolSet,
 } from "ai";
 import {
@@ -21,9 +23,13 @@ import {
   streamText,
 } from "ai";
 import { assert } from "convex-helpers";
-import { convexToZod, zodToConvex } from "convex-helpers/server/zod";
+import {
+  ConvexToZod,
+  convexToZod,
+  zodToConvex,
+} from "convex-helpers/server/zod";
 import { internalActionGeneric } from "convex/server";
-import { v } from "convex/values";
+import { Infer, v, Validator } from "convex/values";
 import { z } from "zod";
 import { Mounts } from "../component/_generated/api";
 import {
@@ -170,7 +176,11 @@ export class Agent<AgentTools extends ToolSet> {
       instructions?: string;
       /**
        * Tools that the agent can call out to and get responses from.
-       * They should be AI SDK tools (import { tool } from "ai")
+       * They can be AI SDK tools (import {tool} from "ai")
+       * or tools that have Convex context
+       * (import { createTool } from "@convex-dev/agent")
+       * Note: Convex tools can't currently annotate the parameters
+       * with descriptions, so the names should be self-evident from naming.
        */
       tools?: AgentTools;
       /**
@@ -625,7 +635,8 @@ export class Agent<AgentTools extends ToolSet> {
       ctx,
       { ...args, userId, threadId }
     );
-    const tools = { ...this.options.tools, ...args.tools } as TOOLS;
+    const toolCtx = { ...ctx, userId, threadId, messageId };
+    const tools = wrapTools(toolCtx, this.options.tools, args.tools) as TOOLS;
     const saveOutputMessages =
       args.saveOutputMessages ??
       this.options.storageOptions?.saveOutputMessages;
@@ -695,7 +706,8 @@ export class Agent<AgentTools extends ToolSet> {
       ctx,
       { ...args, userId, threadId }
     );
-    const tools = { ...this.options.tools, ...args.tools } as TOOLS;
+    const toolCtx = { ...ctx, userId, threadId, messageId };
+    const tools = wrapTools(toolCtx, this.options.tools, args.tools) as TOOLS;
     const saveOutputMessages =
       args.saveOutputMessages ??
       this.options.storageOptions?.saveOutputMessages;
@@ -1084,6 +1096,45 @@ export class Agent<AgentTools extends ToolSet> {
       },
     });
   }
+
+  /**
+   * Create a tool out of this agent so other agents can call this one.
+   * Create a tool out of this agent so other agents can call this one.
+   * @param spec The specification for the arguments to this agent.
+   *   They will be encoded as JSON and passed to the agent.
+   * @returns The agent as a tool that can be passed to other agents.
+   */
+  asTool(spec: {
+    description: string;
+    args: Validator<unknown, "required", string>;
+    contextOptions?: ContextOptions;
+    maxSteps?: number;
+    provideMessageHistory?: boolean;
+  }) {
+    return createTool({
+      ...spec,
+      handler: async (ctx, args, options) => {
+        const maxSteps = spec.maxSteps ?? this.options.maxSteps;
+        const contextOptions =
+          spec.contextOptions && this.mergedContextOptions(spec.contextOptions);
+        const { thread } = await this.createThread(ctx, {
+          parentThreadIds: ctx.threadId ? [ctx.threadId] : undefined,
+          userId: ctx.userId,
+        });
+        const messages = spec.provideMessageHistory ? options.messages : [];
+        messages.push({
+          role: "user",
+          content: JSON.stringify(args),
+        });
+        const value = await thread.generateText({
+          messages,
+          maxSteps,
+          ...contextOptions,
+        });
+        return value.text;
+      },
+    });
+  }
 }
 
 export type ToolCtx = RunActionCtx & {
@@ -1091,6 +1142,67 @@ export type ToolCtx = RunActionCtx & {
   threadId?: string;
   messageId?: string;
 };
+
+/**
+ * This is a wrapper around the ai.tool function that adds support for
+ * userId and threadId to the tool, if they're called within a thread from an agent.
+ * @param tool The AI tool. See https://sdk.vercel.ai/docs/ai-sdk-core/tools-and-tool-calling
+ * @returns The same tool, but with userId and threadId args support added.
+ */
+export function createTool<
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  V extends Validator<any, any, any>,
+  RESULT,
+>(convexTool: {
+  args: V;
+  description?: string;
+  handler: (
+    ctx: ToolCtx,
+    args: Infer<V>,
+    options: ToolExecutionOptions
+  ) => PromiseLike<RESULT>;
+  ctx?: ToolCtx;
+}): Tool<ConvexToZod<V>, RESULT> {
+  const tool = {
+    __acceptsCtx: true,
+    ctx: convexTool.ctx,
+    description: convexTool.description,
+    parameters: convexToZod(convexTool.args),
+    async execute(args: Infer<V>, options: ToolExecutionOptions) {
+      if (!this.ctx) {
+        throw new Error(
+          "To use a Convex tool, you must either provide the ctx" +
+            " at definition time (dynamically in an action), or use the Agent to" +
+            " call it (which injects the ctx, userId and threadId)"
+        );
+      }
+      return convexTool.handler(this.ctx, args, options);
+    },
+  };
+  return tool;
+}
+
+function wrapTools(
+  ctx: ToolCtx,
+  ...toolSets: (ToolSet | undefined)[]
+): ToolSet {
+  const output = {} as ToolSet;
+  for (const toolSet of toolSets) {
+    if (!toolSet) {
+      continue;
+    }
+    for (const [name, tool] of Object.entries(toolSet)) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      if (!(tool as any).__acceptsCtx) {
+        output[name] = tool;
+      } else {
+        const out = { ...tool, ctx };
+        output[name] = out;
+      }
+    }
+  }
+  return output;
+}
 
 type TextArgs<
   AgentTools extends ToolSet,
