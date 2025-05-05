@@ -1109,9 +1109,11 @@ export type ToolCtx = RunActionCtx & {
 };
 
 // Vendoring in from "ai" package since it wasn't exported
-type ToolParameters = z.ZodTypeAny | Schema<unknown>;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type ToolParameters = z.ZodTypeAny | Schema<any>;
 type inferParameters<PARAMETERS extends ToolParameters> =
-  PARAMETERS extends Schema<unknown>
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  PARAMETERS extends Schema<any>
     ? PARAMETERS["_type"]
     : PARAMETERS extends z.ZodTypeAny
       ? z.infer<PARAMETERS>

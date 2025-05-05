@@ -10,14 +10,15 @@ import { openai } from "@ai-sdk/openai";
 import { createTool } from "@convex-dev/agent";
 import { Id } from "./_generated/dataModel";
 import type { MessageDoc } from "@convex-dev/agent";
-
+import { z } from "zod";
+import { zid } from "convex-helpers/server/zod";
 /**
  * TOOLS
  */
 export const ideaSearch = createTool({
   description: "Search for ideas by space-delimited keywords",
-  args: v.object({
-    query: v.string(),
+  args: z.object({
+    query: z.string(),
   }),
   handler: async (
     ctx,
@@ -43,11 +44,11 @@ export const ideaCreation = createTool({
   description:
     "Create a new idea with an initial entryId. " +
     "You can pass in the entryId of what inspired the idea.",
-  args: v.object({
-    title: v.string(),
-    summary: v.string(),
-    tags: v.array(v.string()),
-    entryId: v.union(v.id("entries"), v.null()),
+  args: z.object({
+    title: z.string(),
+    summary: z.string(),
+    tags: z.array(z.string()),
+    entryId: z.union([zid("entries"), z.null()]),
   }),
   handler: async (ctx, args): Promise<Id<"ideas">> => {
     console.log("creating idea", args);
@@ -58,12 +59,12 @@ export const ideaCreation = createTool({
 export const ideaUpdate = createTool({
   description:
     "Update an idea identified by ideaId to include an entryId, and update the title, summary, and tags accordingly",
-  args: v.object({
-    ideaId: v.id("ideas"),
-    title: v.union(v.string(), v.null()),
-    summary: v.union(v.string(), v.null()),
-    tags: v.union(v.array(v.string()), v.null()),
-    entryId: v.id("entries"),
+  args: z.object({
+    ideaId: zid("ideas"),
+    title: z.union([z.string(), z.null()]),
+    summary: z.union([z.string(), z.null()]),
+    tags: z.union([z.array(z.string()), z.null()]),
+    entryId: zid("entries"),
   }),
   handler: async (ctx, args) => {
     console.log("updating idea", args);
@@ -74,11 +75,11 @@ export const ideaUpdate = createTool({
 export const ideaMerge = createTool({
   description:
     "Merge two ideas, deleting the source and adding its entries to the target",
-  args: v.object({
-    sourceIdeaId: v.id("ideas"),
-    targetIdeaId: v.id("ideas"),
-    newTargetTitle: v.string(),
-    newTargetSummary: v.string(),
+  args: z.object({
+    sourceIdeaId: zid("ideas"),
+    targetIdeaId: zid("ideas"),
+    newTargetTitle: z.string(),
+    newTargetSummary: z.string(),
   }),
   handler: (ctx, args): Promise<null> => {
     console.log("merging ideas", args);
@@ -88,9 +89,9 @@ export const ideaMerge = createTool({
 
 export const attachEntryToIdea = createTool({
   description: "Combine an entry into an existing idea",
-  args: v.object({
-    ideaId: v.id("ideas"),
-    entryId: v.id("entries"),
+  args: z.object({
+    ideaId: zid("ideas"),
+    entryId: zid("entries"),
   }),
   handler: (ctx, args): Promise<null> => {
     console.log("attaching entry to idea", args);
