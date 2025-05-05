@@ -4,13 +4,7 @@ import { Agent, createTool } from "@convex-dev/agent";
 import type { ThreadDoc } from "@convex-dev/agent";
 import { components, internal } from "./_generated/api";
 import { openai } from "@ai-sdk/openai";
-import {
-  action,
-  httpAction,
-  internalMutation,
-  mutation,
-  query,
-} from "./_generated/server";
+import { action, httpAction, mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import { z } from "zod";
 import { getGeocoding, getWeather } from "./weather";
@@ -56,18 +50,7 @@ const fashionAgent = new Agent(components.agent, {
   maxSteps: 5,
 });
 
-// Create a thread from within a mutation
-export const createThread = internalMutation({
-  args: { userId: v.optional(v.string()) },
-  handler: async (ctx, { userId }) => {
-    const { threadId } = await weatherAgent.createThread(ctx, {
-      userId,
-    });
-    return { threadId };
-  },
-});
-
-// Use the agent from within an action to also generate text:
+// Create a thread from within a mutation and generate text
 export const createThreadAndGenerateText = action({
   args: { location: v.string(), userId: v.optional(v.string()) },
   handler: async (ctx, { location, userId }) => {
@@ -75,6 +58,7 @@ export const createThreadAndGenerateText = action({
       userId,
       title: `Weather in ${location}`,
     });
+    // Use the thread object from within an action to generate text:
     const result = await thread.generateText({
       prompt: `What is the weather in ${location}?`,
     });
@@ -97,6 +81,7 @@ export const continueThread = action({
 /**
  * Expose the agents as actions
  */
+export const createThread = weatherAgent.createThreadMutation();
 export const getForecast = weatherAgent.asTextAction({
   maxSteps: 3,
 });

@@ -24,8 +24,8 @@ import {
   tool,
 } from "ai";
 import { assert } from "convex-helpers";
-import { internalActionGeneric } from "convex/server";
-import { Infer } from "convex/values";
+import { internalActionGeneric, internalMutationGeneric } from "convex/server";
+import { Infer, v } from "convex/values";
 import { z } from "zod";
 import { Mounts } from "../component/_generated/api.js";
 import {
@@ -1003,6 +1003,39 @@ export class Agent<AgentTools extends ToolSet> {
       search.vectorModel = this.options.textEmbedding.modelId;
     }
     return search;
+  }
+
+  /**
+   * Create a mutation that creates a thread so you can call it from a Workflow.
+   * e.g.
+   * ```ts
+   * // in convex/foo.ts
+   * export const createThread = weatherAgent.createThreadMutation();
+   *
+   * const workflow = new WorkflowManager(components.workflow);
+   * export const myWorkflow = workflow.define({
+   *   args: {},
+   *   handler: async (step) => {
+   *     const { threadId } = await step.runMutation(internal.foo.createThread);
+   *     // use the threadId to generate text, object, etc.
+   *   },
+   * });
+   * ```
+   * @returns A mutation that creates a thread.
+   */
+  createThreadMutation() {
+    return internalMutationGeneric({
+      args: {
+        userId: v.optional(v.string()),
+        parentThreadIds: v.optional(v.array(v.string())),
+        title: v.optional(v.string()),
+        summary: v.optional(v.string()),
+      },
+      handler: async (ctx, args) => {
+        const { threadId } = await this.createThread(ctx, args);
+        return { threadId };
+      },
+    });
   }
 
   /**
