@@ -80,8 +80,12 @@ export const continueThread = action({
 /**
  * Expose the agents as actions
  */
-export const weatherAgentAction = weatherAgent.asAction({ maxSteps: 3 });
-export const fashionAgentAction = fashionAgent.asAction();
+export const {
+  createThread: createThreadAction,
+  generateText: getWeatherAction,
+} = weatherAgent.asActions({ maxSteps: 3 });
+export const { generateText: getFashionSuggestionAction } =
+  fashionAgent.asActions();
 
 /**
  * Use agent actions in a workflow
@@ -94,21 +98,22 @@ const s = internal.example; // where steps are defined
 export const weatherAgentWorkflow = workflow.define({
   args: { location: v.string() },
   handler: async (step, { location }): Promise<string> => {
-    const threadId = await step.runAction(s.weatherAgentAction, {
-      createThread: {},
+    const threadId = await step.runAction(s.createThreadAction, {
+      title: `Weather in ${location}`,
     });
     console.log("threadId", threadId);
-    const weather = await step.runAction(s.weatherAgentAction, {
+    const weather = await step.runAction(s.getWeatherAction, {
       threadId,
-      generateText: { prompt: `What is the weather in ${location}?` },
+      prompt: `What is the weather in ${location}?`,
     });
     console.log("weather", weather);
-    const fashionSuggestion = await step.runAction(s.fashionAgentAction, {
-      threadId,
-      generateText: {
-        prompt: `What should I wear in ${location} if the weather is ${weather}?`,
+    const fashionSuggestion = await step.runAction(
+      s.getFashionSuggestionAction,
+      {
+        threadId,
+        prompt: `What should I wear based on the weather?`,
       },
-    });
+    );
     console.log("fashionSuggestion", fashionSuggestion);
     return fashionSuggestion;
   },

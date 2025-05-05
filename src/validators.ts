@@ -320,9 +320,20 @@ export const vCallSettingsFields = {
 };
 export type CallSettings = ObjectType<typeof vCallSettingsFields>;
 
-export const vTextArgs = v.object({
+const vCommonArgs = {
+  userId: v.optional(v.string()),
+  threadId: v.optional(v.string()),
+  contextOptions: v.optional(vContextOptions),
+  storageOptions: v.optional(vStorageOptions),
+  parentMessageId: v.optional(v.string()),
+  providerOptions,
+  experimental_providerMetadata,
   ...vCallSettingsFields,
   ...vPromptFields,
+};
+
+export const vTextArgs = v.object({
+  ...vCommonArgs,
   toolChoice: v.optional(
     v.union(
       v.literal("auto"),
@@ -341,16 +352,9 @@ export const vTextArgs = v.object({
 });
 export type TextArgs = Infer<typeof vTextArgs>;
 
-const objectArgsCommonFields = {
-  ...vCallSettingsFields,
-  ...vPromptFields,
-  providerOptions,
-  experimental_providerMetadata,
-};
-
 export const vSafeObjectArgs = v.union(
   v.object({
-    ...objectArgsCommonFields,
+    ...vCommonArgs,
     output: v.optional(v.literal("object")),
     schema: v.any(), // JSON schema
     schemaName: v.optional(v.string()),
@@ -360,8 +364,8 @@ export const vSafeObjectArgs = v.union(
     ),
   }),
   v.object({
-    ...objectArgsCommonFields,
-    output: v.optional(v.literal("array")),
+    ...vCommonArgs,
+    output: v.literal("array"),
     schema: v.any(), // JSON schema
     schemaName: v.optional(v.string()),
     schemaDescription: v.optional(v.string()),
@@ -370,15 +374,15 @@ export const vSafeObjectArgs = v.union(
     ),
   }),
   v.object({
-    ...objectArgsCommonFields,
-    output: v.optional(v.literal("enum")),
+    ...vCommonArgs,
+    output: v.literal("enum"),
     enum: v.array(v.string()),
     mode: v.optional(
       v.union(v.literal("auto"), v.literal("json"), v.literal("tool"))
     ),
   }),
   v.object({
-    ...objectArgsCommonFields,
+    ...vCommonArgs,
     output: v.literal("no-schema"),
     mode: v.optional(v.literal("json")),
   })

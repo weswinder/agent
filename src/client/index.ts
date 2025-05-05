@@ -26,7 +26,7 @@ import {
 } from "ai";
 import { assert } from "convex-helpers";
 import { internalActionGeneric } from "convex/server";
-import { Infer, v } from "convex/values";
+import { Infer, ObjectType, v } from "convex/values";
 import { z } from "zod";
 import { Mounts } from "../component/_generated/api.js";
 import {
@@ -1015,90 +1015,100 @@ export class Agent<AgentTools extends ToolSet> {
    * @param spec Configuration for the agent acting as an action, including
    *   {@link ContextOptions} and maxSteps.
    */
-  asAction(spec?: { contextOptions?: ContextOptions; maxSteps?: number }) {
-    return internalActionGeneric({
-      args: {
-        userId: v.optional(v.string()),
-        threadId: v.optional(v.string()),
-        contextOptions: v.optional(vContextOptions),
-        storageOptions: v.optional(vStorageOptions),
-        maxRetries: v.optional(v.number()),
-        parentMessageId: v.optional(v.string()),
+  asActions(spec?: { contextOptions?: ContextOptions; maxSteps?: number }) {
+    const vCommonArgs = {
+      contextOptions: v.optional(vContextOptions),
+      storageOptions: v.optional(vStorageOptions),
+      maxRetries: v.optional(v.number()),
+      parentMessageId: v.optional(v.string()),
+    };
+    const maxSteps = spec?.maxSteps ?? this.options.maxSteps;
 
-        createThread: v.optional(
-          v.object({
-            userId: v.optional(v.string()),
-            parentThreadIds: v.optional(v.array(v.string())),
-            title: v.optional(v.string()),
-            summary: v.optional(v.string()),
-          })
-        ),
-        generateText: v.optional(vTextArgs),
-        streamText: v.optional(vTextArgs),
-        generateObject: v.optional(vSafeObjectArgs),
-        streamObject: v.optional(vSafeObjectArgs),
+    const argsWithDefaults = <
+      T extends {
+        parentMessageId?: string;
+        contextOptions?: ContextOptions;
+        storageOptions?: StorageOptions;
+        maxRetries?: number;
       },
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      handler: async (ctx, args): Promise<any> => {
-        const contextOptions =
-          spec?.contextOptions &&
-          this.mergedContextOptions(spec.contextOptions);
-        const maxSteps = spec?.maxSteps ?? this.options.maxSteps;
-        const commonArgs = {
-          userId: args.userId,
-          threadId: args.threadId,
-          parentMessageId: args.parentMessageId,
-          ...contextOptions,
-          ...args.storageOptions,
-        };
-        if (args.createThread) {
+    >(
+      args: T
+    ): T & ContextOptions & StorageOptions => {
+      const contextOptions =
+        spec?.contextOptions && this.mergedContextOptions(spec.contextOptions);
+      return {
+        maxSteps,
+        ...args,
+        ...contextOptions,
+        ...args.storageOptions,
+      };
+    };;
+
+    return {
+      createThread: internalActionGeneric({
+        args: {
+          userId: v.optional(v.string()),
+          parentThreadIds: v.optional(v.array(v.string())),
+          title: v.optional(v.string()),
+          summary: v.optional(v.string()),
+        },
+        handler: async (ctx, { userId, parentThreadIds, title, summary }) => {
           const { threadId } = await this.createThread(ctx, {
-            userId: args.createThread.userId,
-            parentThreadIds: args.createThread.parentThreadIds,
-            title: args.createThread.title,
-            summary: args.createThread.summary,
+            userId,
+            parentThreadIds,
+            title,
+            summary,
           });
           return threadId;
-        } else if (args.generateText) {
-          const value = await this.generateText(ctx, commonArgs, {
-            ...args.generateText,
-            maxSteps: args.generateText.maxSteps ?? maxSteps,
-          });
+        },
+      }),
+      generateText: internalActionGeneric({
+        args: vTextArgs,
+        handler: async (ctx, args) => {
+          const value = await this.generateText(
+            ctx,
+            args,
+            argsWithDefaults(args)
+          );
           return value.text;
-        } else if (args.streamText) {
-          const value = await this.streamText(ctx, commonArgs, {
-            ...args.streamText,
-            maxSteps: args.streamText.maxSteps ?? maxSteps,
-          });
+        },
+      }),
+      streamText: internalActionGeneric({
+        args: vTextArgs,
+        handler: async (ctx, args) => {
+          const value = await this.streamText(
+            ctx,
+            args,
+            argsWithDefaults(args)
+          );
           await value.consumeStream();
           return await value.text;
-        } else if (args.generateObject) {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const { schema, ...rest } = args.generateObject as { schema?: any };
-          const value = await this.generateObject(ctx, commonArgs, {
-            ...rest,
-            schema: jsonSchema(schema),
+        },
+      }),
+      generateObject: internalActionGeneric({
+        args: vSafeObjectArgs,
+        handler: async (ctx, args) => {
+          const value = await this.generateObject(ctx, args, {
+            ...argsWithDefaults(args),
+            schema: "schema" in args ? jsonSchema(args.schema) : undefined,
           } as unknown as OurObjectArgs<unknown>);
           return value.object;
-        } else if (args.streamObject) {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const { schema, ...rest } = args.streamObject as { schema?: any };
-          const value = await this.streamObject(ctx, commonArgs, {
-            ...rest,
-            schema: jsonSchema(schema),
+        },
+      }),
+      streamObject: internalActionGeneric({
+        args: vSafeObjectArgs,
+        handler: async (ctx, args) => {
+          const value = await this.streamObject(ctx, argsWithDefaults(args), {
+            ...argsWithDefaults(args),
+            schema: "schema" in args ? jsonSchema(args.schema) : undefined,
           } as unknown as OurStreamObjectArgs<unknown>);
           for await (const _ of value.fullStream) {
             // no-op, just consume the stream
           }
           return value.object;
-        } else {
-          throw new Error(
-            "No action specified. Maybe try :" +
-              'generateText: { prompt: "Hello world" }'
-          );
-        }
-      },
-    });
+        },
+      }),
+    };
   }
 }
 

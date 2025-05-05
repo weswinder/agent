@@ -52,21 +52,22 @@ export const continueThread = action({
 });
 
 // Or use it within a workflow, specific to a user:
-export const supportAgentStep = supportAgent.asAction({ maxSteps: 10 });
+export const { generateText: getSupport } = supportAgent.asActions({ maxSteps: 10 });
 
 const workflow = new WorkflowManager(components.workflow);
-const s = internal.example; // where steps are defined
 
 export const supportAgentWorkflow = workflow.define({
   args: { prompt: v.string(), userId: v.string(), threadId: v.string() },
   handler: async (step, { prompt, userId, threadId }) => {
-    const suggestion = await step.runAction(s.supportAgentStep, {
-      threadId, generateText: { prompt },
+    const suggestion = await step.runAction(internal.example.getSupport, {
+      threadId, userId, prompt,
     });
-    const polished = await step.runAction(s.adaptSuggestionForUser, {
-      suggestion, userId,
+    const polished = await step.runAction(internal.example.adaptSuggestionForUser, {
+      userId, suggestion,
     });
-    await step.runMutation(s.sendUserMessage, { userId, message: polished.message });
+    await step.runMutation(internal.example.sendUserMessage, {
+      userId, message: polished.message,
+    });
   },
 });
 ```
@@ -216,18 +217,11 @@ export const continueThread = action({
 
 ### Exposing the agent as a Convex action
 
-```ts
-export const supportAgentStep = supportAgent.asAction({ maxSteps: 10 });
+You can expose the agent as a Convex action by calling `asActions` on it.
+You can destructure the actions you want to expose.
 
-// Then from within another action:
-export const callSupportAgent = action({
-  args: { prompt: v.string(), userId: v.string(), threadId: v.string() },
-  handler: async (ctx, { prompt, userId, threadId }) => {
-    const suggestion = await ctx.runAction(s.supportAgentStep, {
-      threadId, userId, generateText: { prompt },
-    });
-  },
-});
+```ts
+export const { generateText: getSupport } = supportAgent.asActions({ maxSteps: 10 });
 ```
 
 ### Using the agent within a workflow
@@ -239,18 +233,19 @@ and more. Read more about durable workflows
 
 ```ts
 const workflow = new WorkflowManager(components.workflow);
-const s = internal.example; // where steps are defined
 
 export const supportAgentWorkflow = workflow.define({
   args: { prompt: v.string(), userId: v.string(), threadId: v.string() },
   handler: async (step, { prompt, userId, threadId }) => {
-    const suggestion = await step.runAction(s.supportAgentStep, {
-      threadId, userId, generateText: { prompt },
+    const suggestion = await step.runAction(internal.example.getSupport, {
+      threadId, userId, prompt,
     });
-    const polished = await step.runAction(s.adaptSuggestionForUser, {
-      threadId, userId, generateText: { prompt: suggestion },
+    const polished = await step.runAction(internal.example.adaptSuggestionForUser, {
+      userId, suggestion,
     });
-    await step.runMutation(s.sendUserMessage, { userId, message: polished.message });
+    await step.runMutation(internal.example.sendUserMessage, {
+      userId, message: polished.message,
+    });
   },
 });
 ```
