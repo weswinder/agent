@@ -217,18 +217,30 @@ export const continueThread = action({
 
 ### Exposing the agent as a Convex action
 
-You can expose the agent as a Convex action by calling `asActions` on it.
-You can destructure the actions you want to expose.
+You can expose the agent as a Convex internal action.
+This is generally used from a workflow, where each step is a new thread message.
 
 ```ts
-export const { generateText: getSupport } = supportAgent.asActions({ maxSteps: 10 });
+export const getSupport = supportAgent.asTextAction({
+  maxSteps: 10,
+});
 ```
 
-### Using the agent within a workflow
+You can also expose an action that generates an object.
+
+```ts
+export const getStructuredSupport = supportAgent.asObjectAction({
+  schema: z.object({
+    analysis: z.string().describe("A detailed analysis of the user's request."),
+    suggestion: z.string().describe("A suggested action to take.")}),
+});
+```
+
+### Using the agent actions within a workflow
 
 You can use the [Workflow component](https://convex.dev/components/workflow)
-to run, with retries and guarantees of eventually completing, surviving server restarts,
-and more. Read more about durable workflows
+to run agent flows. It handles retries and guarantees of eventually completing,
+surviving server restarts, and more. Read more about durable workflows
 [in this Stack post](https://stack.convex.dev/durable-workflows-and-strong-guarantees).
 
 ```ts
@@ -249,6 +261,8 @@ export const supportAgentWorkflow = workflow.define({
   },
 });
 ```
+
+See another example in [example.ts](./example/convex/example.ts#L120).
 
 ### Fetching thread history
 
