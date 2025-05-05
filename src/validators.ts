@@ -352,41 +352,7 @@ export const vTextArgs = v.object({
 });
 export type TextArgs = Infer<typeof vTextArgs>;
 
-export const vSafeObjectArgs = v.union(
-  v.object({
-    ...vCommonArgs,
-    output: v.optional(v.literal("object")),
-    schema: v.any(), // JSON schema
-    schemaName: v.optional(v.string()),
-    schemaDescription: v.optional(v.string()),
-    mode: v.optional(
-      v.union(v.literal("auto"), v.literal("json"), v.literal("tool"))
-    ),
-  }),
-  v.object({
-    ...vCommonArgs,
-    output: v.literal("array"),
-    schema: v.any(), // JSON schema
-    schemaName: v.optional(v.string()),
-    schemaDescription: v.optional(v.string()),
-    mode: v.optional(
-      v.union(v.literal("auto"), v.literal("json"), v.literal("tool"))
-    ),
-  }),
-  v.object({
-    ...vCommonArgs,
-    output: v.literal("enum"),
-    enum: v.array(v.string()),
-    mode: v.optional(
-      v.union(v.literal("auto"), v.literal("json"), v.literal("tool"))
-    ),
-  }),
-  v.object({
-    ...vCommonArgs,
-    output: v.literal("no-schema"),
-    mode: v.optional(v.literal("json")),
-  })
-);
+export const vSafeObjectArgs = v.object(vCommonArgs);
 export type SafeObjectArgs = Infer<typeof vSafeObjectArgs>;
 
 export const vEmbeddingsWithMetadata = v.object({

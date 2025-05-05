@@ -4,7 +4,13 @@ import { Agent, createTool } from "@convex-dev/agent";
 import type { ThreadDoc } from "@convex-dev/agent";
 import { components, internal } from "./_generated/api";
 import { openai } from "@ai-sdk/openai";
-import { action, httpAction, mutation, query } from "./_generated/server";
+import {
+  action,
+  httpAction,
+  internalMutation,
+  mutation,
+  query,
+} from "./_generated/server";
 import { v } from "convex/values";
 import { z } from "zod";
 import { getGeocoding, getWeather } from "./weather";
@@ -34,7 +40,7 @@ const fashionAgent = new Agent(components.agent, {
     getUserPreferences: createTool({
       description: "Get clothing preferences for a user",
       args: z.object({
-        search: z.string(),
+        search: z.string().describe("Which preferences are requested"),
       }),
       handler: async (ctx, args) => {
         console.log("getting user preferences", args);
@@ -50,8 +56,19 @@ const fashionAgent = new Agent(components.agent, {
   maxSteps: 5,
 });
 
-// Use the agent from within a normal action:
-export const createThread = action({
+// Create a thread from within a mutation
+export const createThread = internalMutation({
+  args: { userId: v.optional(v.string()) },
+  handler: async (ctx, { userId }) => {
+    const { threadId } = await weatherAgent.createThread(ctx, {
+      userId,
+    });
+    return { threadId };
+  },
+});
+
+// Use the agent from within an action to also generate text:
+export const createThreadAndGenerateText = action({
   args: { location: v.string(), userId: v.optional(v.string()) },
   handler: async (ctx, { location, userId }) => {
     const { threadId, thread } = await weatherAgent.createThread(ctx, {
@@ -80,12 +97,17 @@ export const continueThread = action({
 /**
  * Expose the agents as actions
  */
-export const {
-  createThread: createThreadAction,
-  generateText: getWeatherAction,
-} = weatherAgent.asActions({ maxSteps: 3 });
-export const { generateText: getFashionSuggestionAction } =
-  fashionAgent.asActions();
+export const getForecast = weatherAgent.asTextAction({
+  maxSteps: 3,
+});
+export const getFashionAdvice = fashionAgent.asObjectAction({
+  schema: z.object({
+    hat: z.string(),
+    tops: z.string(),
+    bottoms: z.string(),
+    shoes: z.string(),
+  }),
+});
 
 /**
  * Use agent actions in a workflow
@@ -93,26 +115,25 @@ export const { generateText: getFashionSuggestionAction } =
  */
 
 const workflow = new WorkflowManager(components.workflow);
-const s = internal.example; // where steps are defined
 
 export const weatherAgentWorkflow = workflow.define({
   args: { location: v.string() },
-  handler: async (step, { location }): Promise<string> => {
-    const threadId = await step.runAction(s.createThreadAction, {
-      title: `Weather in ${location}`,
+  handler: async (
+    step,
+    { location },
+  ): Promise<{ hat: string; tops: string; bottoms: string; shoes: string }> => {
+    const { threadId } = await step.runMutation(internal.example.createThread, {
+      userId: "123",
     });
     console.log("threadId", threadId);
-    const weather = await step.runAction(s.getWeatherAction, {
+    const weather = await step.runAction(internal.example.getForecast, {
       threadId,
       prompt: `What is the weather in ${location}?`,
     });
     console.log("weather", weather);
     const fashionSuggestion = await step.runAction(
-      s.getFashionSuggestionAction,
-      {
-        threadId,
-        prompt: `What should I wear based on the weather?`,
-      },
+      internal.example.getFashionAdvice,
+      { threadId, prompt: `What should I wear based on the weather?` },
     );
     console.log("fashionSuggestion", fashionSuggestion);
     return fashionSuggestion;

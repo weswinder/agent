@@ -26,7 +26,7 @@ import {
 } from "ai";
 import { assert } from "convex-helpers";
 import { internalActionGeneric } from "convex/server";
-import { Infer, ObjectType, v } from "convex/values";
+import { Infer, v } from "convex/values";
 import { z } from "zod";
 import { Mounts } from "../component/_generated/api.js";
 import {
@@ -52,9 +52,7 @@ import {
   type ProviderMetadata,
   type ProviderOptions,
   type SearchOptions,
-  vContextOptions,
   vSafeObjectArgs,
-  vStorageOptions,
   vTextArgs,
 } from "../validators.js";
 import type {
@@ -1011,104 +1009,52 @@ export class Agent<AgentTools extends ToolSet> {
   /**
    * Create an action out of this agent so you can call it from workflows or other actions
    * without a wrapping function.
-   * Note: currently this is not well typed. The return type of the action is always `any`.
    * @param spec Configuration for the agent acting as an action, including
    *   {@link ContextOptions} and maxSteps.
    */
-  asActions(spec?: { contextOptions?: ContextOptions; maxSteps?: number }) {
-    const vCommonArgs = {
-      contextOptions: v.optional(vContextOptions),
-      storageOptions: v.optional(vStorageOptions),
-      maxRetries: v.optional(v.number()),
-      parentMessageId: v.optional(v.string()),
-    };
+  asTextAction(spec?: { contextOptions?: ContextOptions; maxSteps?: number }) {
     const maxSteps = spec?.maxSteps ?? this.options.maxSteps;
+    const contextOptions =
+      spec?.contextOptions && this.mergedContextOptions(spec.contextOptions);
 
-    const argsWithDefaults = <
-      T extends {
-        parentMessageId?: string;
-        contextOptions?: ContextOptions;
-        storageOptions?: StorageOptions;
-        maxRetries?: number;
+    return internalActionGeneric({
+      args: vTextArgs,
+      handler: async (ctx, args) => {
+        const value = await this.generateText(
+          ctx,
+          { userId: args.userId, threadId: args.threadId },
+          { maxSteps, ...args, ...contextOptions, ...args.storageOptions }
+        );
+        return value.text;
       },
-    >(
-      args: T
-    ): T & ContextOptions & StorageOptions => {
-      const contextOptions =
-        spec?.contextOptions && this.mergedContextOptions(spec.contextOptions);
-      return {
-        maxSteps,
-        ...args,
-        ...contextOptions,
-        ...args.storageOptions,
-      };
-    };;
-
-    return {
-      createThread: internalActionGeneric({
-        args: {
-          userId: v.optional(v.string()),
-          parentThreadIds: v.optional(v.array(v.string())),
-          title: v.optional(v.string()),
-          summary: v.optional(v.string()),
-        },
-        handler: async (ctx, { userId, parentThreadIds, title, summary }) => {
-          const { threadId } = await this.createThread(ctx, {
-            userId,
-            parentThreadIds,
-            title,
-            summary,
-          });
-          return threadId;
-        },
-      }),
-      generateText: internalActionGeneric({
-        args: vTextArgs,
-        handler: async (ctx, args) => {
-          const value = await this.generateText(
-            ctx,
-            args,
-            argsWithDefaults(args)
-          );
-          return value.text;
-        },
-      }),
-      streamText: internalActionGeneric({
-        args: vTextArgs,
-        handler: async (ctx, args) => {
-          const value = await this.streamText(
-            ctx,
-            args,
-            argsWithDefaults(args)
-          );
-          await value.consumeStream();
-          return await value.text;
-        },
-      }),
-      generateObject: internalActionGeneric({
-        args: vSafeObjectArgs,
-        handler: async (ctx, args) => {
-          const value = await this.generateObject(ctx, args, {
-            ...argsWithDefaults(args),
-            schema: "schema" in args ? jsonSchema(args.schema) : undefined,
-          } as unknown as OurObjectArgs<unknown>);
-          return value.object;
-        },
-      }),
-      streamObject: internalActionGeneric({
-        args: vSafeObjectArgs,
-        handler: async (ctx, args) => {
-          const value = await this.streamObject(ctx, argsWithDefaults(args), {
-            ...argsWithDefaults(args),
-            schema: "schema" in args ? jsonSchema(args.schema) : undefined,
-          } as unknown as OurStreamObjectArgs<unknown>);
-          for await (const _ of value.fullStream) {
-            // no-op, just consume the stream
-          }
-          return value.object;
-        },
-      }),
-    };
+    });
+  }
+  /**
+   * Create an action that generates an object out of this agent so you can call
+   * it from workflows or other actions without a wrapping function.
+   * @param spec Configuration for the agent acting as an action, including
+   * the normal parameters to {@link generateObject}, plus {@link ContextOptions}
+   * and maxSteps.
+   */
+  asObjectAction<T>(spec: OurObjectArgs<T> & { maxSteps?: number }) {
+    const maxSteps = spec?.maxSteps ?? this.options.maxSteps;
+    return internalActionGeneric({
+      args: vSafeObjectArgs,
+      handler: async (ctx, args) => {
+        const value = await this.generateObject(
+          ctx,
+          { userId: args.userId, threadId: args.threadId },
+          {
+            ...spec,
+            maxSteps,
+            ...args,
+            ...this.mergedContextOptions(spec),
+            ...args.storageOptions,
+          } as unknown as OurObjectArgs<unknown>
+        );
+        return value.object as T;
+      },
+    });
   }
 }
 
