@@ -175,8 +175,6 @@ export class Agent<AgentTools extends ToolSet> {
        * They can be AI SDK tools (import {tool} from "ai")
        * or tools that have Convex context
        * (import { createTool } from "@convex-dev/agent")
-       * Note: Convex tools can't currently annotate the parameters
-       * with descriptions, so the names should be self-evident from naming.
        */
       tools?: AgentTools;
       /**
