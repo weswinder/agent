@@ -19,14 +19,13 @@ import type {
 import {
   generateObject,
   generateText,
-  jsonSchema,
   streamObject,
   streamText,
   tool,
 } from "ai";
 import { assert } from "convex-helpers";
 import { internalActionGeneric } from "convex/server";
-import { Infer, v } from "convex/values";
+import { Infer } from "convex/values";
 import { z } from "zod";
 import { Mounts } from "../component/_generated/api.js";
 import {
