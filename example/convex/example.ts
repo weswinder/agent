@@ -276,7 +276,7 @@ export const runAgentAsTool = action({
       },
       maxSteps: 20,
     });
-    const agentWithToolsAsTool = agentWithTools.asTool({
+    const agentWithToolsAsTool = createTool({
       description:
         "agentWithTools which can either doSomething or doSomethingElse",
       args: v.object({
@@ -285,6 +285,22 @@ export const runAgentAsTool = action({
           v.literal("doSomethingElse"),
         ),
       }),
+      handler: async (ctx, args) => {
+        // Create a nested thread to call the agent with tools
+        const { thread } = await agentWithTools.createThread(ctx, {
+          userId: ctx.userId,
+          parentThreadIds: ctx.threadId ? [ctx.threadId] : undefined,
+        });
+        const result = await thread.generateText({
+          messages: [
+            {
+              role: "assistant",
+              content: `I'll do this now: ${args.whatToDo}`,
+            },
+          ],
+        });
+        return result.text;
+      },
     });
     const dispatchAgent = new Agent(components.agent, {
       chat: openai.chat("gpt-4o-mini"),

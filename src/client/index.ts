@@ -1096,45 +1096,6 @@ export class Agent<AgentTools extends ToolSet> {
       },
     });
   }
-
-  /**
-   * Create a tool out of this agent so other agents can call this one.
-   * Create a tool out of this agent so other agents can call this one.
-   * @param spec The specification for the arguments to this agent.
-   *   They will be encoded as JSON and passed to the agent.
-   * @returns The agent as a tool that can be passed to other agents.
-   */
-  asTool(spec: {
-    description: string;
-    args: Validator<unknown, "required", string>;
-    contextOptions?: ContextOptions;
-    maxSteps?: number;
-    provideMessageHistory?: boolean;
-  }) {
-    return createTool({
-      ...spec,
-      handler: async (ctx, args, options) => {
-        const maxSteps = spec.maxSteps ?? this.options.maxSteps;
-        const contextOptions =
-          spec.contextOptions && this.mergedContextOptions(spec.contextOptions);
-        const { thread } = await this.createThread(ctx, {
-          parentThreadIds: ctx.threadId ? [ctx.threadId] : undefined,
-          userId: ctx.userId,
-        });
-        const messages = spec.provideMessageHistory ? options.messages : [];
-        messages.push({
-          role: "user",
-          content: JSON.stringify(args),
-        });
-        const value = await thread.generateText({
-          messages,
-          maxSteps,
-          ...contextOptions,
-        });
-        return value.text;
-      },
-    });
-  }
 }
 
 export type ToolCtx = RunActionCtx & {
