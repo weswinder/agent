@@ -109,11 +109,11 @@ export default app;
 ### Configuring the agent
 
 ```ts
-import { v } from "convex/values";
-import { components } from "./_generated/api";
-import { Agent, createTool } from "@convex-dev/agent";
-import { openai } from "@ai-sdk/openai";
 import { tool } from "ai";
+import { openai } from "@ai-sdk/openai";
+import { z } from "zod";
+import { Agent, createTool } from "@convex-dev/agent";
+import { components } from "./_generated/api";
 
 // Define an agent similarly to the AI SDK
 const supportAgent = new Agent(components.agent, {
@@ -129,7 +129,7 @@ const supportAgent = new Agent(components.agent, {
     // Convex tool
     myConvexTool: createTool({
       description: "My Convex tool",
-      args: v.object({...}),
+      args: z.object({...}),
       handler: async (ctx, args) => {
         return "Hello, world!";
       },
