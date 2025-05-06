@@ -156,13 +156,6 @@ export const vMessage = v.union(
 );
 export type Message = Infer<typeof vMessage>;
 
-export const vMessageWithFileAndId = v.object({
-  id: v.optional(v.string()),
-  message: vMessage,
-  fileId: v.optional(v.id("files")),
-});
-export type MessageWithFileAndId = Infer<typeof vMessageWithFileAndId>;
-
 export const vSource = v.object({
   sourceType: v.literal("url"),
   id: v.string(),
@@ -177,6 +170,12 @@ export const vRequest = v.object({
   headers: v.optional(v.record(v.string(), v.string())),
   method: v.optional(v.string()),
   url: v.optional(v.string()),
+});
+
+const vMessageWithFileAndId = v.object({
+  id: v.optional(v.string()),
+  message: vMessage,
+  fileId: v.optional(v.id("files")),
 });
 
 export const vResponse = v.object({
@@ -206,6 +205,12 @@ export const vFinishReason = v.union(
   v.literal("unknown")
 );
 
+export const vUsage = v.object({
+  promptTokens: v.number(),
+  completionTokens: v.number(),
+  totalTokens: v.number(),
+});
+
 export const vLanguageModelV1CallWarning = v.union(
   v.object({
     type: v.literal("unsupported-setting"),
@@ -223,11 +228,31 @@ export const vLanguageModelV1CallWarning = v.union(
   })
 );
 
-export const vUsage = v.object({
-  promptTokens: v.number(),
-  completionTokens: v.number(),
-  totalTokens: v.number(),
+export const vMessageWithMetadata = v.object({
+  id: v.optional(v.string()), // external id, e.g. from Vercel AI SDK
+  message: vMessage,
+  text: v.optional(v.string()),
+  fileId: v.optional(v.id("files")),
+  // metadata
+  finishReason: v.optional(vFinishReason),
+  model: v.optional(v.string()),
+  provider: v.optional(v.string()),
+  providerMetadata: v.optional(v.record(v.string(), v.any())),
+  sources: v.optional(v.array(vSource)),
+  reasoning: v.optional(v.string()),
+  usage: v.optional(vUsage),
+  warnings: v.optional(v.array(vLanguageModelV1CallWarning)),
+  error: v.optional(v.string()),
+  // TODO: move this back out to passed alongside message
+  embedding: v.optional(
+    v.object({
+      model: v.string(),
+      dimension: vVectorDimension,
+      vector: v.array(v.number()),
+    })
+  ),
 });
+export type MessageWithMetadata = Infer<typeof vMessageWithMetadata>;
 
 export const vStep = v.object({
   experimental_providerMetadata,
@@ -250,22 +275,16 @@ export const vStep = v.object({
   text: v.string(),
   toolCalls: v.array(vToolCallPart),
   toolResults: v.array(vToolResultPart),
-  usage: v.optional(
-    v.object({
-      promptTokens: v.number(),
-      completionTokens: v.number(),
-      totalTokens: v.number(),
-    })
-  ),
+  usage: v.optional(vUsage),
   warnings: v.optional(v.array(vLanguageModelV1CallWarning)),
 });
 export type Step = Infer<typeof vStep>;
 
 export const vStepWithMessages = v.object({
   step: vStep,
-  messages: v.array(vMessageWithFileAndId),
+  messages: v.array(vMessageWithMetadata),
 });
-export type StepWithMessagesWithFileAndId = Infer<typeof vStepWithMessages>;
+export type StepWithMessagesWithMetadata = Infer<typeof vStepWithMessages>;
 
 export const vObjectResult = v.object({
   request: vRequest,

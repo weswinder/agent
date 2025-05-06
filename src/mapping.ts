@@ -13,9 +13,9 @@ import {
 } from "ai";
 import { assert } from "convex-helpers";
 import {
-  MessageWithFileAndId,
+  MessageWithMetadata,
   Step,
-  StepWithMessagesWithFileAndId,
+  StepWithMessagesWithMetadata,
 } from "./validators";
 
 export type AIMessageWithoutId = Omit<AIMessage, "id">;
@@ -80,49 +80,79 @@ export function serializeStep<TOOLS extends ToolSet>(
 }
 
 export function serializeNewMessagesInStep<TOOLS extends ToolSet>(
-  step: StepResult<TOOLS>
-): MessageWithFileAndId[] {
+  step: StepResult<TOOLS>,
+  metadata: { model: string; provider: string }
+): MessageWithMetadata[] {
   // If there are tool results, there's another message with the tool results
   // ref: https://github.com/vercel/ai/blob/main/packages/ai/core/generate-text/to-response-messages.ts
-  const messages: MessageWithFileAndId[] = (
+  const assistantFields = {
+    model: metadata.model,
+    provider: metadata.provider,
+    providerMetadata: step.providerMetadata,
+    reasoning: step.reasoning,
+    usage: step.usage,
+    warnings: step.warnings,
+    finishReason: step.finishReason,
+  };
+  const toolFields = {
+    sources: step.sources,
+  };
+  const messages: MessageWithMetadata[] = (
     step.toolResults.length > 0
       ? step.response.messages.slice(-2)
       : step.response.messages.slice(-1)
-  ).map(serializeMessageWithId);
+  ).map((message) => ({
+    message: serializeMessage(message),
+    id: message.id,
+    ...(message.role === "tool" ? toolFields : assistantFields),
+    // fileId: message.fileId,
+  }));
   return messages;
 }
 
 export function serializeObjectResult(
-  result: GenerateObjectResult<unknown>
-): StepWithMessagesWithFileAndId {
-  const text = JSON.stringify(result.object);
-  const serializedMessage = serializeMessageWithId({
-    role: "assistant" as const,
-    content: text,
-    id: result.response.id,
-  });
-
-  const messages = [serializedMessage];
+  step: GenerateObjectResult<unknown>,
+  metadata: { model: string; provider: string }
+): StepWithMessagesWithMetadata {
+  const text = JSON.stringify(step.object);
 
   return {
-    messages,
+    messages: [
+      {
+        message: { role: "assistant" as const, content: text },
+        id: step.response.id,
+        model: metadata.model,
+        provider: metadata.provider,
+        providerMetadata: step.providerMetadata,
+        finishReason: step.finishReason,
+        text,
+        usage: step.usage,
+        warnings: step.warnings,
+      },
+    ],
     step: {
       text,
       isContinued: false,
       stepType: "initial",
       toolCalls: [],
       toolResults: [],
-      usage: result.usage,
-      warnings: result.warnings,
-      finishReason: result.finishReason,
-      request: result.request,
+      usage: step.usage,
+      warnings: step.warnings,
+      finishReason: step.finishReason,
+      request: step.request,
       response: {
-        ...result.response,
-        timestamp: result.response.timestamp.getTime(),
-        messages,
+        ...step.response,
+        timestamp: step.response.timestamp.getTime(),
+        messages: [
+          serializeMessageWithId({
+            role: "assistant" as const,
+            content: text,
+            id: step.response.id,
+          }),
+        ],
       },
-      providerMetadata: result.providerMetadata,
-      experimental_providerMetadata: result.experimental_providerMetadata,
+      providerMetadata: step.providerMetadata,
+      experimental_providerMetadata: step.experimental_providerMetadata,
     },
   };
 }

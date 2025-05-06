@@ -38,14 +38,23 @@ export type Mounts = {
       "public",
       {
         agentName?: string;
-        embeddings?: {
-          dimension: 128 | 256 | 512 | 768 | 1024 | 1536 | 2048 | 3072 | 4096;
-          model: string;
-          vectors: Array<Array<number> | null>;
-        };
         failPendingSteps?: boolean;
         messages: Array<{
+          embedding?: {
+            dimension: 128 | 256 | 512 | 768 | 1024 | 1536 | 2048 | 3072 | 4096;
+            model: string;
+            vector: Array<number>;
+          };
+          error?: string;
           fileId?: string;
+          finishReason?:
+            | "stop"
+            | "length"
+            | "content-filter"
+            | "tool-calls"
+            | "error"
+            | "other"
+            | "unknown";
           id?: string;
           message:
             | {
@@ -144,11 +153,31 @@ export type Mounts = {
                 providerOptions?: Record<string, any>;
                 role: "system";
               };
+          model?: string;
+          provider?: string;
+          providerMetadata?: Record<string, any>;
+          reasoning?: string;
+          sources?: Array<{
+            id: string;
+            providerMetadata?: Record<string, any>;
+            sourceType: "url";
+            title?: string;
+            url: string;
+          }>;
+          text?: string;
+          usage?: {
+            completionTokens: number;
+            promptTokens: number;
+            totalTokens: number;
+          };
+          warnings?: Array<
+            | { details?: string; setting: string; type: "unsupported-setting" }
+            | { details?: string; tool: any; type: "unsupported-tool" }
+            | { message: string; type: "other" }
+          >;
         }>;
-        model?: string;
         parentMessageId?: string;
         pending?: boolean;
-        provider?: string;
         stepId?: string;
         threadId: string;
         userId?: string;
@@ -170,6 +199,14 @@ export type Mounts = {
             | string;
           error?: string;
           fileId?: string;
+          finishReason?:
+            | "stop"
+            | "length"
+            | "content-filter"
+            | "tool-calls"
+            | "error"
+            | "other"
+            | "unknown";
           id?: string;
           message?:
             | {
@@ -272,6 +309,15 @@ export type Mounts = {
           order: number;
           parentMessageId?: string;
           provider?: string;
+          providerMetadata?: Record<string, any>;
+          reasoning?: string;
+          sources?: Array<{
+            id: string;
+            providerMetadata?: Record<string, any>;
+            sourceType: "url";
+            title?: string;
+            url: string;
+          }>;
           status: "pending" | "success" | "failed";
           stepId?: string;
           stepOrder: number;
@@ -284,6 +330,11 @@ export type Mounts = {
             totalTokens: number;
           };
           userId?: string;
+          warnings?: Array<
+            | { details?: string; setting: string; type: "unsupported-setting" }
+            | { details?: string; tool: any; type: "unsupported-tool" }
+            | { message: string; type: "other" }
+          >;
         }>;
         pending?: {
           _creationTime: number;
@@ -301,6 +352,14 @@ export type Mounts = {
             | string;
           error?: string;
           fileId?: string;
+          finishReason?:
+            | "stop"
+            | "length"
+            | "content-filter"
+            | "tool-calls"
+            | "error"
+            | "other"
+            | "unknown";
           id?: string;
           message?:
             | {
@@ -403,6 +462,15 @@ export type Mounts = {
           order: number;
           parentMessageId?: string;
           provider?: string;
+          providerMetadata?: Record<string, any>;
+          reasoning?: string;
+          sources?: Array<{
+            id: string;
+            providerMetadata?: Record<string, any>;
+            sourceType: "url";
+            title?: string;
+            url: string;
+          }>;
           status: "pending" | "success" | "failed";
           stepId?: string;
           stepOrder: number;
@@ -415,6 +483,11 @@ export type Mounts = {
             totalTokens: number;
           };
           userId?: string;
+          warnings?: Array<
+            | { details?: string; setting: string; type: "unsupported-setting" }
+            | { details?: string; tool: any; type: "unsupported-tool" }
+            | { message: string; type: "other" }
+          >;
         };
       }
     >;
@@ -422,16 +495,34 @@ export type Mounts = {
       "mutation",
       "public",
       {
-        embeddings?: {
-          dimension: 128 | 256 | 512 | 768 | 1024 | 1536 | 2048 | 3072 | 4096;
-          model: string;
-          vectors: Array<Array<number> | null>;
-        };
         failPendingSteps?: boolean;
         messageId: string;
         step: {
           messages: Array<{
+            embedding?: {
+              dimension:
+                | 128
+                | 256
+                | 512
+                | 768
+                | 1024
+                | 1536
+                | 2048
+                | 3072
+                | 4096;
+              model: string;
+              vector: Array<number>;
+            };
+            error?: string;
             fileId?: string;
+            finishReason?:
+              | "stop"
+              | "length"
+              | "content-filter"
+              | "tool-calls"
+              | "error"
+              | "other"
+              | "unknown";
             id?: string;
             message:
               | {
@@ -530,6 +621,32 @@ export type Mounts = {
                   providerOptions?: Record<string, any>;
                   role: "system";
                 };
+            model?: string;
+            provider?: string;
+            providerMetadata?: Record<string, any>;
+            reasoning?: string;
+            sources?: Array<{
+              id: string;
+              providerMetadata?: Record<string, any>;
+              sourceType: "url";
+              title?: string;
+              url: string;
+            }>;
+            text?: string;
+            usage?: {
+              completionTokens: number;
+              promptTokens: number;
+              totalTokens: number;
+            };
+            warnings?: Array<
+              | {
+                  details?: string;
+                  setting: string;
+                  type: "unsupported-setting";
+                }
+              | { details?: string; tool: any; type: "unsupported-tool" }
+              | { message: string; type: "other" }
+            >;
           }>;
           step: {
             experimental_providerMetadata?: Record<string, any>;
@@ -1063,6 +1180,14 @@ export type Mounts = {
             | string;
           error?: string;
           fileId?: string;
+          finishReason?:
+            | "stop"
+            | "length"
+            | "content-filter"
+            | "tool-calls"
+            | "error"
+            | "other"
+            | "unknown";
           id?: string;
           message?:
             | {
@@ -1165,6 +1290,15 @@ export type Mounts = {
           order: number;
           parentMessageId?: string;
           provider?: string;
+          providerMetadata?: Record<string, any>;
+          reasoning?: string;
+          sources?: Array<{
+            id: string;
+            providerMetadata?: Record<string, any>;
+            sourceType: "url";
+            title?: string;
+            url: string;
+          }>;
           status: "pending" | "success" | "failed";
           stepId?: string;
           stepOrder: number;
@@ -1177,6 +1311,11 @@ export type Mounts = {
             totalTokens: number;
           };
           userId?: string;
+          warnings?: Array<
+            | { details?: string; setting: string; type: "unsupported-setting" }
+            | { details?: string; tool: any; type: "unsupported-tool" }
+            | { message: string; type: "other" }
+          >;
         }>;
         pageStatus?: "SplitRecommended" | "SplitRequired" | null;
         splitCursor?: string | null;
@@ -1251,6 +1390,14 @@ export type Mounts = {
           | string;
         error?: string;
         fileId?: string;
+        finishReason?:
+          | "stop"
+          | "length"
+          | "content-filter"
+          | "tool-calls"
+          | "error"
+          | "other"
+          | "unknown";
         id?: string;
         message?:
           | {
@@ -1353,6 +1500,15 @@ export type Mounts = {
         order: number;
         parentMessageId?: string;
         provider?: string;
+        providerMetadata?: Record<string, any>;
+        reasoning?: string;
+        sources?: Array<{
+          id: string;
+          providerMetadata?: Record<string, any>;
+          sourceType: "url";
+          title?: string;
+          url: string;
+        }>;
         status: "pending" | "success" | "failed";
         stepId?: string;
         stepOrder: number;
@@ -1365,6 +1521,11 @@ export type Mounts = {
           totalTokens: number;
         };
         userId?: string;
+        warnings?: Array<
+          | { details?: string; setting: string; type: "unsupported-setting" }
+          | { details?: string; tool: any; type: "unsupported-tool" }
+          | { message: string; type: "other" }
+        >;
       }>
     >;
     textSearch: FunctionReference<
@@ -1387,6 +1548,14 @@ export type Mounts = {
           | string;
         error?: string;
         fileId?: string;
+        finishReason?:
+          | "stop"
+          | "length"
+          | "content-filter"
+          | "tool-calls"
+          | "error"
+          | "other"
+          | "unknown";
         id?: string;
         message?:
           | {
@@ -1489,6 +1658,15 @@ export type Mounts = {
         order: number;
         parentMessageId?: string;
         provider?: string;
+        providerMetadata?: Record<string, any>;
+        reasoning?: string;
+        sources?: Array<{
+          id: string;
+          providerMetadata?: Record<string, any>;
+          sourceType: "url";
+          title?: string;
+          url: string;
+        }>;
         status: "pending" | "success" | "failed";
         stepId?: string;
         stepOrder: number;
@@ -1501,6 +1679,11 @@ export type Mounts = {
           totalTokens: number;
         };
         userId?: string;
+        warnings?: Array<
+          | { details?: string; setting: string; type: "unsupported-setting" }
+          | { details?: string; tool: any; type: "unsupported-tool" }
+          | { message: string; type: "other" }
+        >;
       }>
     >;
     updateThread: FunctionReference<

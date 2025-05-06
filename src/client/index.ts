@@ -36,7 +36,7 @@ import {
   type AIMessageWithoutId,
   deserializeMessage,
   promptOrMessagesToCoreMessages,
-  serializeMessageWithId,
+  serializeMessage,
   serializeNewMessagesInStep,
   serializeObjectResult,
   serializeStep,
@@ -49,6 +49,7 @@ import {
 } from "../shared.js";
 import {
   type CallSettings,
+  MessageWithMetadata,
   type ProviderMetadata,
   type ProviderOptions,
   type SearchOptions,
@@ -476,12 +477,14 @@ export class Agent<AgentTools extends ToolSet> {
       userId?: string;
       messages: CoreMessageMaybeWithId[];
       /**
-       * If false, it will "commit" the messages immediately.
-       * If true, it will mark them as pending until the final step has finished.
+       * Metadata to save with the messages. Each element corresponds to the
+       * message at the same index.
        */
+      metadata?: Omit<MessageWithMetadata, "message">[];
       /**
        * If false, it will "commit" the messages immediately.
        * If true, it will mark them as pending until the final step has finished.
+       * Defaults to false.
        */
       pending?: boolean;
       /**
@@ -499,13 +502,23 @@ export class Agent<AgentTools extends ToolSet> {
     lastMessageId: string;
     messageIds: string[];
   }> {
+    const embeddings = await this.getEmbeddings(args.messages);
     const result = await ctx.runMutation(this.component.messages.addMessages, {
       threadId: args.threadId,
       userId: args.userId,
       agentName: this.options.name,
-      model: this.options.chat.modelId,
-      messages: args.messages.map(serializeMessageWithId),
-      embeddings: await this.getEmbeddings(args.messages),
+      messages: args.messages.map(
+        (m, i) =>
+          ({
+            embedding: embeddings?.vectors[i] && {
+              model: embeddings.model,
+              dimension: embeddings.dimension,
+              vector: embeddings.vectors[i],
+            },
+            ...args.metadata?.[i],
+            message: serializeMessage(m),
+          }) as MessageWithMetadata
+      ),
       failPendingSteps: args.failPendingSteps ?? true,
       pending: args.pending ?? false,
       parentMessageId: args.parentMessageId,
@@ -538,16 +551,38 @@ export class Agent<AgentTools extends ToolSet> {
        * The step to save, possibly including multiple tool calls.
        */
       step: StepResult<TOOLS>;
+      /**
+       * The model used to generate the step.
+       * Defaults to the chat model for the Agent.
+       */
+      model?: string;
+      /**
+       * The provider of the model used to generate the step.
+       * Defaults to the chat provider for the Agent.
+       */
+      provider?: string;
     }
   ): Promise<void> {
     const step = serializeStep(args.step as StepResult<ToolSet>);
-    const messages = serializeNewMessagesInStep(args.step);
+    const messages = serializeNewMessagesInStep(args.step, {
+      provider: args.provider ?? this.options.chat.provider,
+      model: args.model ?? this.options.chat.modelId,
+    });
+    const embeddings = await this.getEmbeddings(messages.map((m) => m.message));
+    if (embeddings) {
+      const { model, dimension, vectors } = embeddings;
+      for (let i = 0; i < messages.length; i++) {
+        const vector = vectors[i];
+        if (vector) {
+          messages[i].embedding = { model, dimension, vector };
+        }
+      }
+    }
     await ctx.runMutation(this.component.messages.addStep, {
       threadId: args.threadId,
       messageId: args.messageId,
       step: { step, messages },
       failPendingSteps: false,
-      embeddings: await this.getEmbeddings(messages.map((m) => m.message)),
     });
   }
 
@@ -743,6 +778,7 @@ export class Agent<AgentTools extends ToolSet> {
 
   async saveMessagesAndFetchContext<
     T extends {
+      id?: string;
       prompt?: string;
       messages?: CoreMessage[] | AIMessageWithoutId[];
       system?: string;
@@ -750,6 +786,7 @@ export class Agent<AgentTools extends ToolSet> {
   >(
     ctx: RunActionCtx | RunMutationCtx,
     {
+      id,
       userId,
       threadId,
       parentMessageId,
@@ -783,10 +820,12 @@ export class Agent<AgentTools extends ToolSet> {
     });
     let messageId: string | undefined;
     if (threadId && saveAny !== false) {
+      const coreMessages = saveAll ? messages : messages.slice(-1);
       const saved = await this.saveMessages(ctx, {
         threadId,
         userId,
-        messages: saveAll ? messages : messages.slice(-1),
+        messages: coreMessages,
+        metadata: coreMessages.length === 1 ? [{ id }] : undefined,
         pending: true,
         // We should just fail if you pass in an ID for the message, fail those children
         // failPendingSteps: true,
@@ -934,15 +973,35 @@ export class Agent<AgentTools extends ToolSet> {
       threadId: string;
       messageId: string;
       result: GenerateObjectResult<unknown>;
+      metadata?: Omit<MessageWithMetadata, "message">;
     }
   ): Promise<void> {
-    const step = serializeObjectResult(args.result);
+    const { step, messages: withoutEmbed } = serializeObjectResult(
+      args.result,
+      {
+        model: this.options.chat.modelId,
+        provider: this.options.chat.provider,
+      }
+    );
+    const embeddings = await this.getEmbeddings([withoutEmbed[0].message]);
+    const messages = embeddings?.vectors[0]
+      ? [
+          {
+            ...withoutEmbed[0],
+            embedding: {
+              dimension: embeddings.dimension,
+              model: embeddings.model,
+              vector: embeddings.vectors[0],
+            },
+          },
+        ]
+      : withoutEmbed;
+
     await ctx.runMutation(this.component.messages.addStep, {
       threadId: args.threadId,
       messageId: args.messageId,
       failPendingSteps: false,
-      embeddings: await this.getEmbeddings([step.messages[0].message]),
-      step,
+      step: { step, messages },
     });
   }
 

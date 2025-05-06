@@ -11,9 +11,8 @@ import {
 } from "../shared.js";
 import {
   paginationResultValidator,
-  vEmbeddingsWithMetadata,
   vMessageStatus,
-  vMessageWithFileAndId,
+  vMessageWithMetadata,
   vSearchOptions,
   vStepWithMessages,
 } from "../validators.js";
@@ -340,14 +339,10 @@ const addMessagesArgs = {
   threadId: v.id("threads"),
   stepId: v.optional(v.id("steps")),
   parentMessageId: v.optional(v.id("messages")),
-  // TODO: add more things like usage, sources, reasoning, etc.
-  messages: v.array(vMessageWithFileAndId),
-  model: v.optional(v.string()),
-  provider: v.optional(v.string()),
   agentName: v.optional(v.string()),
+  messages: v.array(vMessageWithMetadata),
   pending: v.optional(v.boolean()),
   failPendingSteps: v.optional(v.boolean()),
-  embeddings: v.optional(vEmbeddingsWithMetadata),
 };
 export const addMessages = mutation({
   args: addMessagesArgs,
@@ -361,10 +356,6 @@ async function addMessagesHandler(
   ctx: MutationCtx,
   args: ObjectType<typeof addMessagesArgs>
 ) {
-  assert(
-    !args.embeddings || args.embeddings.vectors.length === args.messages.length,
-    "embeddings must have one vector per message"
-  );
   let userId = args.userId;
   const threadId = args.threadId;
   if (!userId && args.threadId) {
@@ -372,14 +363,8 @@ async function addMessagesHandler(
     assert(thread, `Thread ${args.threadId} not found`);
     userId = thread.userId;
   }
-  const {
-    failPendingSteps,
-    pending,
-    messages,
-    parentMessageId,
-    embeddings,
-    ...rest
-  } = args;
+  const { failPendingSteps, pending, messages, parentMessageId, ...rest } =
+    args;
   const parent = parentMessageId && (await ctx.db.get(parentMessageId));
   // TODO: I think this is a bug - parent will be pending always?
   if (failPendingSteps && parent?.status !== "pending") {
@@ -392,7 +377,7 @@ async function addMessagesHandler(
       .collect();
     await Promise.all(
       pendingMessages.map((m) =>
-        ctx.db.patch(m._id, { status: "failed", text: "Restarting" })
+        ctx.db.patch(m._id, { status: "failed", error: "Restarting" })
       )
     );
   }
@@ -400,13 +385,12 @@ async function addMessagesHandler(
   let order = maxMessage?.order ?? -1;
   const toReturn: Doc<"messages">[] = [];
   if (messages.length > 0) {
-    for (const [i, { message, fileId, id }] of messages.entries()) {
-      const embedding = embeddings?.vectors[i] ?? undefined;
+    for (const { message, fileId, embedding, ...fields } of messages) {
       let embeddingId: VectorTableId | undefined;
-      if (embeddings && embedding) {
-        embeddingId = await insertVector(ctx, embeddings.dimension, {
-          vector: embedding,
-          model: embeddings.model,
+      if (embedding) {
+        embeddingId = await insertVector(ctx, embedding.dimension, {
+          vector: embedding.vector,
+          model: embedding.model,
           table: "messages",
           userId,
           threadId,
@@ -419,11 +403,11 @@ async function addMessagesHandler(
       const text = extractText(message);
       const messageId = await ctx.db.insert("messages", {
         ...rest,
+        ...fields,
         embeddingId,
         parentMessageId,
         userId,
         message,
-        id,
         order,
         tool,
         text,
@@ -491,7 +475,6 @@ const addStepArgs = {
   messageId: v.id("messages"),
   step: vStepWithMessages,
   failPendingSteps: v.optional(v.boolean()),
-  embeddings: v.optional(vEmbeddingsWithMetadata),
 };
 
 export const addStep = mutation({
@@ -536,12 +519,8 @@ async function addStepHandler(
     parentMessageId: args.messageId,
     stepId,
     messages,
-    model: parentMessage.model,
-    provider: parentMessage.provider,
-    agentName: parentMessage.agentName,
     pending: step.finishReason === "stop" ? false : true,
     failPendingSteps: false,
-    embeddings: args.embeddings,
   });
   // We don't commit if the parent is still pending.
   if (step.finishReason === "stop") {

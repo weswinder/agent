@@ -6,6 +6,9 @@ import {
   vMessageStatus,
   vStep,
   vUsage,
+  vSource,
+  vLanguageModelV1CallWarning,
+  vFinishReason,
 } from "../validators.js";
 import { typedV } from "convex-helpers/validators";
 import vectorTables, { vVectorId } from "./vector/tables.js";
@@ -46,6 +49,11 @@ export const schema = defineSchema({
     order: v.number(),
     stepOrder: v.number(),
     usage: v.optional(vUsage),
+    finishReason: v.optional(vFinishReason),
+    providerMetadata: v.optional(v.record(v.string(), v.any())),
+    sources: v.optional(v.array(vSource)),
+    reasoning: v.optional(v.string()),
+    warnings: v.optional(v.array(vLanguageModelV1CallWarning)),
     fileId: v.optional(v.id("files")),
     status: vMessageStatus,
   })
