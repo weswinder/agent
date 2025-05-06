@@ -45,6 +45,7 @@ import {
   DEFAULT_MESSAGE_RANGE,
   DEFAULT_RECENT_MESSAGES,
   extractText,
+  isTool,
 } from "../shared.js";
 import {
   type CallSettings,
@@ -432,7 +433,7 @@ export class Agent<AgentTools extends ToolSet> {
         }
       | undefined;
     if (this.options.textEmbedding) {
-      const messageTexts = messages.map((m) => extractText(m));
+      const messageTexts = messages.map((m) => !isTool(m) && extractText(m));
       // Find the indexes of the messages that have text.
       const textIndexes = messageTexts
         .map((t, i) => (t ? i : undefined))
