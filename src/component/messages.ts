@@ -340,8 +340,10 @@ const addMessagesArgs = {
   threadId: v.id("threads"),
   stepId: v.optional(v.id("steps")),
   parentMessageId: v.optional(v.id("messages")),
+  // TODO: add more things like usage, sources, reasoning, etc.
   messages: v.array(vMessageWithFileAndId),
   model: v.optional(v.string()),
+  provider: v.optional(v.string()),
   agentName: v.optional(v.string()),
   pending: v.optional(v.boolean()),
   failPendingSteps: v.optional(v.boolean()),

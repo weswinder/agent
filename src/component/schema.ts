@@ -35,6 +35,7 @@ export const schema = defineSchema({
     message: v.optional(vMessage),
     error: v.optional(v.string()),
     model: v.optional(v.string()),
+    provider: v.optional(v.string()),
     text: v.optional(v.string()),
     embeddingId: v.optional(vVectorId),
     // TODO: add sub-messages back in? or be able to skip them?

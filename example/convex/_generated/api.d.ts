@@ -164,6 +164,7 @@ export declare const components: {
           model?: string;
           parentMessageId?: string;
           pending?: boolean;
+          provider?: string;
           stepId?: string;
           threadId: string;
           userId?: string;
@@ -286,6 +287,7 @@ export declare const components: {
             model?: string;
             order: number;
             parentMessageId?: string;
+            provider?: string;
             status: "pending" | "success" | "failed";
             stepId?: string;
             stepOrder: number;
@@ -411,6 +413,7 @@ export declare const components: {
             model?: string;
             order: number;
             parentMessageId?: string;
+            provider?: string;
             status: "pending" | "success" | "failed";
             stepId?: string;
             stepOrder: number;
@@ -1195,6 +1198,7 @@ export declare const components: {
             model?: string;
             order: number;
             parentMessageId?: string;
+            provider?: string;
             status: "pending" | "success" | "failed";
             stepId?: string;
             stepOrder: number;
@@ -1377,6 +1381,7 @@ export declare const components: {
           model?: string;
           order: number;
           parentMessageId?: string;
+          provider?: string;
           status: "pending" | "success" | "failed";
           stepId?: string;
           stepOrder: number;
@@ -1507,6 +1512,7 @@ export declare const components: {
           model?: string;
           order: number;
           parentMessageId?: string;
+          provider?: string;
           status: "pending" | "success" | "failed";
           stepId?: string;
           stepOrder: number;
