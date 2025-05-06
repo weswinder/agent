@@ -534,11 +534,6 @@ export class Agent<AgentTools extends ToolSet> {
    * @param ctx The ctx argument to a mutation or action.
    * @param args What to save
    */
-  /**
-   * Explicitly save a "step" created by the AI SDK.
-   * @param ctx The ctx argument to a mutation or action.
-   * @param args What to save
-   */
   async saveStep<TOOLS extends ToolSet>(
     ctx: RunMutationCtx,
     args: {
@@ -586,14 +581,6 @@ export class Agent<AgentTools extends ToolSet> {
     });
   }
 
-  /**
-   * Commit or rollback a message that was pending.
-   * This is done automatically when saving messages by default.
-   * If creating pending messages, you can call this when the full "transaction" is done.
-   * @param ctx The ctx argument to your mutation or action.
-   * @param args What message to save. Generally the parent message sent into
-   *   the generateText call.
-   */
   /**
    * Commit or rollback a message that was pending.
    * This is done automatically when saving messages by default.
