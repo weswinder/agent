@@ -469,12 +469,6 @@ export class Agent<AgentTools extends ToolSet> {
    * @param args The messages and context to save
    * @returns
    */
-  /**
-   * Explicitly save messages associated with the thread (& user if provided)
-   * @param ctx The ctx parameter to a mutation or action.
-   * @param args The messages and context to save
-   * @returns
-   */
   async saveMessages(
     ctx: RunMutationCtx,
     args: {
@@ -493,17 +487,11 @@ export class Agent<AgentTools extends ToolSet> {
       /**
        * The message that this is responding to.
        */
-      /**
-       * The message that this is responding to.
-       */
       parentMessageId?: string;
       /**
        * Whether to mark all pending messages in the thread as failed.
        * This is used to recover from a failure via a retry that wipes the slate clean.
-       */
-      /**
-       * Whether to mark all pending messages in the thread as failed.
-       * This is used to recover from a failure via a retry that wipes the slate clean.
+       * Defaults to true.
        */
       failPendingSteps?: boolean;
     }
