@@ -289,8 +289,12 @@ const messages = await ctx.runQuery(
 ```
 
 ```ts
-const messages = await agent.saveMessages(ctx, { threadId, userId, messages });
+const messages = await agent.saveMessages(ctx, { threadId, userId, messages: [
+  { role: "user", content: "Hello, world!" },
+]});
 ```
+Note: you can also pass in message metadata if you want to save usage, etc.
+See the docstrings in [the implementation](./src/client/index.ts#L473).
 
 ```ts
 const messages = await agent.saveSteps(ctx, { threadId, userId, step });
