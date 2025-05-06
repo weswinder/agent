@@ -150,15 +150,16 @@ type CoreMessageMaybeWithId = CoreMessage & { id?: string | undefined };
 export type UsageHandler = (
   ctx: RunActionCtx,
   args: {
-    userId?: string;
-    threadId?: string;
+    userId: string | undefined;
+    threadId: string | undefined;
+    agentName: string | undefined;
     usage: Usage;
     // Often has more information, like cached token usage in the case of openai.
-    providerMetadata?: ProviderMetadata;
+    providerMetadata: ProviderMetadata | undefined;
     model: string;
     provider: string;
   }
-) => Promise<void>;
+) => void | Promise<void>;
 
 export class Agent<AgentTools extends ToolSet> {
   constructor(
@@ -694,6 +695,7 @@ export class Agent<AgentTools extends ToolSet> {
             await this.options.usageHandler(ctx, {
               userId,
               threadId,
+              agentName: this.options.name,
               model: model.modelId,
               provider: model.provider,
               usage: step.usage,
@@ -791,6 +793,7 @@ export class Agent<AgentTools extends ToolSet> {
           await this.options.usageHandler(ctx, {
             userId,
             threadId,
+            agentName: this.options.name,
             model: model.modelId,
             provider: model.provider,
             usage: step.usage,
@@ -914,6 +917,7 @@ export class Agent<AgentTools extends ToolSet> {
         await this.options.usageHandler(ctx, {
           userId,
           threadId,
+          agentName: this.options.name,
           model: model.modelId,
           provider: model.provider,
           usage: result.usage,
@@ -994,6 +998,7 @@ export class Agent<AgentTools extends ToolSet> {
           await this.options.usageHandler(ctx, {
             userId,
             threadId,
+            agentName: this.options.name,
             model: model.modelId,
             provider: model.provider,
             usage: result.usage,
