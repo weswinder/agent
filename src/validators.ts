@@ -210,6 +210,7 @@ export const vUsage = v.object({
   completionTokens: v.number(),
   totalTokens: v.number(),
 });
+export type Usage = Infer<typeof vUsage>;
 
 export const vLanguageModelV1CallWarning = v.union(
   v.object({
