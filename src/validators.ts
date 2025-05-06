@@ -222,6 +222,13 @@ export const vLanguageModelV1CallWarning = v.union(
     message: v.string(),
   })
 );
+
+export const vUsage = v.object({
+  promptTokens: v.number(),
+  completionTokens: v.number(),
+  totalTokens: v.number(),
+});
+
 export const vStep = v.object({
   experimental_providerMetadata,
   files: v.optional(v.array(v.any())),

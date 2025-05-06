@@ -5,6 +5,7 @@ import {
   vMessage,
   vMessageStatus,
   vStep,
+  vUsage,
 } from "../validators.js";
 import { typedV } from "convex-helpers/validators";
 import vectorTables, { vVectorId } from "./vector/tables.js";
@@ -44,6 +45,7 @@ export const schema = defineSchema({
     // Unset if it's not in a thread.
     order: v.number(),
     stepOrder: v.number(),
+    usage: v.optional(vUsage),
     fileId: v.optional(v.id("files")),
     status: vMessageStatus,
   })

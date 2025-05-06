@@ -278,6 +278,11 @@ export type Mounts = {
           text?: string;
           threadId: string;
           tool: boolean;
+          usage?: {
+            completionTokens: number;
+            promptTokens: number;
+            totalTokens: number;
+          };
           userId?: string;
         }>;
         pending?: {
@@ -404,6 +409,11 @@ export type Mounts = {
           text?: string;
           threadId: string;
           tool: boolean;
+          usage?: {
+            completionTokens: number;
+            promptTokens: number;
+            totalTokens: number;
+          };
           userId?: string;
         };
       }
@@ -1161,6 +1171,11 @@ export type Mounts = {
           text?: string;
           threadId: string;
           tool: boolean;
+          usage?: {
+            completionTokens: number;
+            promptTokens: number;
+            totalTokens: number;
+          };
           userId?: string;
         }>;
         pageStatus?: "SplitRecommended" | "SplitRequired" | null;
@@ -1344,6 +1359,11 @@ export type Mounts = {
         text?: string;
         threadId: string;
         tool: boolean;
+        usage?: {
+          completionTokens: number;
+          promptTokens: number;
+          totalTokens: number;
+        };
         userId?: string;
       }>
     >;
@@ -1475,6 +1495,11 @@ export type Mounts = {
         text?: string;
         threadId: string;
         tool: boolean;
+        usage?: {
+          completionTokens: number;
+          promptTokens: number;
+          totalTokens: number;
+        };
         userId?: string;
       }>
     >;

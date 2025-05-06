@@ -294,6 +294,11 @@ export declare const components: {
             text?: string;
             threadId: string;
             tool: boolean;
+            usage?: {
+              completionTokens: number;
+              promptTokens: number;
+              totalTokens: number;
+            };
             userId?: string;
           }>;
           pending?: {
@@ -420,6 +425,11 @@ export declare const components: {
             text?: string;
             threadId: string;
             tool: boolean;
+            usage?: {
+              completionTokens: number;
+              promptTokens: number;
+              totalTokens: number;
+            };
             userId?: string;
           };
         }
@@ -1205,6 +1215,11 @@ export declare const components: {
             text?: string;
             threadId: string;
             tool: boolean;
+            usage?: {
+              completionTokens: number;
+              promptTokens: number;
+              totalTokens: number;
+            };
             userId?: string;
           }>;
           pageStatus?: "SplitRecommended" | "SplitRequired" | null;
@@ -1388,6 +1403,11 @@ export declare const components: {
           text?: string;
           threadId: string;
           tool: boolean;
+          usage?: {
+            completionTokens: number;
+            promptTokens: number;
+            totalTokens: number;
+          };
           userId?: string;
         }>
       >;
@@ -1519,6 +1539,11 @@ export declare const components: {
           text?: string;
           threadId: string;
           tool: boolean;
+          usage?: {
+            completionTokens: number;
+            promptTokens: number;
+            totalTokens: number;
+          };
           userId?: string;
         }>
       >;
