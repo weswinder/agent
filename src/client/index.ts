@@ -53,6 +53,7 @@ import {
   type ProviderMetadata,
   type ProviderOptions,
   type SearchOptions,
+  Usage,
   vSafeObjectArgs,
   vTextArgs,
 } from "../validators.js";
@@ -146,6 +147,19 @@ export type GenerationOutputMetadata = { messageId?: string };
 
 type CoreMessageMaybeWithId = CoreMessage & { id?: string | undefined };
 
+export type UsageHandler = (
+  ctx: RunActionCtx,
+  args: {
+    userId?: string;
+    threadId?: string;
+    usage: Usage;
+    // Often has more information, like cached token usage in the case of openai.
+    providerMetadata?: ProviderMetadata;
+    model: string;
+    provider: string;
+  }
+) => Promise<void>;
+
 export class Agent<AgentTools extends ToolSet> {
   constructor(
     public component: UseApi<Mounts>,
@@ -207,6 +221,10 @@ export class Agent<AgentTools extends ToolSet> {
        * This can be overridden at each generate/stream callsite.
        */
       maxRetries?: number;
+      /**
+       * The usage handler to use for this agent.
+       */
+      usageHandler?: UsageHandler;
     }
   ) {}
 
@@ -446,6 +464,7 @@ export class Agent<AgentTools extends ToolSet> {
       const textEmbeddings = await this.options.textEmbedding.doEmbed({
         values: messageTexts.filter((t): t is string => !!t),
       });
+      // TODO: record usage of embeddings
       // Then assemble the embeddings into a single array with nulls for the messages without text.
       const embeddingsOrNull = Array(messages.length).fill(null);
       textIndexes.forEach((i, j) => {
@@ -652,13 +671,14 @@ export class Agent<AgentTools extends ToolSet> {
     const saveOutputMessages =
       args.saveOutputMessages ??
       this.options.storageOptions?.saveOutputMessages;
+    const model = aiArgs.model ?? this.options.chat;
     try {
       const result = (await generateText({
         // Can be overridden
-        model: this.options.chat,
         maxSteps: this.options.maxSteps,
         maxRetries: this.options.maxRetries,
         ...aiArgs,
+        model,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         toolChoice: args.toolChoice as any,
         tools,
@@ -668,6 +688,16 @@ export class Agent<AgentTools extends ToolSet> {
               threadId,
               messageId,
               step,
+            });
+          }
+          if (this.options.usageHandler && step.usage) {
+            await this.options.usageHandler(ctx, {
+              userId,
+              threadId,
+              model: model.modelId,
+              provider: model.provider,
+              usage: step.usage,
+              providerMetadata: step.providerMetadata,
             });
           }
           return args.onStepFinish?.(step);
@@ -723,12 +753,13 @@ export class Agent<AgentTools extends ToolSet> {
     const saveOutputMessages =
       args.saveOutputMessages ??
       this.options.storageOptions?.saveOutputMessages;
+    const model = aiArgs.model ?? this.options.chat;
     const result = streamText({
       // Can be overridden
-      model: this.options.chat,
       maxSteps: this.options.maxSteps,
       maxRetries: this.options.maxRetries,
       ...aiArgs,
+      model,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       toolChoice: args.toolChoice as any,
       tools,
@@ -754,6 +785,16 @@ export class Agent<AgentTools extends ToolSet> {
             threadId,
             messageId,
             step,
+          });
+        }
+        if (this.options.usageHandler && step.usage) {
+          await this.options.usageHandler(ctx, {
+            userId,
+            threadId,
+            model: model.modelId,
+            provider: model.provider,
+            usage: step.usage,
+            providerMetadata: step.providerMetadata,
           });
         }
         return args.onStepFinish?.(step);
@@ -852,16 +893,16 @@ export class Agent<AgentTools extends ToolSet> {
       ctx,
       { ...args, userId, threadId }
     );
-
+    const model = aiArgs.model ?? this.options.chat;
     const saveOutputMessages =
       args.saveOutputMessages ??
       this.options.storageOptions?.saveOutputMessages;
     try {
       const result = (await generateObject({
         // Can be overridden
-        model: this.options.chat,
         maxRetries: this.options.maxRetries,
         ...aiArgs,
+        model,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } as any)) as GenerateObjectResult<T> & GenerationOutputMetadata;
 
@@ -869,6 +910,16 @@ export class Agent<AgentTools extends ToolSet> {
         await this.saveObject(ctx, { threadId, messageId, result });
       }
       result.messageId = messageId;
+      if (this.options.usageHandler && result.usage) {
+        await this.options.usageHandler(ctx, {
+          userId,
+          threadId,
+          model: model.modelId,
+          provider: model.provider,
+          usage: result.usage,
+          providerMetadata: result.providerMetadata,
+        });
+      }
       return result;
     } catch (error) {
       if (threadId && messageId) {
@@ -894,7 +945,7 @@ export class Agent<AgentTools extends ToolSet> {
    * @returns The result of the streamObject function.
    */
   async streamObject<T>(
-    ctx: RunMutationCtx,
+    ctx: RunActionCtx,
     { userId, threadId }: { userId?: string; threadId?: string },
     args: OurStreamObjectArgs<T>
   ): Promise<
@@ -905,15 +956,16 @@ export class Agent<AgentTools extends ToolSet> {
       ctx,
       { ...args, userId, threadId }
     );
+    const model = aiArgs.model ?? this.options.chat;
     const saveOutputMessages =
       args.saveOutputMessages ??
       this.options.storageOptions?.saveOutputMessages;
     const stream = streamObject<T>({
       // Can be overridden
-      model: this.options.chat,
       maxRetries: this.options.maxRetries,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       ...(aiArgs as any),
+      model,
       onError: async (error) => {
         console.error("onError", error);
         return args.onError?.(error);
@@ -936,6 +988,16 @@ export class Agent<AgentTools extends ToolSet> {
               logprobs: undefined,
               toJsonResponse: stream.toTextStreamResponse,
             },
+          });
+        }
+        if (this.options.usageHandler && result.usage) {
+          await this.options.usageHandler(ctx, {
+            userId,
+            threadId,
+            model: model.modelId,
+            provider: model.provider,
+            usage: result.usage,
+            providerMetadata: result.providerMetadata,
           });
         }
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1035,6 +1097,7 @@ export class Agent<AgentTools extends ToolSet> {
           values: [text],
         })
       ).embeddings[0];
+      // TODO: record usage of embeddings
       search.vectorModel = this.options.textEmbedding.modelId;
     }
     return search;
