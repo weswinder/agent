@@ -537,6 +537,7 @@ async function addStepHandler(
     stepId,
     messages,
     model: parentMessage.model,
+    provider: parentMessage.provider,
     agentName: parentMessage.agentName,
     pending: step.finishReason === "stop" ? false : true,
     failPendingSteps: false,
