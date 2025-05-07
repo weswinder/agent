@@ -547,6 +547,7 @@ export class Agent<AgentTools extends ToolSet> {
   async saveStep<TOOLS extends ToolSet>(
     ctx: RunMutationCtx,
     args: {
+      userId?: string;
       threadId: string;
       /**
        * The message this step is in response to.
@@ -584,6 +585,7 @@ export class Agent<AgentTools extends ToolSet> {
       }
     }
     await ctx.runMutation(this.component.messages.addStep, {
+      userId: args.userId,
       threadId: args.threadId,
       messageId: args.messageId,
       step: { step, messages },
@@ -683,6 +685,7 @@ export class Agent<AgentTools extends ToolSet> {
         onStepFinish: async (step) => {
           if (threadId && messageId && saveOutputMessages !== false) {
             await this.saveStep(ctx, {
+              userId,
               threadId,
               messageId,
               step,
@@ -786,6 +789,7 @@ export class Agent<AgentTools extends ToolSet> {
         // TODO: compare delta to the output. internally drop the deltas when committing
         if (threadId && messageId) {
           await this.saveStep(ctx, {
+            userId,
             threadId,
             messageId,
             step,
@@ -917,7 +921,7 @@ export class Agent<AgentTools extends ToolSet> {
       } as any)) as GenerateObjectResult<T> & GenerationOutputMetadata;
 
       if (threadId && messageId && saveOutputMessages !== false) {
-        await this.saveObject(ctx, { threadId, messageId, result });
+        await this.saveObject(ctx, { threadId, messageId, result, userId });
       }
       result.messageId = messageId;
       if (trackUsage && result.usage) {
@@ -989,6 +993,7 @@ export class Agent<AgentTools extends ToolSet> {
       onFinish: async (result) => {
         if (threadId && messageId && saveOutputMessages !== false) {
           await this.saveObject(ctx, {
+            userId,
             threadId,
             messageId,
             result: {
@@ -1036,6 +1041,7 @@ export class Agent<AgentTools extends ToolSet> {
   async saveObject(
     ctx: RunMutationCtx,
     args: {
+      userId: string | undefined;
       threadId: string;
       messageId: string;
       result: GenerateObjectResult<unknown>;
@@ -1064,6 +1070,7 @@ export class Agent<AgentTools extends ToolSet> {
       : withoutEmbed;
 
     await ctx.runMutation(this.component.messages.addStep, {
+      userId: args.userId,
       threadId: args.threadId,
       messageId: args.messageId,
       failPendingSteps: false,

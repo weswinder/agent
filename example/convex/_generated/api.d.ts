@@ -912,6 +912,7 @@ export declare const components: {
             };
           };
           threadId: string;
+          userId?: string;
         },
         Array<{
           _creationTime: number;

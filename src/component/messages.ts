@@ -471,6 +471,7 @@ async function getMaxMessage(
 }
 
 const addStepArgs = {
+  userId: v.optional(v.string()),
   threadId: v.id("threads"),
   messageId: v.id("messages"),
   step: vStepWithMessages,
@@ -515,9 +516,11 @@ async function addStepHandler(
     step,
   });
   await addMessagesHandler(ctx, {
+    userId: args.userId,
     threadId: args.threadId,
-    parentMessageId: args.messageId,
     stepId,
+    parentMessageId: args.messageId,
+    agentName: parentMessage.agentName,
     messages,
     pending: step.finishReason === "stop" ? false : true,
     failPendingSteps: false,

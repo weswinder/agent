@@ -851,6 +851,7 @@ export type Mounts = {
           };
         };
         threadId: string;
+        userId?: string;
       },
       Array<{
         _creationTime: number;
