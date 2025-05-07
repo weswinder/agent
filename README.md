@@ -357,6 +357,41 @@ Read more in [this Stack post](https://stack.convex.dev/ai-agents).
 npm i @convex-dev/agent
 ```
 
+### Tracking token usage
+
+You can provide a `usageHandler` to the agent to track token usage.
+See an example in
+[this demo](https://github.com/ianmacartney/ai-agent-chat/blob/main/convex/chat.ts)
+that captures usage to a table, then scans it to generate per-user invoices.
+
+```ts
+const supportAgent = new Agent(components.agent, {
+  ...
+  usageHandler: async (ctx, args) => {
+    const { userId, threadId, agentName } = args;
+    const { model, provider, usage, providerMetadata } = args;
+    // ... save usage to your database, etc.
+  },
+});
+// or when creating/continuing a thread:
+const { thread } = await supportAgent.createThread(ctx, {
+  ...
+  usageHandler: async (ctx, args) => {
+    // ...
+  },
+});
+// or when generating text:
+const result = await thread.generateText({
+  ...
+  usageHandler: async (ctx, args) => {
+    // ...
+  },
+});
+```
+
+Tip: Define the `usageHandler` within a function where you have more variables
+available to attribute the usage to a different user, team, project, etc.
+
 ## Troubleshooting
 
 ### Circular dependencies
