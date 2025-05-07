@@ -296,7 +296,6 @@ export const runAgentAsTool = action({
         // Create a nested thread to call the agent with tools
         const { thread } = await agentWithTools.createThread(ctx, {
           userId: ctx.userId,
-          parentThreadIds: ctx.threadId ? [ctx.threadId] : undefined,
         });
         const result = await thread.generateText({
           messages: [

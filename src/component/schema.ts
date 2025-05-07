@@ -21,11 +21,8 @@ export const schema = defineSchema({
     title: v.optional(v.string()),
     summary: v.optional(v.string()),
     status: vThreadStatus,
-    // If this is a thread continuation, we can use this to find context from
-    // the parent thread(s). There are multiple if the thread is a merging of
-    // multiple threads.
-    parentThreadIds: v.optional(v.array(v.id("threads"))),
     // DEPRECATED
+    parentThreadIds: v.optional(v.array(v.id("threads"))),
     order: /*DEPRECATED*/ v.optional(v.number()),
   }).index("userId", ["userId"]),
   // TODO: text search on title/ summary

@@ -259,12 +259,6 @@ export class Agent<AgentTools extends ToolSet> {
        */
       userId?: string;
       /**
-       * The parent threadIds to merge with.
-       * If the thread is a continuation of one or many previous threads,
-       * you can pass in the threadIds of the parent threads to merge the histories.
-       */
-      parentThreadIds?: string[];
-      /**
        * The title of the thread. Not currently used.
        */
       title?: string;
@@ -295,7 +289,6 @@ export class Agent<AgentTools extends ToolSet> {
     ctx: RunMutationCtx,
     args?: {
       userId?: string;
-      parentThreadIds?: string[];
       title?: string;
       summary?: string;
       usageHandler?: UsageHandler;
@@ -307,7 +300,6 @@ export class Agent<AgentTools extends ToolSet> {
     ctx: RunActionCtx | RunMutationCtx,
     args?: {
       userId: string;
-      parentThreadIds?: string[];
       title?: string;
       summary?: string;
       usageHandler?: UsageHandler;
@@ -323,7 +315,6 @@ export class Agent<AgentTools extends ToolSet> {
         userId: args?.userId,
         title: args?.title,
         summary: args?.summary,
-        parentThreadIds: args?.parentThreadIds,
       }
     );
     if (!("runAction" in ctx)) {
@@ -1151,7 +1142,6 @@ export class Agent<AgentTools extends ToolSet> {
     return internalMutationGeneric({
       args: {
         userId: v.optional(v.string()),
-        parentThreadIds: v.optional(v.array(v.string())),
         title: v.optional(v.string()),
         summary: v.optional(v.string()),
       },
