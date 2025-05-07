@@ -66,6 +66,7 @@ import type {
 } from "./types.js";
 import schema from "../component/schema.js";
 
+export { type Usage, type ProviderMetadata };
 export {
   vUsage,
   vProviderMetadata,
