@@ -5,8 +5,12 @@ import { vVectorDimension } from "./component/vector/tables";
 
 const providerOptions = v.optional(v.record(v.string(), v.any()));
 export type ProviderOptions = Infer<typeof providerOptions>;
+const providerMetadata = v.optional(
+  v.record(v.string(), v.record(v.string(), v.any()))
+);
+export { providerMetadata as vProviderMetadata };
+export type ProviderMetadata = Infer<typeof providerMetadata>;
 const experimental_providerMetadata = providerOptions;
-export type ProviderMetadata = Infer<typeof experimental_providerMetadata>;
 
 export const vThreadStatus = v.union(
   v.literal("active"),
@@ -161,7 +165,7 @@ export const vSource = v.object({
   id: v.string(),
   url: v.string(),
   title: v.optional(v.string()),
-  providerMetadata: providerOptions,
+  providerMetadata,
 });
 
 export const vRequest = v.object({
@@ -238,7 +242,7 @@ export const vMessageWithMetadata = v.object({
   finishReason: v.optional(vFinishReason),
   model: v.optional(v.string()),
   provider: v.optional(v.string()),
-  providerMetadata: v.optional(v.record(v.string(), v.any())),
+  providerMetadata,
   sources: v.optional(v.array(vSource)),
   reasoning: v.optional(v.string()),
   usage: v.optional(vUsage),
@@ -261,7 +265,7 @@ export const vStep = v.object({
   finishReason: vFinishReason,
   isContinued: v.boolean(),
   logprobs: v.optional(v.any()),
-  providerMetadata: providerOptions,
+  providerMetadata,
   providerOptions,
   reasoning: v.optional(v.string()),
   reasoningDetails: v.optional(v.array(v.any())),
@@ -295,7 +299,7 @@ export const vObjectResult = v.object({
   object: v.any(),
   error: v.optional(v.string()),
   warnings: v.optional(v.array(vLanguageModelV1CallWarning)),
-  providerMetadata: providerOptions,
+  providerMetadata,
   experimental_providerMetadata,
 });
 export type ObjectResult = Infer<typeof vObjectResult>;

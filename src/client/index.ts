@@ -53,7 +53,7 @@ import {
   type ProviderMetadata,
   type ProviderOptions,
   type SearchOptions,
-  Usage,
+  type Usage,
   vSafeObjectArgs,
   vTextArgs,
 } from "../validators.js";
@@ -65,6 +65,16 @@ import type {
   UseApi,
 } from "./types.js";
 import schema from "../component/schema.js";
+
+export {
+  vUsage,
+  vProviderMetadata,
+  vUserMessage,
+  vAssistantMessage,
+  vToolMessage,
+  vSystemMessage,
+  vMessage,
+} from "../validators.js";
 
 export type ThreadDoc = OpaqueIds<
   { _id: string; _creationTime: number } & Infer<

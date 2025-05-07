@@ -180,11 +180,11 @@ export declare const components: {
                 };
             model?: string;
             provider?: string;
-            providerMetadata?: Record<string, any>;
+            providerMetadata?: Record<string, Record<string, any>>;
             reasoning?: string;
             sources?: Array<{
               id: string;
-              providerMetadata?: Record<string, any>;
+              providerMetadata?: Record<string, Record<string, any>>;
               sourceType: "url";
               title?: string;
               url: string;
@@ -342,7 +342,7 @@ export declare const components: {
             reasoning?: string;
             sources?: Array<{
               id: string;
-              providerMetadata?: Record<string, any>;
+              providerMetadata?: Record<string, Record<string, any>>;
               sourceType: "url";
               title?: string;
               url: string;
@@ -499,7 +499,7 @@ export declare const components: {
             reasoning?: string;
             sources?: Array<{
               id: string;
-              providerMetadata?: Record<string, any>;
+              providerMetadata?: Record<string, Record<string, any>>;
               sourceType: "url";
               title?: string;
               url: string;
@@ -684,11 +684,11 @@ export declare const components: {
                   };
               model?: string;
               provider?: string;
-              providerMetadata?: Record<string, any>;
+              providerMetadata?: Record<string, Record<string, any>>;
               reasoning?: string;
               sources?: Array<{
                 id: string;
-                providerMetadata?: Record<string, any>;
+                providerMetadata?: Record<string, Record<string, any>>;
                 sourceType: "url";
                 title?: string;
                 url: string;
@@ -722,7 +722,7 @@ export declare const components: {
                 | "unknown";
               isContinued: boolean;
               logprobs?: any;
-              providerMetadata?: Record<string, any>;
+              providerMetadata?: Record<string, Record<string, any>>;
               providerOptions?: Record<string, any>;
               reasoning?: string;
               reasoningDetails?: Array<any>;
@@ -866,7 +866,7 @@ export declare const components: {
               };
               sources?: Array<{
                 id: string;
-                providerMetadata?: Record<string, any>;
+                providerMetadata?: Record<string, Record<string, any>>;
                 sourceType: "url";
                 title?: string;
                 url: string;
@@ -932,7 +932,7 @@ export declare const components: {
               | "unknown";
             isContinued: boolean;
             logprobs?: any;
-            providerMetadata?: Record<string, any>;
+            providerMetadata?: Record<string, Record<string, any>>;
             providerOptions?: Record<string, any>;
             reasoning?: string;
             reasoningDetails?: Array<any>;
@@ -1076,7 +1076,7 @@ export declare const components: {
             };
             sources?: Array<{
               id: string;
-              providerMetadata?: Record<string, any>;
+              providerMetadata?: Record<string, Record<string, any>>;
               sourceType: "url";
               title?: string;
               url: string;
@@ -1359,7 +1359,7 @@ export declare const components: {
             reasoning?: string;
             sources?: Array<{
               id: string;
-              providerMetadata?: Record<string, any>;
+              providerMetadata?: Record<string, Record<string, any>>;
               sourceType: "url";
               title?: string;
               url: string;
@@ -1573,7 +1573,7 @@ export declare const components: {
           reasoning?: string;
           sources?: Array<{
             id: string;
-            providerMetadata?: Record<string, any>;
+            providerMetadata?: Record<string, Record<string, any>>;
             sourceType: "url";
             title?: string;
             url: string;
@@ -1731,7 +1731,7 @@ export declare const components: {
           reasoning?: string;
           sources?: Array<{
             id: string;
-            providerMetadata?: Record<string, any>;
+            providerMetadata?: Record<string, Record<string, any>>;
             sourceType: "url";
             title?: string;
             url: string;

@@ -155,11 +155,11 @@ export type Mounts = {
               };
           model?: string;
           provider?: string;
-          providerMetadata?: Record<string, any>;
+          providerMetadata?: Record<string, Record<string, any>>;
           reasoning?: string;
           sources?: Array<{
             id: string;
-            providerMetadata?: Record<string, any>;
+            providerMetadata?: Record<string, Record<string, any>>;
             sourceType: "url";
             title?: string;
             url: string;
@@ -313,7 +313,7 @@ export type Mounts = {
           reasoning?: string;
           sources?: Array<{
             id: string;
-            providerMetadata?: Record<string, any>;
+            providerMetadata?: Record<string, Record<string, any>>;
             sourceType: "url";
             title?: string;
             url: string;
@@ -466,7 +466,7 @@ export type Mounts = {
           reasoning?: string;
           sources?: Array<{
             id: string;
-            providerMetadata?: Record<string, any>;
+            providerMetadata?: Record<string, Record<string, any>>;
             sourceType: "url";
             title?: string;
             url: string;
@@ -623,11 +623,11 @@ export type Mounts = {
                 };
             model?: string;
             provider?: string;
-            providerMetadata?: Record<string, any>;
+            providerMetadata?: Record<string, Record<string, any>>;
             reasoning?: string;
             sources?: Array<{
               id: string;
-              providerMetadata?: Record<string, any>;
+              providerMetadata?: Record<string, Record<string, any>>;
               sourceType: "url";
               title?: string;
               url: string;
@@ -661,7 +661,7 @@ export type Mounts = {
               | "unknown";
             isContinued: boolean;
             logprobs?: any;
-            providerMetadata?: Record<string, any>;
+            providerMetadata?: Record<string, Record<string, any>>;
             providerOptions?: Record<string, any>;
             reasoning?: string;
             reasoningDetails?: Array<any>;
@@ -805,7 +805,7 @@ export type Mounts = {
             };
             sources?: Array<{
               id: string;
-              providerMetadata?: Record<string, any>;
+              providerMetadata?: Record<string, Record<string, any>>;
               sourceType: "url";
               title?: string;
               url: string;
@@ -871,7 +871,7 @@ export type Mounts = {
             | "unknown";
           isContinued: boolean;
           logprobs?: any;
-          providerMetadata?: Record<string, any>;
+          providerMetadata?: Record<string, Record<string, any>>;
           providerOptions?: Record<string, any>;
           reasoning?: string;
           reasoningDetails?: Array<any>;
@@ -1015,7 +1015,7 @@ export type Mounts = {
           };
           sources?: Array<{
             id: string;
-            providerMetadata?: Record<string, any>;
+            providerMetadata?: Record<string, Record<string, any>>;
             sourceType: "url";
             title?: string;
             url: string;
@@ -1294,7 +1294,7 @@ export type Mounts = {
           reasoning?: string;
           sources?: Array<{
             id: string;
-            providerMetadata?: Record<string, any>;
+            providerMetadata?: Record<string, Record<string, any>>;
             sourceType: "url";
             title?: string;
             url: string;
@@ -1504,7 +1504,7 @@ export type Mounts = {
         reasoning?: string;
         sources?: Array<{
           id: string;
-          providerMetadata?: Record<string, any>;
+          providerMetadata?: Record<string, Record<string, any>>;
           sourceType: "url";
           title?: string;
           url: string;
@@ -1662,7 +1662,7 @@ export type Mounts = {
         reasoning?: string;
         sources?: Array<{
           id: string;
-          providerMetadata?: Record<string, any>;
+          providerMetadata?: Record<string, Record<string, any>>;
           sourceType: "url";
           title?: string;
           url: string;
