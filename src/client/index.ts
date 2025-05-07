@@ -271,6 +271,11 @@ export class Agent<AgentTools extends ToolSet> {
        * The summary of the thread. Not currently used.
        */
       summary?: string;
+      /**
+       * The usage handler to use for this thread. Overrides any handler
+       * set in the agent constructor.
+       */
+      usageHandler?: UsageHandler;
     }
   ): Promise<{
     threadId: string;
@@ -292,6 +297,7 @@ export class Agent<AgentTools extends ToolSet> {
       parentThreadIds?: string[];
       title?: string;
       summary?: string;
+      usageHandler?: UsageHandler;
     }
   ): Promise<{
     threadId: string;
@@ -303,6 +309,7 @@ export class Agent<AgentTools extends ToolSet> {
       parentThreadIds?: string[];
       title?: string;
       summary?: string;
+      usageHandler?: UsageHandler;
     }
   ): Promise<{
     threadId: string;
@@ -324,6 +331,7 @@ export class Agent<AgentTools extends ToolSet> {
     const { thread } = await this.continueThread(ctx, {
       threadId: threadDoc._id,
       userId: args?.userId,
+      usageHandler: args?.usageHandler,
     });
     return {
       threadId: threadDoc._id,
@@ -339,23 +347,9 @@ export class Agent<AgentTools extends ToolSet> {
    * @param { threadId, userId }: the thread and user to associate the messages with.
    * @returns Functions bound to the userId and threadId on a `{thread}` object.
    */
-  /**
-   * Continues a thread using this agent. Note: threads can be continued
-   * by different agents. This is a convenience around calling the various
-   * generate and stream functions with explicit userId and threadId parameters.
-   * @param ctx The ctx object passed to the action handler
-   * @param { threadId, userId }: the thread and user to associate the messages with.
-   * @returns Functions bound to the userId and threadId on a `{thread}` object.
-   */
   async continueThread(
     ctx: RunActionCtx,
-    {
-      threadId,
-      userId,
-    }: {
-      /**
-       * The associated thread created by {@link createThread}
-       */
+    args: {
       /**
        * The associated thread created by {@link createThread}
        */
@@ -365,34 +359,28 @@ export class Agent<AgentTools extends ToolSet> {
        * relevant messages from the same user as context for the LLM calls.
        */
       userId?: string;
+      /**
+       * The usage handler to use for this thread. Overrides any handler
+       * set in the agent constructor.
+       */
+      usageHandler?: UsageHandler;
     }
   ): Promise<{
     thread: Thread<AgentTools>;
   }> {
     return {
       thread: {
-        threadId,
-        generateText: this.generateText.bind(this, ctx, { userId, threadId }),
-        streamText: this.streamText.bind(this, ctx, { userId, threadId }),
-        generateObject: this.generateObject.bind(this, ctx, {
-          userId,
-          threadId,
-        }),
-        streamObject: this.streamObject.bind(this, ctx, { userId, threadId }),
+        threadId: args.threadId,
+        generateText: this.generateText.bind(this, ctx, args),
+        streamText: this.streamText.bind(this, ctx, args),
+        generateObject: this.generateObject.bind(this, ctx, args),
+        streamObject: this.streamObject.bind(this, ctx, args),
       } as Thread<AgentTools>,
     };
   }
 
   /**
-   *
-   * @param ctx Either a query, mutation, or action ctx.
-   *   If it is not an action context, you can't do text or
-   *   vector search.
-   * @param args The associated thread, user, message
-   * @returns
-   */
-  /**
-   *
+   * Fetch the context messages for a thread.
    * @param ctx Either a query, mutation, or action ctx.
    *   If it is not an action context, you can't do text or
    *   vector search.
@@ -661,9 +649,15 @@ export class Agent<AgentTools extends ToolSet> {
     {
       userId,
       threadId,
+      usageHandler,
     }: {
       userId?: string;
       threadId?: string;
+      /**
+       * The usage handler to use for this thread. Overrides any handler
+       * set in the agent constructor.
+       */
+      usageHandler?: UsageHandler;
     },
     args: TextArgs<
       AgentTools,
@@ -683,6 +677,7 @@ export class Agent<AgentTools extends ToolSet> {
       args.saveOutputMessages ??
       this.options.storageOptions?.saveOutputMessages;
     const model = aiArgs.model ?? this.options.chat;
+    const trackUsage = usageHandler ?? this.options.usageHandler;
     try {
       const result = (await generateText({
         // Can be overridden
@@ -701,8 +696,8 @@ export class Agent<AgentTools extends ToolSet> {
               step,
             });
           }
-          if (this.options.usageHandler && step.usage) {
-            await this.options.usageHandler(ctx, {
+          if (trackUsage && step.usage) {
+            await trackUsage(ctx, {
               userId,
               threadId,
               agentName: this.options.name,
@@ -747,7 +742,11 @@ export class Agent<AgentTools extends ToolSet> {
     PARTIAL_OUTPUT = never,
   >(
     ctx: RunActionCtx,
-    { userId, threadId }: { userId?: string; threadId?: string },
+    {
+      userId,
+      threadId,
+      usageHandler,
+    }: { userId?: string; threadId?: string; usageHandler?: UsageHandler },
     args: TextArgs<
       AgentTools,
       TOOLS,
@@ -766,6 +765,7 @@ export class Agent<AgentTools extends ToolSet> {
       args.saveOutputMessages ??
       this.options.storageOptions?.saveOutputMessages;
     const model = aiArgs.model ?? this.options.chat;
+    const trackUsage = usageHandler ?? this.options.usageHandler;
     const result = streamText({
       // Can be overridden
       maxSteps: this.options.maxSteps,
@@ -799,8 +799,8 @@ export class Agent<AgentTools extends ToolSet> {
             step,
           });
         }
-        if (this.options.usageHandler && step.usage) {
-          await this.options.usageHandler(ctx, {
+        if (trackUsage && step.usage) {
+          await trackUsage(ctx, {
             userId,
             threadId,
             agentName: this.options.name,
@@ -899,7 +899,11 @@ export class Agent<AgentTools extends ToolSet> {
    */
   async generateObject<T>(
     ctx: RunActionCtx,
-    { userId, threadId }: { userId?: string; threadId?: string },
+    {
+      userId,
+      threadId,
+      usageHandler,
+    }: { userId?: string; threadId?: string; usageHandler?: UsageHandler },
     args: OurObjectArgs<T>
   ): Promise<GenerateObjectResult<T> & GenerationOutputMetadata> {
     const { args: aiArgs, messageId } = await this.saveMessagesAndFetchContext(
@@ -907,6 +911,7 @@ export class Agent<AgentTools extends ToolSet> {
       { ...args, userId, threadId }
     );
     const model = aiArgs.model ?? this.options.chat;
+    const trackUsage = usageHandler ?? this.options.usageHandler;
     const saveOutputMessages =
       args.saveOutputMessages ??
       this.options.storageOptions?.saveOutputMessages;
@@ -923,8 +928,8 @@ export class Agent<AgentTools extends ToolSet> {
         await this.saveObject(ctx, { threadId, messageId, result });
       }
       result.messageId = messageId;
-      if (this.options.usageHandler && result.usage) {
-        await this.options.usageHandler(ctx, {
+      if (trackUsage && result.usage) {
+        await trackUsage(ctx, {
           userId,
           threadId,
           agentName: this.options.name,
@@ -960,7 +965,11 @@ export class Agent<AgentTools extends ToolSet> {
    */
   async streamObject<T>(
     ctx: RunActionCtx,
-    { userId, threadId }: { userId?: string; threadId?: string },
+    {
+      userId,
+      threadId,
+      usageHandler,
+    }: { userId?: string; threadId?: string; usageHandler?: UsageHandler },
     args: OurStreamObjectArgs<T>
   ): Promise<
     StreamObjectResult<DeepPartial<T>, T, never> & GenerationOutputMetadata
@@ -971,6 +980,7 @@ export class Agent<AgentTools extends ToolSet> {
       { ...args, userId, threadId }
     );
     const model = aiArgs.model ?? this.options.chat;
+    const trackUsage = usageHandler ?? this.options.usageHandler;
     const saveOutputMessages =
       args.saveOutputMessages ??
       this.options.storageOptions?.saveOutputMessages;
@@ -1004,8 +1014,8 @@ export class Agent<AgentTools extends ToolSet> {
             },
           });
         }
-        if (this.options.usageHandler && result.usage) {
-          await this.options.usageHandler(ctx, {
+        if (trackUsage && result.usage) {
+          await trackUsage(ctx, {
             userId,
             threadId,
             agentName: this.options.name,
