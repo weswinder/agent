@@ -1,7 +1,7 @@
 import { paginationOptsValidator, PaginationResult } from "convex/server";
 import { WorkflowManager } from "@convex-dev/workflow";
 import { Agent, createTool } from "@convex-dev/agent";
-import type { ThreadDoc } from "@convex-dev/agent";
+import type { ThreadDoc, UsageHandler } from "@convex-dev/agent";
 import { components, internal } from "./_generated/api";
 import { openai } from "@ai-sdk/openai";
 import { action, httpAction, mutation, query } from "./_generated/server";
@@ -9,6 +9,10 @@ import { v } from "convex/values";
 import { z } from "zod";
 import { getGeocoding, getWeather } from "./weather";
 import { tool } from "ai";
+
+const usageHandler: UsageHandler = async (_ctx, args) => {
+  console.log("token usage", args);
+};
 
 // Define an agent similarly to the AI SDK
 const weatherAgent = new Agent(components.agent, {
@@ -22,6 +26,7 @@ const weatherAgent = new Agent(components.agent, {
     getGeocoding,
   },
   maxSteps: 3,
+  usageHandler,
 });
 
 const fashionAgent = new Agent(components.agent, {
@@ -48,6 +53,7 @@ const fashionAgent = new Agent(components.agent, {
     }),
   },
   maxSteps: 5,
+  usageHandler,
 });
 
 // Create a thread from within a mutation and generate text
