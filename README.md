@@ -230,6 +230,51 @@ export const continueThread = action({
 });
 ```
 
+### Creating a tool with Convex context
+
+There are two ways to create a tool that has access to the Convex context.
+
+1. Use the `createTool` function, which is a wrapper around the AI SDK's `tool` function.
+
+```ts
+export const ideaSearch = createTool({
+  description: "Search for ideas in the database",
+  args: z.object({ query: z.string() }),
+  handler: async (ctx, args): Promise<Array<Idea>> => {
+    // ctx has userId, threadId, messageId, runQuery, runMutation, and runAction
+    const ideas = await ctx.runQuery(api.ideas.searchIdeas, { query: args.query });
+    console.log("found ideas", ideas);
+    return ideas;
+  },
+});
+```
+
+2. Define tools at runtime in a context with the variables you want to use.
+
+```ts
+async function createTool(ctx: ActionCtx, teamId: Id<"teams">) {
+  const myTool = tool({
+    description: "My tool",
+    parameters: z.object({...}),
+    execute: async (args, options) => {
+      return await ctx.runQuery(internal.foo.bar, args);
+    },
+  });
+}
+```
+
+You can provide tools at different times:
+
+- Agent contructor: (`new Agent(components.agent, { tools: {...} })`)
+- Creating a thread: `createThread(ctx, { tools: {...} })`
+- Continuing a thread: `continueThread(ctx, { tools: {...} })`
+- On thread functions: `thread.generateText({ tools: {...} })`
+- Outside of a thread: `supportAgent.generateText(ctx, {}, { tools: {...} })`
+
+Specifying tools at each layer will overwrite the defaults.
+The tools will be `args.tools ?? thread.tools ?? agent.options.tools`.
+This allows you to create tools in a context that is convenient.
+
 ### Exposing the agent as Convex actions
 
 You can expose the agent as a Convex internal action.
@@ -306,73 +351,83 @@ const result = await supportAgent.generateText(ctx, { userId }, { prompt });
 
 ### Manually managing messages
 
+Fetch the full messages directly. These will include things like usage, etc.
+
 ```ts
 const messages = await ctx.runQuery(
   components.agent.messages.getThreadMessages,
-  { threadId, ...searchOptions }
+  { threadId, order: "desc", paginationOpts: { cursor: null, numItems: 10 } }
 );
 ```
 
-```ts
-const messages = await agent.saveMessages(ctx, { threadId, userId, messages: [
-  { role: "user", content: "Hello, world!" },
-]});
-```
-Note: you can also pass in message metadata if you want to save usage, etc.
-See the docstrings in [the implementation](./src/client/index.ts#L473).
+Fetch CoreMessages (e.g. `{ role, content }`) for a user and/or thread.
+Accepts ContextOptions, e.g. includeToolCalls, searchOptions, etc.
+If you provide a parentMessageId, it will only fetch messages from before that message.
 
 ```ts
-const messages = await agent.saveSteps(ctx, { threadId, userId, step });
+const coreMessages = await supportAgent.fetchContextMessages(ctx, {
+  threadId, messages: [{ role, content }], contextOptions
+});
 ```
 
-// Update the message from pending to complete, along with any associated steps.
+Save messages to the database.
+
 ```ts
-const messages = await agent.completeMessage(ctx, {
-  threadId,
-  messageId,
-  result: { kind: "success" }
+const { lastMessageId, messageIds} = await agent.saveMessages(ctx, {
+  threadId, userId,
+  messages: [{ role, content }],
+  metadata: [{ reasoning, usage, ... }] // See MessageWithMetadata type
 });
 ```
 
 ### Manage embeddings
 
+Generate embeddings for a set of messages.
+
+```ts
+const embeddings = await supportAgent.generateEmbeddings([
+  { role: "user", content: "What is love?" },
+]);
+```
+
+Get and update embeddings, e.g. for a migration to a new model.
+
 ```ts
 const messages = await ctx.runQuery(
-  components.agent.vector.paginate,
+  components.agent.vector.index.paginate,
   { vectorDimension: 1536, cursor: null, limit: 10 }
 );
 ```
 
-```ts
-const messages = await ctx.runQuery(
-  components.agent.vector.deleteBatchForThread,
-  { vectorDimension: 1536, targetModel: "gpt-4o-mini", threadId: "123", cursor: null, limit: 10 }
-);
-```
+Note: If the dimension changes, you need to delete the old and insert the new.
 
 ```ts
-const messages = await ctx.runQuery(
-  components.agent.vector.insertBatch, {
-    vectorDimension: 1536,
-    vectors: [
-      { model: "gpt-4o-mini", kind: "thread", userId: "123", threadId: "123", vector: embedding, },
-    ],
-  }
-);
-```
-
-```ts
-const messages = await ctx.runQuery(components.agent.vector.updateBatch, {
+const messages = await ctx.runQuery(components.agent.vector.index.updateBatch, {
   vectors: [
     { model: "gpt-4o-mini", vector: embedding, id: msg.embeddingId },
   ],
 });
 ```
 
+Delete embeddings
+
 ```ts
-const messages = await ctx.runQuery(components.agent.vector.deleteBatch, {
+const messages = await ctx.runQuery(components.agent.vector.index.deleteBatch, {
   ids: [embeddingId1, embeddingId2],
 });
+```
+
+Insert embeddings
+
+```ts
+const messages = await ctx.runQuery(
+  components.agent.vector.index.insertBatch, {
+    vectorDimension: 1536,
+    vectors: [
+      { model: "gpt-4o-mini", table: "messages", userId: "123", threadId: "123", vector: embedding, },
+    ],
+  }
+);
 ```
 
 See example usage in [example.ts](./example/convex/example.ts).
