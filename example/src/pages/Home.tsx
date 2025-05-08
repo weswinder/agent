@@ -21,7 +21,7 @@ export function Home() {
     threadId ? { threadId } : "skip",
     { initialNumItems: 10 },
   );
-  const getWeather = useAction(api.example.createThread);
+  const getWeather = useAction(api.example.createThreadAndGenerateText);
   const getOutfit = useAction(api.example.continueThread);
   const [followUpContent, setFollowUpContent] = useState("");
   // const token = useAuthToken();

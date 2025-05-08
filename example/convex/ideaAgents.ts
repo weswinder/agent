@@ -15,24 +15,19 @@ import { zid } from "convex-helpers/server/zod";
 /**
  * TOOLS
  */
+type Idea = {
+  title: string;
+  summary: string;
+  tags: string[];
+  ideaId: Id<"ideas">;
+  createdAt: string;
+  lastUpdated: string;
+};
+
 export const ideaSearch = createTool({
   description: "Search for ideas by space-delimited keywords",
-  args: z.object({
-    query: z.string(),
-  }),
-  handler: async (
-    ctx,
-    { query },
-  ): Promise<
-    Array<{
-      title: string;
-      summary: string;
-      tags: string[];
-      ideaId: Id<"ideas">;
-      createdAt: string;
-      lastUpdated: string;
-    }>
-  > => {
+  args: z.object({ query: z.string() }),
+  handler: async (ctx, { query }): Promise<Array<Idea>> => {
     console.log("searching for ideas", query);
     const ideas = await ctx.runQuery(api.ideas.searchIdeas, { query });
     console.log("found ideas", ideas);
