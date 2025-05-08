@@ -66,7 +66,7 @@ import type {
 } from "./types.js";
 import schema from "../component/schema.js";
 
-export { type Usage, type ProviderMetadata };
+export type { Usage, ProviderMetadata };
 export {
   vUsage,
   vProviderMetadata,
@@ -382,11 +382,11 @@ export class Agent<AgentTools extends ToolSet> {
   async fetchContextMessages(
     ctx: RunQueryCtx | RunActionCtx,
     args: {
-      userId?: string;
-      threadId?: string;
+      userId: string | undefined;
+      threadId: string | undefined;
       messages: CoreMessage[];
       parentMessageId?: string;
-      contextOptions: ContextOptions;
+      contextOptions: ContextOptions | undefined;
     }
   ): Promise<CoreMessage[]> {
     assert(args.userId || args.threadId, "Specify userId or threadId");
@@ -401,7 +401,7 @@ export class Agent<AgentTools extends ToolSet> {
       const searchMessages = await ctx.runAction(
         this.component.messages.searchMessages,
         {
-          userId: args.contextOptions.searchOtherThreads
+          userId: args.contextOptions?.searchOtherThreads
             ? args.userId
             : undefined,
           threadId: args.threadId,
@@ -843,30 +843,28 @@ export class Agent<AgentTools extends ToolSet> {
       userId: string | undefined;
       threadId: string | undefined;
       parentMessageId?: string;
-      saveAllInputMessages?: boolean;
-      saveAnyInputMessages?: boolean;
-    } & ContextOptions &
-      T
+      contextOptions?: ContextOptions;
+      storageOptions?: StorageOptions;
+    } & T
   ): Promise<{
     args: T;
     messageId: string | undefined;
   }> {
-    const saveAny =
-      args.saveAnyInputMessages ??
-      this.options.storageOptions?.saveAnyInputMessages;
-    const saveAll =
-      args.saveAllInputMessages ??
-      this.options.storageOptions?.saveAllInputMessages;
+    const contextOptions: ContextOptions | Record<string, unknown> =
+      args.contextOptions ?? this.options.contextOptions ?? args;
+    const storageOptions: StorageOptions | Record<string, unknown> =
+      args.storageOptions ?? this.options.storageOptions ?? args;
     const messages = promptOrMessagesToCoreMessages(args);
     const contextMessages = await this.fetchContextMessages(ctx, {
       userId,
       threadId,
       messages,
       parentMessageId,
-      contextOptions: args,
+      contextOptions,
     });
     let messageId: string | undefined;
-    if (threadId && saveAny !== false) {
+    if (threadId && storageOptions?.saveAnyInputMessages !== false) {
+      const saveAll = storageOptions?.saveAllInputMessages;
       const coreMessages = saveAll ? messages : messages.slice(-1);
       const saved = await this.saveMessages(ctx, {
         threadId,
@@ -1088,10 +1086,10 @@ export class Agent<AgentTools extends ToolSet> {
     });
   }
 
-  mergedContextOptions(opts: ContextOptions): ContextOptions {
+  mergedContextOptions(opts: ContextOptions | undefined): ContextOptions {
     const searchOptions = {
       ...this.options.contextOptions?.searchOptions,
-      ...opts.searchOptions,
+      ...opts?.searchOptions,
     };
     return {
       ...this.options.contextOptions,
@@ -1331,10 +1329,12 @@ type TextArgs<
   },
 > = Omit<T, "toolChoice" | "tools" | "model"> & {
   model?: LanguageModelV1;
-  parentMessageId?: string;
-} & {
   tools?: TOOLS;
   toolChoice?: ToolChoice<{ [key in keyof TOOLS | keyof AgentTools]: unknown }>;
+  // Non-AI SDK args
+  parentMessageId?: string;
+  contextOptions?: ContextOptions;
+  storageOptions?: StorageOptions;
 } & ContextOptions &
   StorageOptions;
 
@@ -1342,7 +1342,6 @@ type BaseGenerateObjectOptions = StorageOptions &
   ContextOptions &
   CallSettings & {
     model?: LanguageModelV1;
-    parentMessageId?: string;
     system?: string;
     prompt?: string;
     messages?: CoreMessage[];
@@ -1350,6 +1349,10 @@ type BaseGenerateObjectOptions = StorageOptions &
     experimental_telemetry?: TelemetrySettings;
     providerOptions?: ProviderOptions;
     experimental_providerMetadata?: ProviderMetadata;
+    // Non-AI SDK args
+    parentMessageId?: string;
+    contextOptions?: ContextOptions;
+    storageOptions?: StorageOptions;
   };
 
 type GenerateObjectObjectOptions<T extends Record<string, unknown>> =

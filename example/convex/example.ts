@@ -228,13 +228,15 @@ export const searchMessages = action({
       userId,
       threadId,
       messages: [{ role: "user", content: text }],
-      searchOtherThreads: true,
-      recentMessages: 0,
-      searchOptions: {
-        textSearch: true,
-        vectorSearch: true,
-        messageRange: { before: 0, after: 0 },
-        limit: 10,
+      contextOptions: {
+        searchOtherThreads: true,
+        recentMessages: 0,
+        searchOptions: {
+          textSearch: true,
+          vectorSearch: true,
+          messageRange: { before: 0, after: 0 },
+          limit: 10,
+        },
       },
     });
   },
