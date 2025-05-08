@@ -250,7 +250,7 @@ export class Agent<AgentTools extends ToolSet> {
    * @param args The thread metadata.
    * @returns The threadId of the new thread and the thread object.
    */
-  async createThread(
+  async createThread<ThreadTools extends ToolSet | undefined = undefined>(
     ctx: RunActionCtx,
     args?: {
       /**
@@ -271,10 +271,15 @@ export class Agent<AgentTools extends ToolSet> {
        * set in the agent constructor.
        */
       usageHandler?: UsageHandler;
+      /**
+       * The tools to use for this thread.
+       * Overrides any tools passed in the agent constructor.
+       */
+      tools?: ThreadTools;
     }
   ): Promise<{
     threadId: string;
-    thread: Thread<AgentTools>;
+    thread: Thread<ThreadTools extends undefined ? AgentTools : ThreadTools>;
   }>;
   /**
    * Start a new thread with the agent. This will have a fresh history, though if
@@ -285,28 +290,48 @@ export class Agent<AgentTools extends ToolSet> {
    * @param args The thread metadata.
    * @returns The threadId of the new thread.
    */
-  async createThread(
+  async createThread<ThreadTools extends ToolSet | undefined = undefined>(
     ctx: RunMutationCtx,
     args?: {
+      /**
+       * The userId to associate with the thread. If not provided, the thread will be
+       * anonymous.
+       */
       userId?: string;
+      /**
+       * The title of the thread. Not currently used.
+       */
       title?: string;
+      /**
+       * The summary of the thread. Not currently used.
+       */
       summary?: string;
+      /**
+       * The usage handler to use for this thread. Overrides any handler
+       * set in the agent constructor.
+       */
       usageHandler?: UsageHandler;
+      /**
+       * The tools to use for this thread.
+       * Overrides any tools passed in the agent constructor.
+       */
+      tools?: ThreadTools;
     }
   ): Promise<{
     threadId: string;
   }>;
-  async createThread(
+  async createThread<ThreadTools extends ToolSet | undefined = undefined>(
     ctx: RunActionCtx | RunMutationCtx,
     args?: {
       userId: string;
       title?: string;
       summary?: string;
       usageHandler?: UsageHandler;
+      tools?: ThreadTools;
     }
   ): Promise<{
     threadId: string;
-    thread?: Thread<AgentTools>;
+    thread?: Thread<ThreadTools extends undefined ? AgentTools : ThreadTools>;
   }> {
     const threadDoc = await ctx.runMutation(
       this.component.messages.createThread,
@@ -324,6 +349,7 @@ export class Agent<AgentTools extends ToolSet> {
       threadId: threadDoc._id,
       userId: args?.userId,
       usageHandler: args?.usageHandler,
+      tools: args?.tools,
     });
     return {
       threadId: threadDoc._id,
@@ -339,7 +365,7 @@ export class Agent<AgentTools extends ToolSet> {
    * @param { threadId, userId }: the thread and user to associate the messages with.
    * @returns Functions bound to the userId and threadId on a `{thread}` object.
    */
-  async continueThread(
+  async continueThread<ThreadTools extends ToolSet | undefined = undefined>(
     ctx: RunActionCtx,
     args: {
       /**
@@ -356,9 +382,14 @@ export class Agent<AgentTools extends ToolSet> {
        * set in the agent constructor.
        */
       usageHandler?: UsageHandler;
+      /**
+       * The tools to use for this thread.
+       * Overrides any tools passed in the agent constructor.
+       */
+      tools?: ThreadTools;
     }
   ): Promise<{
-    thread: Thread<AgentTools>;
+    thread: Thread<ThreadTools extends undefined ? AgentTools : ThreadTools>;
   }> {
     return {
       thread: {
@@ -367,7 +398,7 @@ export class Agent<AgentTools extends ToolSet> {
         streamText: this.streamText.bind(this, ctx, args),
         generateObject: this.generateObject.bind(this, ctx, args),
         streamObject: this.streamObject.bind(this, ctx, args),
-      } as Thread<AgentTools>,
+      } as Thread<ThreadTools extends undefined ? AgentTools : ThreadTools>,
     };
   }
 
@@ -645,7 +676,7 @@ export class Agent<AgentTools extends ToolSet> {
    * @returns The result of the generateText function.
    */
   async generateText<
-    TOOLS extends ToolSet,
+    TOOLS extends ToolSet | undefined = undefined,
     OUTPUT = never,
     OUTPUT_PARTIAL = never,
   >(
@@ -654,6 +685,7 @@ export class Agent<AgentTools extends ToolSet> {
       userId,
       threadId,
       usageHandler,
+      tools: threadTools,
     }: {
       userId?: string;
       threadId?: string;
@@ -662,21 +694,25 @@ export class Agent<AgentTools extends ToolSet> {
        * set in the agent constructor.
        */
       usageHandler?: UsageHandler;
+      /**
+       * The tools to use for this thread. Overrides any tools passed in the agent constructor.
+       */
+      tools?: ToolSet;
     },
-    args: TextArgs<
-      AgentTools,
-      TOOLS,
-      Parameters<typeof generateText<TOOLS, OUTPUT, OUTPUT_PARTIAL>>[0]
-    >
+    args: TextArgs<AgentTools, TOOLS, OUTPUT, OUTPUT_PARTIAL>
   ): Promise<
-    GenerateTextResult<TOOLS & AgentTools, OUTPUT> & GenerationOutputMetadata
+    GenerateTextResult<TOOLS extends undefined ? AgentTools : TOOLS, OUTPUT> &
+      GenerationOutputMetadata
   > {
     const { args: aiArgs, messageId } = await this.saveMessagesAndFetchContext(
       ctx,
       { ...args, userId, threadId }
     );
     const toolCtx = { ...ctx, userId, threadId, messageId };
-    const tools = wrapTools(toolCtx, this.options.tools, args.tools) as TOOLS;
+    const tools = wrapTools(
+      toolCtx,
+      args.tools ?? threadTools ?? this.options.tools
+    ) as TOOLS extends undefined ? AgentTools : TOOLS;
     const saveOutputMessages =
       args.saveOutputMessages ??
       this.options.storageOptions?.saveOutputMessages;
@@ -689,8 +725,6 @@ export class Agent<AgentTools extends ToolSet> {
         maxRetries: this.options.maxRetries,
         ...aiArgs,
         model,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        toolChoice: args.toolChoice as any,
         tools,
         onStepFinish: async (step) => {
           if (threadId && messageId && saveOutputMessages !== false) {
@@ -714,7 +748,11 @@ export class Agent<AgentTools extends ToolSet> {
           }
           return args.onStepFinish?.(step);
         },
-      })) as GenerateTextResult<TOOLS, OUTPUT> & GenerationOutputMetadata;
+      })) as GenerateTextResult<
+        TOOLS extends undefined ? AgentTools : TOOLS,
+        OUTPUT
+      > &
+        GenerationOutputMetadata;
       result.messageId = messageId;
       return result;
     } catch (error) {
@@ -742,7 +780,7 @@ export class Agent<AgentTools extends ToolSet> {
    * @returns The result of the streamText function.
    */
   async streamText<
-    TOOLS extends ToolSet,
+    TOOLS extends ToolSet | undefined = undefined,
     OUTPUT = never,
     PARTIAL_OUTPUT = never,
   >(
@@ -751,21 +789,34 @@ export class Agent<AgentTools extends ToolSet> {
       userId,
       threadId,
       usageHandler,
-    }: { userId?: string; threadId?: string; usageHandler?: UsageHandler },
-    args: TextArgs<
-      AgentTools,
-      TOOLS,
-      Parameters<typeof streamText<TOOLS, OUTPUT, PARTIAL_OUTPUT>>[0]
-    >
+      /**
+       * @deprecated Pass `tools` in the next parameter instead.
+       * This is only intended to pass through thread-default tools.
+       */
+      tools: threadTools,
+    }: {
+      userId?: string;
+      threadId?: string;
+      usageHandler?: UsageHandler;
+      tools?: ToolSet;
+    },
+    args: StreamingTextArgs<AgentTools, TOOLS, OUTPUT, PARTIAL_OUTPUT>
   ): Promise<
-    StreamTextResult<TOOLS, PARTIAL_OUTPUT> & GenerationOutputMetadata
+    StreamTextResult<
+      TOOLS extends undefined ? AgentTools : TOOLS,
+      PARTIAL_OUTPUT
+    > &
+      GenerationOutputMetadata
   > {
     const { args: aiArgs, messageId } = await this.saveMessagesAndFetchContext(
       ctx,
       { ...args, userId, threadId }
     );
     const toolCtx = { ...ctx, userId, threadId, messageId };
-    const tools = wrapTools(toolCtx, this.options.tools, args.tools) as TOOLS;
+    const tools = wrapTools(
+      toolCtx,
+      args.tools ?? threadTools ?? this.options.tools
+    ) as TOOLS extends undefined ? AgentTools : TOOLS;
     const saveOutputMessages =
       args.saveOutputMessages ??
       this.options.storageOptions?.saveOutputMessages;
@@ -777,8 +828,6 @@ export class Agent<AgentTools extends ToolSet> {
       maxRetries: this.options.maxRetries,
       ...aiArgs,
       model,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      toolChoice: args.toolChoice as any,
       tools,
       onChunk: async (chunk) => {
         // console.log("onChunk", chunk);
@@ -818,7 +867,11 @@ export class Agent<AgentTools extends ToolSet> {
         }
         return args.onStepFinish?.(step);
       },
-    }) as StreamTextResult<TOOLS, PARTIAL_OUTPUT> & GenerationOutputMetadata;
+    }) as StreamTextResult<
+      TOOLS extends undefined ? AgentTools : TOOLS,
+      PARTIAL_OUTPUT
+    > &
+      GenerationOutputMetadata;
     result.messageId = messageId;
     return result;
   }
@@ -1321,19 +1374,92 @@ function wrapTools(
 
 type TextArgs<
   AgentTools extends ToolSet,
-  TOOLS extends ToolSet,
-  T extends {
-    toolChoice?: ToolChoice<TOOLS & AgentTools>;
-    tools?: TOOLS;
-    model: LanguageModelV1;
-  },
-> = Omit<T, "toolChoice" | "tools" | "model"> & {
+  TOOLS extends ToolSet | undefined = undefined,
+  OUTPUT = never,
+  OUTPUT_PARTIAL = never,
+> = Omit<
+  Parameters<
+    typeof generateText<
+      TOOLS extends undefined ? AgentTools : TOOLS,
+      OUTPUT,
+      OUTPUT_PARTIAL
+    >
+  >[0],
+  "toolChoice" | "tools" | "model"
+> & {
+  /**
+   * The model to use for the tool calls. This will override the model specified
+   * in the Agent constructor.
+   */
   model?: LanguageModelV1;
+  /**
+   * The tools to use for the tool calls. This will override tools specified
+   * in the Agent constructor or createThread / continueThread.
+   */
   tools?: TOOLS;
-  toolChoice?: ToolChoice<{ [key in keyof TOOLS | keyof AgentTools]: unknown }>;
+  /**
+   * The tool choice to use for the tool calls. This must be one of the tools
+   * specified in the tools array. e.g. {toolName: "getWeather", type: "tool"}
+   */
+  toolChoice?: ToolChoice<TOOLS extends undefined ? AgentTools : TOOLS>;
   // Non-AI SDK args
+  /**
+   * The parent message id to use for the tool calls.
+   */
   parentMessageId?: string;
+  /**
+   * The context options to use for passing in message history to the LLM.
+   */
   contextOptions?: ContextOptions;
+  /**
+   * The storage options to use for saving the input and output messages to the thread.
+   */
+  storageOptions?: StorageOptions;
+} & ContextOptions &
+  StorageOptions;
+
+type StreamingTextArgs<
+  AgentTools extends ToolSet,
+  TOOLS extends ToolSet | undefined = undefined,
+  OUTPUT = never,
+  OUTPUT_PARTIAL = never,
+> = Omit<
+  Parameters<
+    typeof streamText<
+      TOOLS extends undefined ? AgentTools : TOOLS,
+      OUTPUT,
+      OUTPUT_PARTIAL
+    >
+  >[0],
+  "toolChoice" | "tools" | "model"
+> & {
+  /**
+   * The model to use for the tool calls. This will override the model specified
+   * in the Agent constructor.
+   */
+  model?: LanguageModelV1;
+  /**
+   * The tools to use for the tool calls. This will override tools specified
+   * in the Agent constructor or createThread / continueThread.
+   */
+  tools?: TOOLS;
+  /**
+   * The tool choice to use for the tool calls. This must be one of the tools
+   * specified in the tools array. e.g. {toolName: "getWeather", type: "tool"}
+   */
+  toolChoice?: ToolChoice<TOOLS extends undefined ? AgentTools : TOOLS>;
+  // Non-AI SDK args
+  /**
+   * The parent message id to use for the tool calls.
+   */
+  parentMessageId?: string;
+  /**
+   * The context options to use for passing in message history to the LLM.
+   */
+  contextOptions?: ContextOptions;
+  /**
+   * The storage options to use for saving the input and output messages to the thread.
+   */
   storageOptions?: StorageOptions;
 } & ContextOptions &
   StorageOptions;
@@ -1341,17 +1467,43 @@ type TextArgs<
 type BaseGenerateObjectOptions = StorageOptions &
   ContextOptions &
   CallSettings & {
+    /**
+     * The model to use for the object generation. This will override the model
+     * specified in the Agent constructor.
+     */
     model?: LanguageModelV1;
+    /**
+     * The system prompt to use for the object generation. This will override the
+     * system prompt specified in the Agent constructor.
+     */
     system?: string;
+    /**
+     * The prompt to the LLM to use for the object generation.
+     * Specify this or messages, but not both.
+     */
     prompt?: string;
+    /**
+     * The messages to use for the object generation.
+     * Note: recent messages are automatically added based on the thread it's
+     * associated with and your contextOptions.
+     */
     messages?: CoreMessage[];
     experimental_repairText?: RepairTextFunction;
     experimental_telemetry?: TelemetrySettings;
     providerOptions?: ProviderOptions;
     experimental_providerMetadata?: ProviderMetadata;
     // Non-AI SDK args
+    /**
+     * The parent message id to use for the object generation.
+     */
     parentMessageId?: string;
+    /**
+     * The context options to use for passing in message history to the LLM.
+     */
     contextOptions?: ContextOptions;
+    /**
+     * The storage options to use for saving the input and output messages to the thread.
+     */
     storageOptions?: StorageOptions;
   };
 
@@ -1417,7 +1569,7 @@ type ThreadOutputMetadata = GenerationOutputMetadata & {
   messageId: string;
 };
 
-interface Thread<AgentTools extends ToolSet> {
+interface Thread<DefaultTools extends ToolSet> {
   /**
    * The target threadId, from the startThread or continueThread initializers.
    */
@@ -1432,14 +1584,20 @@ interface Thread<AgentTools extends ToolSet> {
    * for the {@link ContextOptions} and {@link StorageOptions}.
    * @returns The result of the generateText function.
    */
-  generateText<TOOLS extends ToolSet, OUTPUT = never, OUTPUT_PARTIAL = never>(
+  generateText<
+    TOOLS extends ToolSet | undefined = undefined,
+    OUTPUT = never,
+    OUTPUT_PARTIAL = never,
+  >(
     args: TextArgs<
-      AgentTools,
+      TOOLS extends undefined ? DefaultTools : TOOLS,
       TOOLS,
-      Parameters<typeof generateText<TOOLS, OUTPUT, OUTPUT_PARTIAL>>[0]
+      OUTPUT,
+      OUTPUT_PARTIAL
     >
   ): Promise<
-    GenerateTextResult<TOOLS & AgentTools, OUTPUT> & ThreadOutputMetadata
+    GenerateTextResult<TOOLS extends undefined ? DefaultTools : TOOLS, OUTPUT> &
+      ThreadOutputMetadata
   >;
 
   /**
@@ -1452,14 +1610,23 @@ interface Thread<AgentTools extends ToolSet> {
    * for the {@link ContextOptions} and {@link StorageOptions}.
    * @returns The result of the streamText function.
    */
-  streamText<TOOLS extends ToolSet, OUTPUT = never, PARTIAL_OUTPUT = never>(
-    args: TextArgs<
-      AgentTools,
+  streamText<
+    TOOLS extends ToolSet | undefined = undefined,
+    OUTPUT = never,
+    PARTIAL_OUTPUT = never,
+  >(
+    args: StreamingTextArgs<
+      TOOLS extends undefined ? DefaultTools : TOOLS,
       TOOLS,
-      Parameters<typeof streamText<TOOLS, OUTPUT, PARTIAL_OUTPUT>>[0]
+      OUTPUT,
+      PARTIAL_OUTPUT
     >
   ): Promise<
-    StreamTextResult<TOOLS & AgentTools, PARTIAL_OUTPUT> & ThreadOutputMetadata
+    StreamTextResult<
+      TOOLS extends undefined ? DefaultTools : TOOLS,
+      PARTIAL_OUTPUT
+    > &
+      ThreadOutputMetadata
   >;
   /**
    * This behaves like {@link generateObject} from the "ai" package except that
