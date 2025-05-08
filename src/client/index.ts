@@ -386,13 +386,14 @@ export class Agent<AgentTools extends ToolSet> {
       threadId?: string;
       messages: CoreMessage[];
       parentMessageId?: string;
-    } & ContextOptions
+      contextOptions: ContextOptions;
+    }
   ): Promise<CoreMessage[]> {
     assert(args.userId || args.threadId, "Specify userId or threadId");
     // Fetch the latest messages from the thread
     const contextMessages: MessageDoc[] = [];
     let included: Set<string> | undefined;
-    const opts = this.mergedContextOptions(args);
+    const opts = this.mergedContextOptions(args.contextOptions);
     if (opts.searchOptions?.textSearch || opts.searchOptions?.vectorSearch) {
       if (!("runAction" in ctx)) {
         throw new Error("searchUserMessages only works in an action");
@@ -400,7 +401,9 @@ export class Agent<AgentTools extends ToolSet> {
       const searchMessages = await ctx.runAction(
         this.component.messages.searchMessages,
         {
-          userId: args.searchOtherThreads ? args.userId : undefined,
+          userId: args.contextOptions.searchOtherThreads
+            ? args.userId
+            : undefined,
           threadId: args.threadId,
           parentMessageId: args.parentMessageId,
           ...(await this.searchOptionsWithDefaults(opts, args.messages)),
@@ -849,11 +852,11 @@ export class Agent<AgentTools extends ToolSet> {
       this.options.storageOptions?.saveAllInputMessages;
     const messages = promptOrMessagesToCoreMessages(args);
     const contextMessages = await this.fetchContextMessages(ctx, {
-      messages,
-      parentMessageId,
       userId,
       threadId,
-      ...args,
+      messages,
+      parentMessageId,
+      contextOptions: args,
     });
     let messageId: string | undefined;
     if (threadId && saveAny !== false) {
