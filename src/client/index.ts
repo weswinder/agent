@@ -437,7 +437,12 @@ export class Agent<AgentTools extends ToolSet> {
       .map((m) => deserializeMessage(m.message!));
   }
 
-  async getEmbeddings(messages: CoreMessage[]) {
+  /**
+   * Get the embeddings for a set of messages.
+   * @param messages The messages to get the embeddings for.
+   * @returns The embeddings for the messages.
+   */
+  async generateEmbeddings(messages: CoreMessage[]) {
     let embeddings:
       | {
           vectors: (number[] | null)[];
@@ -515,7 +520,7 @@ export class Agent<AgentTools extends ToolSet> {
     lastMessageId: string;
     messageIds: string[];
   }> {
-    const embeddings = await this.getEmbeddings(args.messages);
+    const embeddings = await this.generateEmbeddings(args.messages);
     const result = await ctx.runMutation(this.component.messages.addMessages, {
       threadId: args.threadId,
       userId: args.userId,
@@ -577,7 +582,9 @@ export class Agent<AgentTools extends ToolSet> {
       provider: args.provider ?? this.options.chat.provider,
       model: args.model ?? this.options.chat.modelId,
     });
-    const embeddings = await this.getEmbeddings(messages.map((m) => m.message));
+    const embeddings = await this.generateEmbeddings(
+      messages.map((m) => m.message)
+    );
     if (embeddings) {
       const { model, dimension, vectors } = embeddings;
       for (let i = 0; i < messages.length; i++) {
@@ -1058,7 +1065,7 @@ export class Agent<AgentTools extends ToolSet> {
         provider: this.options.chat.provider,
       }
     );
-    const embeddings = await this.getEmbeddings([withoutEmbed[0].message]);
+    const embeddings = await this.generateEmbeddings([withoutEmbed[0].message]);
     const messages = embeddings?.vectors[0]
       ? [
           {
