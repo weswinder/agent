@@ -27,7 +27,7 @@ import { assert } from "convex-helpers";
 import { internalActionGeneric, internalMutationGeneric } from "convex/server";
 import { Infer, v } from "convex/values";
 import { z } from "zod";
-import { Mounts } from "../component/_generated/api.js";
+import { api } from "../component/_generated/api.js";
 import {
   validateVectorDimension,
   type VectorDimension,
@@ -174,7 +174,8 @@ export type UsageHandler = (
 
 export class Agent<AgentTools extends ToolSet> {
   constructor(
-    public component: UseApi<Mounts>,
+    // public component: UseApi<Mounts>,
+    public component: UseApi<typeof api>,
     public options: {
       /**
        * The name for the agent. This will be attributed on each message
