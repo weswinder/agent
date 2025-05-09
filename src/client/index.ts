@@ -699,14 +699,16 @@ export class Agent<AgentTools extends ToolSet> {
        */
       tools?: ToolSet;
     },
-    args: TextArgs<AgentTools, TOOLS, OUTPUT, OUTPUT_PARTIAL>
+    args: TextArgs<AgentTools, TOOLS, OUTPUT, OUTPUT_PARTIAL>,
+    options?: Options
   ): Promise<
     GenerateTextResult<TOOLS extends undefined ? AgentTools : TOOLS, OUTPUT> &
       GenerationOutputMetadata
   > {
     const { args: aiArgs, messageId } = await this.saveMessagesAndFetchContext(
       ctx,
-      { ...args, userId, threadId }
+      args,
+      { userId, threadId, ...options }
     );
     const toolCtx = { ...ctx, userId, threadId, messageId };
     const tools = wrapTools(
@@ -714,6 +716,7 @@ export class Agent<AgentTools extends ToolSet> {
       args.tools ?? threadTools ?? this.options.tools
     ) as TOOLS extends undefined ? AgentTools : TOOLS;
     const saveOutputMessages =
+      options?.storageOptions?.saveOutputMessages ??
       args.saveOutputMessages ??
       this.options.storageOptions?.saveOutputMessages;
     const model = aiArgs.model ?? this.options.chat;
@@ -800,7 +803,8 @@ export class Agent<AgentTools extends ToolSet> {
       usageHandler?: UsageHandler;
       tools?: ToolSet;
     },
-    args: StreamingTextArgs<AgentTools, TOOLS, OUTPUT, PARTIAL_OUTPUT>
+    args: StreamingTextArgs<AgentTools, TOOLS, OUTPUT, PARTIAL_OUTPUT>,
+    options?: Options
   ): Promise<
     StreamTextResult<
       TOOLS extends undefined ? AgentTools : TOOLS,
@@ -810,7 +814,8 @@ export class Agent<AgentTools extends ToolSet> {
   > {
     const { args: aiArgs, messageId } = await this.saveMessagesAndFetchContext(
       ctx,
-      { ...args, userId, threadId }
+      args,
+      { userId, threadId, ...options }
     );
     const toolCtx = { ...ctx, userId, threadId, messageId };
     const tools = wrapTools(
@@ -818,6 +823,7 @@ export class Agent<AgentTools extends ToolSet> {
       args.tools ?? threadTools ?? this.options.tools
     ) as TOOLS extends undefined ? AgentTools : TOOLS;
     const saveOutputMessages =
+      options?.storageOptions?.saveOutputMessages ??
       args.saveOutputMessages ??
       this.options.storageOptions?.saveOutputMessages;
     const model = aiArgs.model ?? this.options.chat;
@@ -885,28 +891,23 @@ export class Agent<AgentTools extends ToolSet> {
     },
   >(
     ctx: RunActionCtx | RunMutationCtx,
+    args: T,
     {
-      id,
       userId,
       threadId,
       parentMessageId,
-      system,
-      ...args
+      contextOptions,
+      storageOptions,
     }: {
       userId: string | undefined;
       threadId: string | undefined;
-      parentMessageId?: string;
-      contextOptions?: ContextOptions;
-      storageOptions?: StorageOptions;
-    } & T
+    } & Options
   ): Promise<{
     args: T;
     messageId: string | undefined;
   }> {
-    const contextOptions: ContextOptions | Record<string, unknown> =
-      args.contextOptions ?? this.options.contextOptions ?? args;
-    const storageOptions: StorageOptions | Record<string, unknown> =
-      args.storageOptions ?? this.options.storageOptions ?? args;
+    contextOptions ||= this.options.contextOptions ?? (args as ContextOptions);
+    storageOptions ||= this.options.storageOptions ?? (args as StorageOptions);
     const messages = promptOrMessagesToCoreMessages(args);
     const contextMessages = await this.fetchContextMessages(ctx, {
       userId,
@@ -923,7 +924,7 @@ export class Agent<AgentTools extends ToolSet> {
         threadId,
         userId,
         messages: coreMessages,
-        metadata: coreMessages.length === 1 ? [{ id }] : undefined,
+        metadata: coreMessages.length === 1 ? [{ id: args.id }] : undefined,
         pending: true,
         // We should just fail if you pass in an ID for the message, fail those children
         // failPendingSteps: true,
@@ -935,7 +936,7 @@ export class Agent<AgentTools extends ToolSet> {
     return {
       args: {
         ...rest,
-        system: system ?? this.options.instructions,
+        system: args.system ?? this.options.instructions,
         messages: [...contextMessages, ...messages],
       } as T,
       messageId,
@@ -961,15 +962,18 @@ export class Agent<AgentTools extends ToolSet> {
       threadId,
       usageHandler,
     }: { userId?: string; threadId?: string; usageHandler?: UsageHandler },
-    args: OurObjectArgs<T>
+    args: OurObjectArgs<T>,
+    options?: Options
   ): Promise<GenerateObjectResult<T> & GenerationOutputMetadata> {
     const { args: aiArgs, messageId } = await this.saveMessagesAndFetchContext(
       ctx,
-      { ...args, userId, threadId }
+      args,
+      { userId, threadId, ...options }
     );
     const model = aiArgs.model ?? this.options.chat;
     const trackUsage = usageHandler ?? this.options.usageHandler;
     const saveOutputMessages =
+      options?.storageOptions?.saveOutputMessages ??
       args.saveOutputMessages ??
       this.options.storageOptions?.saveOutputMessages;
     try {
@@ -1027,18 +1031,21 @@ export class Agent<AgentTools extends ToolSet> {
       threadId,
       usageHandler,
     }: { userId?: string; threadId?: string; usageHandler?: UsageHandler },
-    args: OurStreamObjectArgs<T>
+    args: OurStreamObjectArgs<T>,
+    options?: Options
   ): Promise<
     StreamObjectResult<DeepPartial<T>, T, never> & GenerationOutputMetadata
   > {
     // TODO: unify all this shared code between all the generate* and stream* functions
     const { args: aiArgs, messageId } = await this.saveMessagesAndFetchContext(
       ctx,
-      { ...args, userId, threadId }
+      args,
+      { userId, threadId, ...options }
     );
     const model = aiArgs.model ?? this.options.chat;
     const trackUsage = usageHandler ?? this.options.usageHandler;
     const saveOutputMessages =
+      options?.storageOptions?.saveOutputMessages ??
       args.saveOutputMessages ??
       this.options.storageOptions?.saveOutputMessages;
     const stream = streamObject<T>({
@@ -1226,18 +1233,30 @@ export class Agent<AgentTools extends ToolSet> {
    * @param spec Configuration for the agent acting as an action, including
    *   {@link ContextOptions} and maxSteps.
    */
-  asTextAction(spec?: { contextOptions?: ContextOptions; maxSteps?: number }) {
+  asTextAction(spec?: {
+    contextOptions?: ContextOptions;
+    maxSteps?: number;
+    storageOptions?: StorageOptions;
+  }) {
     const maxSteps = spec?.maxSteps ?? this.options.maxSteps;
-    const contextOptions =
-      spec?.contextOptions && this.mergedContextOptions(spec.contextOptions);
-
     return internalActionGeneric({
       args: vTextArgs,
       handler: async (ctx, args) => {
+        const { contextOptions, storageOptions, ...rest } = args;
         const value = await this.generateText(
           ctx,
           { userId: args.userId, threadId: args.threadId },
-          { maxSteps, ...args, ...contextOptions, ...args.storageOptions }
+          { maxSteps, ...rest },
+          {
+            contextOptions:
+              contextOptions ??
+              spec?.contextOptions ??
+              this.options.contextOptions,
+            storageOptions:
+              storageOptions ??
+              spec?.storageOptions ??
+              this.options.storageOptions,
+          }
         );
         return value.text;
       },
@@ -1250,21 +1269,36 @@ export class Agent<AgentTools extends ToolSet> {
    * the normal parameters to {@link generateObject}, plus {@link ContextOptions}
    * and maxSteps.
    */
-  asObjectAction<T>(spec: OurObjectArgs<T> & { maxSteps?: number }) {
+  asObjectAction<T>(
+    spec: OurObjectArgs<T> & { maxSteps?: number },
+    options?: {
+      contextOptions?: ContextOptions;
+      storageOptions?: StorageOptions;
+    }
+  ) {
     const maxSteps = spec?.maxSteps ?? this.options.maxSteps;
     return internalActionGeneric({
       args: vSafeObjectArgs,
       handler: async (ctx, args) => {
+        const { contextOptions, storageOptions, ...rest } = args;
         const value = await this.generateObject(
           ctx,
           { userId: args.userId, threadId: args.threadId },
           {
             ...spec,
             maxSteps,
-            ...args,
-            ...this.mergedContextOptions(spec),
-            ...args.storageOptions,
-          } as unknown as OurObjectArgs<unknown>
+            ...rest,
+          } as unknown as OurObjectArgs<unknown>,
+          {
+            contextOptions:
+              contextOptions ??
+              options?.contextOptions ??
+              this.options.contextOptions,
+            storageOptions:
+              storageOptions ??
+              options?.storageOptions ??
+              this.options.storageOptions,
+          }
         );
         return value.object as T;
       },
@@ -1372,6 +1406,21 @@ function wrapTools(
   return output;
 }
 
+type Options = {
+  /**
+   * The parent message id to use for the tool calls.
+   */
+  parentMessageId?: string;
+  /**
+   * The context options to use for passing in message history to the LLM.
+   */
+  contextOptions?: ContextOptions;
+  /**
+   * The storage options to use for saving the input and output messages to the thread.
+   */
+  storageOptions?: StorageOptions;
+};
+
 type TextArgs<
   AgentTools extends ToolSet,
   TOOLS extends ToolSet | undefined = undefined,
@@ -1402,20 +1451,7 @@ type TextArgs<
    * specified in the tools array. e.g. {toolName: "getWeather", type: "tool"}
    */
   toolChoice?: ToolChoice<TOOLS extends undefined ? AgentTools : TOOLS>;
-  // Non-AI SDK args
-  /**
-   * The parent message id to use for the tool calls.
-   */
-  parentMessageId?: string;
-  /**
-   * The context options to use for passing in message history to the LLM.
-   */
-  contextOptions?: ContextOptions;
-  /**
-   * The storage options to use for saving the input and output messages to the thread.
-   */
-  storageOptions?: StorageOptions;
-} & ContextOptions &
+} & ContextOptions & // DEPRECATED: pass them in the subsequent parameter instead
   StorageOptions;
 
 type StreamingTextArgs<
@@ -1448,19 +1484,6 @@ type StreamingTextArgs<
    * specified in the tools array. e.g. {toolName: "getWeather", type: "tool"}
    */
   toolChoice?: ToolChoice<TOOLS extends undefined ? AgentTools : TOOLS>;
-  // Non-AI SDK args
-  /**
-   * The parent message id to use for the tool calls.
-   */
-  parentMessageId?: string;
-  /**
-   * The context options to use for passing in message history to the LLM.
-   */
-  contextOptions?: ContextOptions;
-  /**
-   * The storage options to use for saving the input and output messages to the thread.
-   */
-  storageOptions?: StorageOptions;
 } & ContextOptions &
   StorageOptions;
 
@@ -1492,19 +1515,6 @@ type BaseGenerateObjectOptions = StorageOptions &
     experimental_telemetry?: TelemetrySettings;
     providerOptions?: ProviderOptions;
     experimental_providerMetadata?: ProviderMetadata;
-    // Non-AI SDK args
-    /**
-     * The parent message id to use for the object generation.
-     */
-    parentMessageId?: string;
-    /**
-     * The context options to use for passing in message history to the LLM.
-     */
-    contextOptions?: ContextOptions;
-    /**
-     * The storage options to use for saving the input and output messages to the thread.
-     */
-    storageOptions?: StorageOptions;
   };
 
 type GenerateObjectObjectOptions<T extends Record<string, unknown>> =
@@ -1536,6 +1546,8 @@ type GenerateObjectNoSchemaOptions = BaseGenerateObjectOptions & {
   mode?: "json";
 };
 
+// TODO: simplify this to just use the generateObject args, with an optional
+// model and tool/toolChoice types
 type GenerateObjectArgs<T> =
   T extends Record<string, unknown>
     ? GenerateObjectObjectOptions<T>
@@ -1569,6 +1581,10 @@ type ThreadOutputMetadata = GenerationOutputMetadata & {
   messageId: string;
 };
 
+/**
+ * The interface for a thread returned from {@link createThread} or {@link continueThread}.
+ * This is contextual to a thread and/or user.
+ */
 interface Thread<DefaultTools extends ToolSet> {
   /**
    * The target threadId, from the startThread or continueThread initializers.
@@ -1594,7 +1610,8 @@ interface Thread<DefaultTools extends ToolSet> {
       TOOLS,
       OUTPUT,
       OUTPUT_PARTIAL
-    >
+    >,
+    options?: Options
   ): Promise<
     GenerateTextResult<TOOLS extends undefined ? DefaultTools : TOOLS, OUTPUT> &
       ThreadOutputMetadata
@@ -1620,7 +1637,8 @@ interface Thread<DefaultTools extends ToolSet> {
       TOOLS,
       OUTPUT,
       PARTIAL_OUTPUT
-    >
+    >,
+    options?: Options
   ): Promise<
     StreamTextResult<
       TOOLS extends undefined ? DefaultTools : TOOLS,
@@ -1639,7 +1657,8 @@ interface Thread<DefaultTools extends ToolSet> {
    * @returns The result of the generateObject function.
    */
   generateObject<T>(
-    args: OurObjectArgs<T>
+    args: OurObjectArgs<T>,
+    options?: Options
   ): Promise<GenerateObjectResult<T> & ThreadOutputMetadata>;
   /**
    * This behaves like {@link generateObject} from the "ai" package except that
@@ -1652,7 +1671,8 @@ interface Thread<DefaultTools extends ToolSet> {
    * @returns The result of the generateObject function.
    */
   generateObject(
-    args: GenerateObjectNoSchemaOptions
+    args: GenerateObjectNoSchemaOptions,
+    options?: Options
   ): Promise<GenerateObjectResult<JSONValue> & ThreadOutputMetadata>;
   /**
    * This behaves like {@link streamObject} from the "ai" package except that
@@ -1665,7 +1685,8 @@ interface Thread<DefaultTools extends ToolSet> {
    * @returns The result of the streamObject function.
    */
   streamObject<T>(
-    args: OurStreamObjectArgs<T>
+    args: OurStreamObjectArgs<T>,
+    options?: Options
   ): Promise<
     StreamObjectResult<DeepPartial<T>, T, never> & ThreadOutputMetadata
   >;

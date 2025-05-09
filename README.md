@@ -230,6 +230,30 @@ export const continueThread = action({
 });
 ```
 
+### Sending a message with configurable message history context
+
+You can customize what history is included per-message via `contextOptions`.
+See the [configuring the agent](#configuring-the-agent) section for details.
+
+```ts
+const result = await thread.generateText({ prompt }, { contextOptions });
+```
+
+### Configuring the storage of messages
+
+See the [configuring the agent](#configuring-the-agent) section for details.
+Generally the defaults are fine, but if you want to pass in multiple messages
+and have them all saved (vs. just the last one), or avoid saving any input
+or output messages, you can pass in a `storageOptions` object.
+
+The usecase for passing multiple messages is if you want to include some extra
+messages for context to the LLM, but only the last message is the user's actual
+request. e.g. `messages = [...messagesFromRag, messageFromUser]`.
+
+```ts
+const result = await thread.generateText({ messages }, { storageOptions });
+```
+
 ### Creating a tool with Convex context
 
 There are two ways to create a tool that has access to the Convex context.
