@@ -428,7 +428,7 @@ export class Agent<AgentTools extends ToolSet> {
       userId: string | undefined;
       threadId: string | undefined;
       messages: CoreMessage[];
-      parentMessageId?: string;
+      beforeMessageId?: string;
       contextOptions: ContextOptions | undefined;
     }
   ): Promise<CoreMessage[]> {
@@ -448,7 +448,7 @@ export class Agent<AgentTools extends ToolSet> {
             ? args.userId
             : undefined,
           threadId: args.threadId,
-          parentMessageId: args.parentMessageId,
+          beforeMessageId: args.beforeMessageId,
           ...(await this.searchOptionsWithDefaults(opts, args.messages)),
         }
       );
@@ -466,7 +466,7 @@ export class Agent<AgentTools extends ToolSet> {
             numItems: opts.recentMessages ?? DEFAULT_RECENT_MESSAGES,
             cursor: null,
           },
-          parentMessageId: args.parentMessageId,
+          beforeMessageId: args.beforeMessageId,
           order: "desc",
           statuses: ["success"],
         }
@@ -925,7 +925,7 @@ export class Agent<AgentTools extends ToolSet> {
       userId,
       threadId,
       messages,
-      parentMessageId,
+      beforeMessageId: parentMessageId,
       contextOptions,
     });
     let messageId: string | undefined;

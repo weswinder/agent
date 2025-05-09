@@ -337,12 +337,13 @@ export const getThreadMessages = query({
     order: v.optional(v.union(v.literal("asc"), v.literal("desc"))),
     paginationOpts: v.optional(paginationOptsValidator),
     statuses: v.optional(v.array(vMessageStatus)),
-    parentMessageId: v.optional(v.id("messages")),
+    beforeMessageId: v.optional(v.id("messages")),
   },
   handler: async (ctx, args) => {
-    const statuses = args.statuses ?? ["success"];
-    const parent =
-      args.parentMessageId && (await ctx.db.get(args.parentMessageId));
+    const statuses =
+      args.statuses ?? vMessageStatus.members.map((m) => m.value);
+    const before =
+      args.beforeMessageId && (await ctx.db.get(args.beforeMessageId));
     const toolOptions =
       args.isTool === undefined ? [true, false] : [args.isTool];
     const order = args.order ?? "desc";
@@ -355,8 +356,8 @@ export const getThreadMessages = query({
               .eq("threadId", args.threadId)
               .eq("status", status)
               .eq("tool", tool);
-            if (parent) {
-              return qq.lte("order", parent.order);
+            if (before) {
+              return qq.lte("order", before.order);
             }
             return qq;
           })
@@ -381,7 +382,7 @@ export const searchMessages = action({
   args: {
     userId: v.optional(v.string()),
     threadId: v.optional(v.id("threads")),
-    parentMessageId: v.optional(v.id("messages")),
+    beforeMessageId: v.optional(v.id("messages")),
     ...vSearchOptions.fields,
   },
   returns: v.array(v.doc("messages")),
@@ -434,7 +435,7 @@ export const searchMessages = action({
             (m) => !vectorIds.includes(m.embeddingId!)
           ),
           messageRange: args.messageRange ?? DEFAULT_MESSAGE_RANGE,
-          parentMessageId: args.parentMessageId,
+          beforeMessageId: args.beforeMessageId,
           limit,
         }
       );
@@ -451,13 +452,13 @@ export const _fetchSearchMessages = internalQuery({
     vectorIds: v.array(vVectorId),
     textSearchMessages: v.optional(v.array(v.doc("messages"))),
     messageRange: v.object({ before: v.number(), after: v.number() }),
-    parentMessageId: v.optional(v.id("messages")),
+    beforeMessageId: v.optional(v.id("messages")),
     limit: v.number(),
   },
   returns: v.array(v.doc("messages")),
   handler: async (ctx, args): Promise<Doc<"messages">[]> => {
-    const parent =
-      args.parentMessageId && (await ctx.db.get(args.parentMessageId));
+    const beforeMessage =
+      args.beforeMessageId && (await ctx.db.get(args.beforeMessageId));
     const { userId, threadId } = args;
     assert(userId || threadId, "Specify userId or threadId to search");
     let messages = (
@@ -481,7 +482,7 @@ export const _fetchSearchMessages = internalQuery({
         m !== undefined &&
         m !== null &&
         !m.tool &&
-        (!parent || m.order <= parent.order)
+        (!beforeMessage || m.order <= beforeMessage.order)
     );
     messages.push(...(args.textSearchMessages ?? []));
     // TODO: prioritize more recent messages

@@ -318,7 +318,7 @@ This is what the agent does automatically, but it can be useful to do manually, 
 
 Fetch CoreMessages (e.g. `{ role, content }`) for a user and/or thread.
 Accepts ContextOptions, e.g. includeToolCalls, searchOptions, etc.
-If you provide a parentMessageId, it will only fetch messages from before that message.
+If you provide a `beforeMessageId`, it will only fetch messages from before that message.
 
 ```ts
 const coreMessages = await supportAgent.fetchContextMessages(ctx, {

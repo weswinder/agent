@@ -1188,6 +1188,7 @@ export declare const components: {
         "query",
         "internal",
         {
+          beforeMessageId?: string;
           isTool?: boolean;
           order?: "asc" | "desc";
           paginationOpts?: {
@@ -1198,7 +1199,6 @@ export declare const components: {
             maximumRowsRead?: number;
             numItems: number;
           };
-          parentMessageId?: string;
           statuses?: Array<"pending" | "success" | "failed">;
           threadId: string;
         },
@@ -1376,9 +1376,9 @@ export declare const components: {
         "action",
         "internal",
         {
+          beforeMessageId?: string;
           limit: number;
           messageRange?: { after: number; before: number };
-          parentMessageId?: string;
           text?: string;
           threadId?: string;
           userId?: string;

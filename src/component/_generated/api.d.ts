@@ -1121,6 +1121,7 @@ export type Mounts = {
       "query",
       "public",
       {
+        beforeMessageId?: string;
         isTool?: boolean;
         order?: "asc" | "desc";
         paginationOpts?: {
@@ -1131,7 +1132,6 @@ export type Mounts = {
           maximumRowsRead?: number;
           numItems: number;
         };
-        parentMessageId?: string;
         statuses?: Array<"pending" | "success" | "failed">;
         threadId: string;
       },
@@ -1305,9 +1305,9 @@ export type Mounts = {
       "action",
       "public",
       {
+        beforeMessageId?: string;
         limit: number;
         messageRange?: { after: number; before: number };
-        parentMessageId?: string;
         text?: string;
         threadId?: string;
         userId?: string;
