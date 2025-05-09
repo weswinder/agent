@@ -54,6 +54,12 @@ export type Mounts = {
     validate: FunctionReference<"query", "public", { apiKey: string }, boolean>;
   };
   files: {
+    addFile: FunctionReference<
+      "mutation",
+      "public",
+      { hash: string; storageId: string },
+      string
+    >;
     getFilesToDelete: FunctionReference<
       "query",
       "public",
@@ -69,6 +75,12 @@ export type Mounts = {
         }>;
         isDone: boolean;
       }
+    >;
+    resuseFile: FunctionReference<
+      "mutation",
+      "public",
+      { fileId: string },
+      null
     >;
   };
   messages: {

@@ -1,41 +1,49 @@
-import { assert, omit, pick } from "convex-helpers";
 import { paginator } from "convex-helpers/server/pagination";
-import { mergedStream, stream } from "convex-helpers/server/stream";
-import { nullable, partial } from "convex-helpers/validators";
-import { ObjectType } from "convex/values";
-import {
-  DEFAULT_MESSAGE_RANGE,
-  DEFAULT_RECENT_MESSAGES,
-  extractText,
-  isTool,
-} from "../shared.js";
-import {
-  paginationResultValidator,
-  vMessageStatus,
-  vMessageWithMetadata,
-  vSearchOptions,
-  vStepWithMessages,
-} from "../validators.js";
-import { api, internal } from "./_generated/api.js";
-import { Doc, Id } from "./_generated/dataModel.js";
-import {
-  action,
-  internalMutation,
-  internalQuery,
-  mutation,
-  MutationCtx,
-  query,
-  QueryCtx,
-} from "./_generated/server.js";
+import { mutation, MutationCtx, query } from "./_generated/server.js";
 import { schema, v } from "./schema.js";
-import { insertVector, searchVectors } from "./vector/index.js";
-import {
-  VectorDimension,
-  VectorDimensions,
-  VectorTableId,
-  vVectorId,
-} from "./vector/tables.js";
-import { paginationOptsValidator } from "convex/server";
+import { Id } from "./_generated/dataModel.js";
+
+export const addFile = mutation({
+  args: {
+    storageId: v.string(),
+    hash: v.string(),
+  },
+  handler: addFileHandler,
+  returns: v.id("files"),
+});
+
+export async function addFileHandler(
+  ctx: MutationCtx,
+  args: { storageId: string; hash: string }
+) {
+  const fileId = await ctx.db.insert("files", {
+    storageId: args.storageId,
+    hash: args.hash,
+    refcount: 1,
+  });
+  return fileId;
+}
+
+export const resuseFile = mutation({
+  args: {
+    fileId: v.id("files"),
+  },
+  handler: reuseFileHandler,
+  returns: v.null(),
+});
+
+export async function reuseFileHandler(
+  ctx: MutationCtx,
+  args: { fileId: Id<"files"> }
+) {
+  const file = await ctx.db.get(args.fileId);
+  if (!file) {
+    throw new Error("File not found");
+  }
+  await ctx.db.patch(args.fileId, {
+    refcount: file.refcount + 1,
+  });
+}
 
 export const getFilesToDelete = query({
   args: {

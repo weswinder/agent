@@ -72,6 +72,12 @@ export declare const components: {
       >;
     };
     files: {
+      addFile: FunctionReference<
+        "mutation",
+        "internal",
+        { hash: string; storageId: string },
+        string
+      >;
       getFilesToDelete: FunctionReference<
         "query",
         "internal",
@@ -87,6 +93,12 @@ export declare const components: {
           }>;
           isDone: boolean;
         }
+      >;
+      resuseFile: FunctionReference<
+        "mutation",
+        "internal",
+        { fileId: string },
+        null
       >;
     };
     messages: {
