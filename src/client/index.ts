@@ -428,6 +428,11 @@ export class Agent<AgentTools extends ToolSet> {
       userId: string | undefined;
       threadId: string | undefined;
       messages: CoreMessage[];
+      /**
+       * If provided, it will search for messages before this message.
+       * Note: if this is far in the past, the search results may be more
+       * limited, as it's post-filtering the results.
+       */
       beforeMessageId?: string;
       contextOptions: ContextOptions | undefined;
     }
@@ -549,13 +554,8 @@ export class Agent<AgentTools extends ToolSet> {
        */
       pending?: boolean;
       /**
-       * The message that this is responding to.
-       */
-      parentMessageId?: string;
-      /**
-       * Whether to mark all pending messages in the thread as failed.
-       * This is used to recover from a failure via a retry that wipes the slate clean.
-       * Defaults to true.
+       * If true, it will fail any pending steps.
+       * Defaults to false.
        */
       failPendingSteps?: boolean;
     }
@@ -580,9 +580,8 @@ export class Agent<AgentTools extends ToolSet> {
             message: serializeMessage(m),
           }) as MessageWithMetadata
       ),
-      failPendingSteps: args.failPendingSteps ?? true,
+      failPendingSteps: args.failPendingSteps ?? false,
       pending: args.pending ?? false,
-      parentMessageId: args.parentMessageId,
     });
     return {
       lastMessageId: result.messages.at(-1)!._id,
@@ -907,7 +906,6 @@ export class Agent<AgentTools extends ToolSet> {
     {
       userId,
       threadId,
-      parentMessageId,
       contextOptions,
       storageOptions,
     }: {
@@ -925,7 +923,6 @@ export class Agent<AgentTools extends ToolSet> {
       userId,
       threadId,
       messages,
-      beforeMessageId: parentMessageId,
       contextOptions,
     });
     let messageId: string | undefined;
@@ -938,9 +935,7 @@ export class Agent<AgentTools extends ToolSet> {
         messages: coreMessages,
         metadata: coreMessages.length === 1 ? [{ id: args.id }] : undefined,
         pending: true,
-        // We should just fail if you pass in an ID for the message, fail those children
-        // failPendingSteps: true,
-        parentMessageId,
+        failPendingSteps: true,
       });
       messageId = saved.lastMessageId;
     }
@@ -1424,10 +1419,6 @@ function wrapTools(
 }
 
 type Options = {
-  /**
-   * The parent message id to use for the tool calls.
-   */
-  parentMessageId?: string;
   /**
    * The context options to use for passing in message history to the LLM.
    */

@@ -86,9 +86,7 @@ async function addMessagesHandler(
   }
   const { failPendingSteps, pending, messages, parentMessageId, ...rest } =
     args;
-  const parent = parentMessageId && (await ctx.db.get(parentMessageId));
-  // TODO: I think this is a bug - parent will be pending always?
-  if (failPendingSteps && parent?.status !== "pending") {
+  if (failPendingSteps) {
     assert(args.threadId, "threadId is required to fail pending steps");
     const pendingMessages = await ctx.db
       .query("messages")
