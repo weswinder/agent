@@ -547,7 +547,7 @@ export type Mounts = {
       "public",
       {
         failPendingSteps?: boolean;
-        messageId: string;
+        parentMessageId: string;
         step: {
           messages: Array<{
             embedding?: {

@@ -586,7 +586,7 @@ export declare const components: {
         "internal",
         {
           failPendingSteps?: boolean;
-          messageId: string;
+          parentMessageId: string;
           step: {
             messages: Array<{
               embedding?: {

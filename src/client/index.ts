@@ -603,7 +603,7 @@ export class Agent<AgentTools extends ToolSet> {
       /**
        * The message this step is in response to.
        */
-      messageId: string;
+      parentMessageId: string;
       /**
        * The step to save, possibly including multiple tool calls.
        */
@@ -640,7 +640,7 @@ export class Agent<AgentTools extends ToolSet> {
     await ctx.runMutation(this.component.messages.addStep, {
       userId: args.userId,
       threadId: args.threadId,
-      messageId: args.messageId,
+      parentMessageId: args.parentMessageId,
       step: { step, messages },
       failPendingSteps: false,
     });
@@ -746,7 +746,7 @@ export class Agent<AgentTools extends ToolSet> {
             await this.saveStep(ctx, {
               userId,
               threadId,
-              messageId,
+              parentMessageId: messageId,
               step,
             });
           }
@@ -868,7 +868,7 @@ export class Agent<AgentTools extends ToolSet> {
           await this.saveStep(ctx, {
             userId,
             threadId,
-            messageId,
+            parentMessageId: messageId,
             step,
           });
         }
@@ -998,7 +998,12 @@ export class Agent<AgentTools extends ToolSet> {
       } as any)) as GenerateObjectResult<T> & GenerationOutputMetadata;
 
       if (threadId && messageId && saveOutputMessages !== false) {
-        await this.saveObject(ctx, { threadId, messageId, result, userId });
+        await this.saveObject(ctx, {
+          threadId,
+          parentMessageId: messageId,
+          result,
+          userId,
+        });
       }
       result.messageId = messageId;
       if (trackUsage && result.usage) {
@@ -1075,7 +1080,7 @@ export class Agent<AgentTools extends ToolSet> {
           await this.saveObject(ctx, {
             userId,
             threadId,
-            messageId,
+            parentMessageId: messageId,
             result: {
               object: result.object,
               finishReason: "stop",
@@ -1123,7 +1128,7 @@ export class Agent<AgentTools extends ToolSet> {
     args: {
       userId: string | undefined;
       threadId: string;
-      messageId: string;
+      parentMessageId: string;
       result: GenerateObjectResult<unknown>;
       metadata?: Omit<MessageWithMetadata, "message">;
     }
@@ -1152,7 +1157,7 @@ export class Agent<AgentTools extends ToolSet> {
     await ctx.runMutation(this.component.messages.addStep, {
       userId: args.userId,
       threadId: args.threadId,
-      messageId: args.messageId,
+      parentMessageId: args.parentMessageId,
       failPendingSteps: false,
       step: { step, messages },
     });

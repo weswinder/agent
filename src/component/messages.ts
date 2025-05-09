@@ -194,7 +194,7 @@ async function getMaxMessage(
 const addStepArgs = {
   userId: v.optional(v.string()),
   threadId: v.id("threads"),
-  messageId: v.id("messages"),
+  parentMessageId: v.id("messages"),
   step: vStepWithMessages,
   failPendingSteps: v.optional(v.boolean()),
 };
@@ -208,15 +208,15 @@ async function addStepHandler(
   ctx: MutationCtx,
   args: ObjectType<typeof addStepArgs>
 ) {
-  const parentMessage = await ctx.db.get(args.messageId);
-  assert(parentMessage, `Message ${args.messageId} not found`);
+  const parentMessage = await ctx.db.get(args.parentMessageId);
+  assert(parentMessage, `Message ${args.parentMessageId} not found`);
   const order = parentMessage.order;
-  assert(order !== undefined, `${args.messageId} has no order`);
+  assert(order !== undefined, `${args.parentMessageId} has no order`);
   let steps = await ctx.db
     .query("steps")
     .withIndex("parentMessageId_order_stepOrder", (q) =>
       // TODO: fetch pending, and commit later
-      q.eq("parentMessageId", args.messageId)
+      q.eq("parentMessageId", args.parentMessageId)
     )
     .collect();
   if (args.failPendingSteps) {
@@ -230,7 +230,7 @@ async function addStepHandler(
   const { step, messages } = args.step;
   const stepId = await ctx.db.insert("steps", {
     threadId: args.threadId,
-    parentMessageId: args.messageId,
+    parentMessageId: args.parentMessageId,
     order,
     stepOrder: (steps.at(-1)?.stepOrder ?? -1) + 1,
     status: step.finishReason === "stop" ? "success" : "pending",
@@ -240,7 +240,7 @@ async function addStepHandler(
     userId: args.userId,
     threadId: args.threadId,
     stepId,
-    parentMessageId: args.messageId,
+    parentMessageId: args.parentMessageId,
     agentName: parentMessage.agentName,
     messages,
     pending: step.finishReason === "stop" ? false : true,
@@ -248,7 +248,7 @@ async function addStepHandler(
   });
   // We don't commit if the parent is still pending.
   if (step.finishReason === "stop") {
-    await commitMessageHandler(ctx, { messageId: args.messageId });
+    await commitMessageHandler(ctx, { messageId: args.parentMessageId });
   }
   steps.push((await ctx.db.get(stepId))!);
   return steps;
