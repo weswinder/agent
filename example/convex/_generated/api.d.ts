@@ -48,6 +48,24 @@ export declare const internal: FilterApi<
 
 export declare const components: {
   agent: {
+    files: {
+      getFilesToDelete: FunctionReference<
+        "query",
+        "internal",
+        { cursor?: string; limit?: number },
+        {
+          continueCursor: string;
+          files: Array<{
+            _creationTime: number;
+            _id: string;
+            hash: string;
+            refcount: number;
+            storageId: string;
+          }>;
+          isDone: boolean;
+        }
+      >;
+    };
     messages: {
       addMessages: FunctionReference<
         "mutation",
@@ -1131,84 +1149,6 @@ export declare const components: {
         { messageId: string },
         null
       >;
-      createThread: FunctionReference<
-        "mutation",
-        "internal",
-        {
-          defaultSystemPrompt?: string;
-          parentThreadIds?: Array<string>;
-          summary?: string;
-          title?: string;
-          userId?: string;
-        },
-        {
-          _creationTime: number;
-          _id: string;
-          defaultSystemPrompt?: string;
-          order?: number;
-          parentThreadIds?: Array<string>;
-          status: "active" | "archived";
-          summary?: string;
-          title?: string;
-          userId?: string;
-        }
-      >;
-      deleteAllForThreadIdAsync: FunctionReference<
-        "mutation",
-        "internal",
-        { cursor?: string; limit?: number; threadId: string },
-        { cursor: string; isDone: boolean }
-      >;
-      deleteAllForThreadIdSync: FunctionReference<
-        "action",
-        "internal",
-        { cursor?: string; limit?: number; threadId: string },
-        { cursor: string; isDone: boolean }
-      >;
-      deleteAllForUserId: FunctionReference<
-        "action",
-        "internal",
-        { userId: string },
-        null
-      >;
-      deleteAllForUserIdAsync: FunctionReference<
-        "mutation",
-        "internal",
-        { userId: string },
-        boolean
-      >;
-      getFilesToDelete: FunctionReference<
-        "query",
-        "internal",
-        { cursor?: string; limit?: number },
-        {
-          continueCursor: string;
-          files: Array<{
-            _creationTime: number;
-            _id: string;
-            hash: string;
-            refcount: number;
-            storageId: string;
-          }>;
-          isDone: boolean;
-        }
-      >;
-      getThread: FunctionReference<
-        "query",
-        "internal",
-        { threadId: string },
-        {
-          _creationTime: number;
-          _id: string;
-          defaultSystemPrompt?: string;
-          order?: number;
-          parentThreadIds?: Array<string>;
-          status: "active" | "archived";
-          summary?: string;
-          title?: string;
-          userId?: string;
-        } | null
-      >;
       getThreadMessages: FunctionReference<
         "query",
         "internal",
@@ -1386,39 +1326,6 @@ export declare const components: {
               | { details?: string; tool: any; type: "unsupported-tool" }
               | { message: string; type: "other" }
             >;
-          }>;
-          pageStatus?: "SplitRecommended" | "SplitRequired" | null;
-          splitCursor?: string | null;
-        }
-      >;
-      getThreadsByUserId: FunctionReference<
-        "query",
-        "internal",
-        {
-          order?: "asc" | "desc";
-          paginationOpts?: {
-            cursor: string | null;
-            endCursor?: string | null;
-            id?: number;
-            maximumBytesRead?: number;
-            maximumRowsRead?: number;
-            numItems: number;
-          };
-          userId: string;
-        },
-        {
-          continueCursor: string;
-          isDone: boolean;
-          page: Array<{
-            _creationTime: number;
-            _id: string;
-            defaultSystemPrompt?: string;
-            order?: number;
-            parentThreadIds?: Array<string>;
-            status: "active" | "archived";
-            summary?: string;
-            title?: string;
-            userId?: string;
           }>;
           pageStatus?: "SplitRecommended" | "SplitRequired" | null;
           splitCursor?: string | null;
@@ -1756,6 +1663,82 @@ export declare const components: {
           >;
         }>
       >;
+    };
+    threads: {
+      createThread: FunctionReference<
+        "mutation",
+        "internal",
+        {
+          defaultSystemPrompt?: string;
+          parentThreadIds?: Array<string>;
+          summary?: string;
+          title?: string;
+          userId?: string;
+        },
+        {
+          _creationTime: number;
+          _id: string;
+          status: "active" | "archived";
+          summary?: string;
+          title?: string;
+          userId?: string;
+        }
+      >;
+      deleteAllForThreadIdAsync: FunctionReference<
+        "mutation",
+        "internal",
+        { cursor?: string; limit?: number; threadId: string },
+        { cursor: string; isDone: boolean }
+      >;
+      deleteAllForThreadIdSync: FunctionReference<
+        "action",
+        "internal",
+        { cursor?: string; limit?: number; threadId: string },
+        { cursor: string; isDone: boolean }
+      >;
+      getThread: FunctionReference<
+        "query",
+        "internal",
+        { threadId: string },
+        {
+          _creationTime: number;
+          _id: string;
+          status: "active" | "archived";
+          summary?: string;
+          title?: string;
+          userId?: string;
+        } | null
+      >;
+      getThreadsByUserId: FunctionReference<
+        "query",
+        "internal",
+        {
+          order?: "asc" | "desc";
+          paginationOpts?: {
+            cursor: string | null;
+            endCursor?: string | null;
+            id?: number;
+            maximumBytesRead?: number;
+            maximumRowsRead?: number;
+            numItems: number;
+          };
+          userId: string;
+        },
+        {
+          continueCursor: string;
+          isDone: boolean;
+          page: Array<{
+            _creationTime: number;
+            _id: string;
+            status: "active" | "archived";
+            summary?: string;
+            title?: string;
+            userId?: string;
+          }>;
+          pageStatus?: "SplitRecommended" | "SplitRequired" | null;
+          splitCursor?: string | null;
+        }
+      >;
       updateThread: FunctionReference<
         "mutation",
         "internal",
@@ -1770,13 +1753,45 @@ export declare const components: {
         {
           _creationTime: number;
           _id: string;
-          defaultSystemPrompt?: string;
-          order?: number;
-          parentThreadIds?: Array<string>;
           status: "active" | "archived";
           summary?: string;
           title?: string;
           userId?: string;
+        }
+      >;
+    };
+    users: {
+      deleteAllForUserId: FunctionReference<
+        "action",
+        "internal",
+        { userId: string },
+        null
+      >;
+      deleteAllForUserIdAsync: FunctionReference<
+        "mutation",
+        "internal",
+        { userId: string },
+        boolean
+      >;
+      listUsersWithThreads: FunctionReference<
+        "query",
+        "internal",
+        {
+          paginationOpts: {
+            cursor: string | null;
+            endCursor?: string | null;
+            id?: number;
+            maximumBytesRead?: number;
+            maximumRowsRead?: number;
+            numItems: number;
+          };
+        },
+        {
+          continueCursor: string;
+          isDone: boolean;
+          page: Array<string>;
+          pageStatus?: "SplitRecommended" | "SplitRequired" | null;
+          splitCursor?: string | null;
         }
       >;
     };

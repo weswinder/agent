@@ -8,7 +8,10 @@
  * @module
  */
 
+import type * as apiKeys from "../apiKeys.js";
 import type * as messages from "../messages.js";
+import type * as threads from "../threads.js";
+import type * as users from "../users.js";
 import type * as vector_index from "../vector/index.js";
 import type * as vector_tables from "../vector/tables.js";
 
@@ -27,11 +30,32 @@ import type {
  * ```
  */
 declare const fullApi: ApiFromModules<{
+  files: typeof files;
   messages: typeof messages;
+  threads: typeof threads;
+  users: typeof users;
   "vector/index": typeof vector_index;
   "vector/tables": typeof vector_tables;
 }>;
 export type Mounts = {
+  files: {
+    getFilesToDelete: FunctionReference<
+      "query",
+      "public",
+      { cursor?: string; limit?: number },
+      {
+        continueCursor: string;
+        files: Array<{
+          _creationTime: number;
+          _id: string;
+          hash: string;
+          refcount: number;
+          storageId: string;
+        }>;
+        isDone: boolean;
+      }
+    >;
+  };
   messages: {
     addMessages: FunctionReference<
       "mutation",
@@ -1066,84 +1090,6 @@ export type Mounts = {
       { messageId: string },
       null
     >;
-    createThread: FunctionReference<
-      "mutation",
-      "public",
-      {
-        defaultSystemPrompt?: string;
-        parentThreadIds?: Array<string>;
-        summary?: string;
-        title?: string;
-        userId?: string;
-      },
-      {
-        _creationTime: number;
-        _id: string;
-        defaultSystemPrompt?: string;
-        order?: number;
-        parentThreadIds?: Array<string>;
-        status: "active" | "archived";
-        summary?: string;
-        title?: string;
-        userId?: string;
-      }
-    >;
-    deleteAllForThreadIdAsync: FunctionReference<
-      "mutation",
-      "public",
-      { cursor?: string; limit?: number; threadId: string },
-      { cursor: string; isDone: boolean }
-    >;
-    deleteAllForThreadIdSync: FunctionReference<
-      "action",
-      "public",
-      { cursor?: string; limit?: number; threadId: string },
-      { cursor: string; isDone: boolean }
-    >;
-    deleteAllForUserId: FunctionReference<
-      "action",
-      "public",
-      { userId: string },
-      null
-    >;
-    deleteAllForUserIdAsync: FunctionReference<
-      "mutation",
-      "public",
-      { userId: string },
-      boolean
-    >;
-    getFilesToDelete: FunctionReference<
-      "query",
-      "public",
-      { cursor?: string; limit?: number },
-      {
-        continueCursor: string;
-        files: Array<{
-          _creationTime: number;
-          _id: string;
-          hash: string;
-          refcount: number;
-          storageId: string;
-        }>;
-        isDone: boolean;
-      }
-    >;
-    getThread: FunctionReference<
-      "query",
-      "public",
-      { threadId: string },
-      {
-        _creationTime: number;
-        _id: string;
-        defaultSystemPrompt?: string;
-        order?: number;
-        parentThreadIds?: Array<string>;
-        status: "active" | "archived";
-        summary?: string;
-        title?: string;
-        userId?: string;
-      } | null
-    >;
     getThreadMessages: FunctionReference<
       "query",
       "public",
@@ -1317,39 +1263,6 @@ export type Mounts = {
             | { details?: string; tool: any; type: "unsupported-tool" }
             | { message: string; type: "other" }
           >;
-        }>;
-        pageStatus?: "SplitRecommended" | "SplitRequired" | null;
-        splitCursor?: string | null;
-      }
-    >;
-    getThreadsByUserId: FunctionReference<
-      "query",
-      "public",
-      {
-        order?: "asc" | "desc";
-        paginationOpts?: {
-          cursor: string | null;
-          endCursor?: string | null;
-          id?: number;
-          maximumBytesRead?: number;
-          maximumRowsRead?: number;
-          numItems: number;
-        };
-        userId: string;
-      },
-      {
-        continueCursor: string;
-        isDone: boolean;
-        page: Array<{
-          _creationTime: number;
-          _id: string;
-          defaultSystemPrompt?: string;
-          order?: number;
-          parentThreadIds?: Array<string>;
-          status: "active" | "archived";
-          summary?: string;
-          title?: string;
-          userId?: string;
         }>;
         pageStatus?: "SplitRecommended" | "SplitRequired" | null;
         splitCursor?: string | null;
@@ -1687,6 +1600,82 @@ export type Mounts = {
         >;
       }>
     >;
+  };
+  threads: {
+    createThread: FunctionReference<
+      "mutation",
+      "public",
+      {
+        defaultSystemPrompt?: string;
+        parentThreadIds?: Array<string>;
+        summary?: string;
+        title?: string;
+        userId?: string;
+      },
+      {
+        _creationTime: number;
+        _id: string;
+        status: "active" | "archived";
+        summary?: string;
+        title?: string;
+        userId?: string;
+      }
+    >;
+    deleteAllForThreadIdAsync: FunctionReference<
+      "mutation",
+      "public",
+      { cursor?: string; limit?: number; threadId: string },
+      { cursor: string; isDone: boolean }
+    >;
+    deleteAllForThreadIdSync: FunctionReference<
+      "action",
+      "public",
+      { cursor?: string; limit?: number; threadId: string },
+      { cursor: string; isDone: boolean }
+    >;
+    getThread: FunctionReference<
+      "query",
+      "public",
+      { threadId: string },
+      {
+        _creationTime: number;
+        _id: string;
+        status: "active" | "archived";
+        summary?: string;
+        title?: string;
+        userId?: string;
+      } | null
+    >;
+    getThreadsByUserId: FunctionReference<
+      "query",
+      "public",
+      {
+        order?: "asc" | "desc";
+        paginationOpts?: {
+          cursor: string | null;
+          endCursor?: string | null;
+          id?: number;
+          maximumBytesRead?: number;
+          maximumRowsRead?: number;
+          numItems: number;
+        };
+        userId: string;
+      },
+      {
+        continueCursor: string;
+        isDone: boolean;
+        page: Array<{
+          _creationTime: number;
+          _id: string;
+          status: "active" | "archived";
+          summary?: string;
+          title?: string;
+          userId?: string;
+        }>;
+        pageStatus?: "SplitRecommended" | "SplitRequired" | null;
+        splitCursor?: string | null;
+      }
+    >;
     updateThread: FunctionReference<
       "mutation",
       "public",
@@ -1701,13 +1690,45 @@ export type Mounts = {
       {
         _creationTime: number;
         _id: string;
-        defaultSystemPrompt?: string;
-        order?: number;
-        parentThreadIds?: Array<string>;
         status: "active" | "archived";
         summary?: string;
         title?: string;
         userId?: string;
+      }
+    >;
+  };
+  users: {
+    deleteAllForUserId: FunctionReference<
+      "action",
+      "public",
+      { userId: string },
+      null
+    >;
+    deleteAllForUserIdAsync: FunctionReference<
+      "mutation",
+      "public",
+      { userId: string },
+      boolean
+    >;
+    listUsersWithThreads: FunctionReference<
+      "query",
+      "public",
+      {
+        paginationOpts: {
+          cursor: string | null;
+          endCursor?: string | null;
+          id?: number;
+          maximumBytesRead?: number;
+          maximumRowsRead?: number;
+          numItems: number;
+        };
+      },
+      {
+        continueCursor: string;
+        isDone: boolean;
+        page: Array<string>;
+        pageStatus?: "SplitRecommended" | "SplitRequired" | null;
+        splitCursor?: string | null;
       }
     >;
   };

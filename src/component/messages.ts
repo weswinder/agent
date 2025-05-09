@@ -37,187 +37,11 @@ import {
 } from "./vector/tables.js";
 import { paginationOptsValidator } from "convex/server";
 
-export const getThread = query({
-  args: { threadId: v.id("threads") },
-  handler: async (ctx, args) => {
-    return ctx.db.get(args.threadId);
-  },
-  returns: v.union(v.doc("threads"), v.null()),
-});
 
-export const getThreadsByUserId = query({
-  args: {
-    userId: v.string(),
-    order: v.optional(v.union(v.literal("asc"), v.literal("desc"))),
-    paginationOpts: v.optional(paginationOptsValidator),
-  },
-  handler: async (ctx, args) => {
-    const threads = await paginator(ctx.db, schema)
-      .query("threads")
-      .withIndex("userId", (q) => q.eq("userId", args.userId))
-      .order(args.order ?? "desc")
-      .paginate(args.paginationOpts ?? { cursor: null, numItems: 100 });
-    return threads;
-  },
-  returns: paginationResultValidator(v.doc("threads")),
-});
-
-const vThread = schema.tables.threads.validator;
-
-export const createThread = mutation({
-  args: omit(vThread.fields, ["order", "status"]),
-  handler: async (ctx, args) => {
-    const threadId = await ctx.db.insert("threads", {
-      ...args,
-      status: "active",
-    });
-    return (await ctx.db.get(threadId))!;
-  },
-  returns: v.doc("threads"),
-});
-
-export const updateThread = mutation({
-  args: {
-    threadId: v.id("threads"),
-    patch: v.object(
-      partial(pick(vThread.fields, ["title", "summary", "status"]))
-    ),
-  },
-  handler: async (ctx, args) => {
-    const thread = await ctx.db.get(args.threadId);
-    assert(thread, `Thread ${args.threadId} not found`);
-    await ctx.db.patch(args.threadId, args.patch);
-    return (await ctx.db.get(args.threadId))!;
-  },
-  returns: v.doc("threads"),
-});
-
-// When we expose this, we need to also hide all the messages and steps
-// export const archiveThread = mutation({
-//   args: { threadId: v.id("threads") },
-//   handler: async (ctx, args) => {
-//     const thread = await ctx.db.get(args.threadId);
-//     assert(thread, `Thread ${args.threadId} not found`);
-//     await ctx.db.patch(args.threadId, { status: "archived" });
-//     return (await ctx.db.get(args.threadId))!;
-//   },
-//   returns: v.doc("threads"),
-// });
-
-export const deleteAllForUserId = action({
-  args: { userId: v.string() },
-  handler: async (ctx, args) => {
-    let messagesCursor = null;
-    let threadsCursor = null;
-    let isDone = false;
-    while (!isDone) {
-      const result: {
-        messagesCursor: string;
-        threadsCursor: string | null;
-        isDone: boolean;
-      } = await ctx.runMutation(internal.messages._deletePageForUserId, {
-        userId: args.userId,
-        messagesCursor,
-        threadsCursor,
-      });
-      messagesCursor = result.messagesCursor;
-      threadsCursor = result.threadsCursor;
-      isDone = result.isDone;
-    }
-  },
-  returns: v.null(),
-});
-
-export const deleteAllForUserIdAsync = mutation({
-  args: {
-    userId: v.string(),
-  },
-  handler: async (ctx, args) => {
-    const isDone = await deleteAllForUserIdAsyncHandler(ctx, {
-      userId: args.userId,
-      messagesCursor: null,
-      threadsCursor: null,
-    });
-    return isDone;
-  },
-  returns: v.boolean(),
-});
-
-const deleteAllArgs = {
-  userId: v.string(),
-  messagesCursor: nullable(v.string()),
-  threadsCursor: nullable(v.string()),
-};
-type DeleteAllArgs = ObjectType<typeof deleteAllArgs>;
-const deleteAllReturns = {
-  messagesCursor: v.string(),
-  threadsCursor: nullable(v.string()),
-  isDone: v.boolean(),
-};
-type DeleteAllReturns = ObjectType<typeof deleteAllReturns>;
-
-export const _deleteAllForUserIdAsync = internalMutation({
-  args: deleteAllArgs,
-  handler: deleteAllForUserIdAsyncHandler,
-  returns: v.boolean(),
-});
-
-async function deleteAllForUserIdAsyncHandler(
+export async function deleteMessage(
   ctx: MutationCtx,
-  args: DeleteAllArgs
-): Promise<boolean> {
-  const result = await deletePageForUserId(ctx, args);
-  if (!result.isDone) {
-    await ctx.scheduler.runAfter(
-      0,
-      internal.messages._deleteAllForUserIdAsync,
-      {
-        userId: args.userId,
-        messagesCursor: result.messagesCursor,
-        threadsCursor: result.threadsCursor,
-      }
-    );
-  }
-  return result.isDone;
-}
-
-export const _deletePageForUserId = internalMutation({
-  args: deleteAllArgs,
-  handler: deletePageForUserId,
-  returns: deleteAllReturns,
-});
-async function deletePageForUserId(
-  ctx: MutationCtx,
-  args: DeleteAllArgs
-): Promise<DeleteAllReturns> {
-  const threads = await paginator(ctx.db, schema)
-    .query("threads")
-    .withIndex("userId", (q) => q.eq("userId", args.userId))
-    .order("desc")
-    .paginate({
-      numItems: 100,
-      cursor: args.threadsCursor ?? null,
-    });
-  await Promise.all(threads.page.map((c) => ctx.db.delete(c._id)));
-  const messages = await paginator(ctx.db, schema)
-    .query("messages")
-    .withIndex("userId_status_tool_order_stepOrder", (q) =>
-      q.eq("userId", args.userId)
-    )
-    .order("desc")
-    .paginate({
-      numItems: 100,
-      cursor: args.messagesCursor ?? null,
-    });
-  await Promise.all(messages.page.map((m) => deleteMessage(ctx, m)));
-  return {
-    messagesCursor: messages.continueCursor,
-    threadsCursor: threads.continueCursor,
-    isDone: messages.isDone,
-  };
-}
-
-async function deleteMessage(ctx: MutationCtx, messageDoc: Doc<"messages">) {
+  messageDoc: Doc<"messages">
+) {
   await ctx.db.delete(messageDoc._id);
   if (messageDoc.embeddingId) {
     await ctx.db.delete(messageDoc.embeddingId);
@@ -229,98 +53,6 @@ async function deleteMessage(ctx: MutationCtx, messageDoc: Doc<"messages">) {
     }
   }
 }
-
-const deleteThreadArgs = {
-  threadId: v.id("threads"),
-  cursor: v.optional(v.string()),
-  limit: v.optional(v.number()),
-};
-type DeleteThreadArgs = ObjectType<typeof deleteThreadArgs>;
-const deleteThreadReturns = {
-  cursor: v.string(),
-  isDone: v.boolean(),
-};
-type DeleteThreadReturns = ObjectType<typeof deleteThreadReturns>;
-
-export const deleteAllForThreadIdSync = action({
-  args: deleteThreadArgs,
-  handler: async (ctx, args) => {
-    const result: DeleteThreadReturns = await ctx.runMutation(
-      internal.messages._deletePageForThreadId,
-      { threadId: args.threadId, cursor: args.cursor, limit: args.limit }
-    );
-    return result;
-  },
-  returns: deleteThreadReturns,
-});
-
-export const deleteAllForThreadIdAsync = mutation({
-  args: deleteThreadArgs,
-  handler: async (ctx, args) => {
-    const result = await deletePageForThreadIdHandler(ctx, args);
-    if (!result.isDone) {
-      await ctx.scheduler.runAfter(0, api.messages.deleteAllForThreadIdAsync, {
-        threadId: args.threadId,
-        cursor: result.cursor,
-      });
-    }
-    return result;
-  },
-  returns: deleteThreadReturns,
-});
-
-export const _deletePageForThreadId = internalMutation({
-  args: deleteThreadArgs,
-  handler: deletePageForThreadIdHandler,
-  returns: deleteThreadReturns,
-});
-
-async function deletePageForThreadIdHandler(
-  ctx: MutationCtx,
-  args: DeleteThreadArgs
-): Promise<DeleteThreadReturns> {
-  const messages = await paginator(ctx.db, schema)
-    .query("messages")
-    .withIndex("threadId_status_tool_order_stepOrder", (q) =>
-      q.eq("threadId", args.threadId)
-    )
-    .paginate({
-      numItems: args.limit ?? 100,
-      cursor: args.cursor ?? null,
-    });
-  await Promise.all(messages.page.map((m) => deleteMessage(ctx, m)));
-  await ctx.db.delete(args.threadId);
-  return {
-    cursor: messages.continueCursor,
-    isDone: messages.isDone,
-  };
-}
-
-export const getFilesToDelete = query({
-  args: {
-    cursor: v.optional(v.string()),
-    limit: v.optional(v.number()),
-  },
-  handler: async (ctx, args) => {
-    const files = await paginator(ctx.db, schema)
-      .query("files")
-      .withIndex("refcount", (q) => q.eq("refcount", 0))
-      .paginate({
-        numItems: args.limit ?? 100,
-        cursor: args.cursor ?? null,
-      });
-    return {
-      files: files.page,
-      continueCursor: files.continueCursor,
-      isDone: files.isDone,
-    };
-  },
-  returns: v.object({
-    files: v.array(v.doc("files")),
-    continueCursor: v.string(),
-    isDone: v.boolean(),
-  }),
-});
 
 export const vMessageDoc = schema.tables.messages.validator;
 export const messageStatuses = vMessageDoc.fields.status.members.map(
@@ -697,7 +429,7 @@ export const searchMessages = action({
         .sort((a, b) => b.score - a.score);
       const vectorIds = vectorScores.slice(0, limit).map((v) => v.id);
       const messages: Doc<"messages">[] = await ctx.runQuery(
-        internal.messages._fetchVectorMessages,
+        internal.messages._fetchSearchMessages,
         {
           userId: args.userId,
           threadId: args.threadId,
@@ -716,7 +448,7 @@ export const searchMessages = action({
   },
 });
 
-export const _fetchVectorMessages = internalQuery({
+export const _fetchSearchMessages = internalQuery({
   args: {
     userId: v.optional(v.string()),
     threadId: v.optional(v.id("threads")),

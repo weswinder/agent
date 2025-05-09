@@ -56,6 +56,7 @@ import {
   type Usage,
   vSafeObjectArgs,
   vTextArgs,
+  vThreadStatus,
 } from "../validators.js";
 import type {
   OpaqueIds,
@@ -65,6 +66,7 @@ import type {
   UseApi,
 } from "./types.js";
 import schema from "../component/schema.js";
+import { withSystemFields } from "convex-helpers/validators";
 
 export type { Usage, ProviderMetadata };
 export {
@@ -77,16 +79,20 @@ export {
   vMessage,
 } from "../validators.js";
 
-export type ThreadDoc = OpaqueIds<
-  { _id: string; _creationTime: number } & Infer<
-    typeof schema.tables.threads.validator
-  >
->;
-export type MessageDoc = OpaqueIds<
-  { _id: string; _creationTime: number } & Infer<
-    typeof schema.tables.messages.validator
-  >
->;
+export const vThreadDoc = v.object({
+  _id: v.string(),
+  _creationTime: v.number(),
+  userId: v.optional(v.string()), // Unset for anonymous
+  title: v.optional(v.string()),
+  summary: v.optional(v.string()),
+  status: vThreadStatus,
+});
+export type ThreadDoc = Infer<typeof vThreadDoc>;
+
+export const vMessageDoc = v.object(
+  withSystemFields("messages", schema.tables.messages.validator.fields)
+);
+export type MessageDoc = OpaqueIds<Infer<typeof vMessageDoc>>;
 
 /**
  * Options to configure what messages are fetched as context,
@@ -334,7 +340,7 @@ export class Agent<AgentTools extends ToolSet> {
     thread?: Thread<ThreadTools extends undefined ? AgentTools : ThreadTools>;
   }> {
     const threadDoc = await ctx.runMutation(
-      this.component.messages.createThread,
+      this.component.threads.createThread,
       {
         userId: args?.userId,
         title: args?.title,
