@@ -59,14 +59,12 @@ import {
   vThreadStatus,
 } from "../validators.js";
 import type {
-  OpaqueIds,
   RunActionCtx,
   RunMutationCtx,
   RunQueryCtx,
   UseApi,
 } from "./types.js";
 import schema from "../component/schema.js";
-import { withSystemFields } from "convex-helpers/validators";
 
 export type { Usage, ProviderMetadata };
 export {
@@ -89,10 +87,19 @@ export const vThreadDoc = v.object({
 });
 export type ThreadDoc = Infer<typeof vThreadDoc>;
 
-export const vMessageDoc = v.object(
-  withSystemFields("messages", schema.tables.messages.validator.fields)
-);
-export type MessageDoc = OpaqueIds<Infer<typeof vMessageDoc>>;
+export const vMessageDoc = v.object({
+  _id: v.string(),
+  _creationTime: v.number(),
+  ...schema.tables.messages.validator.fields,
+  // Overwrite all the types that have a v.id validator
+  // Outside of the component, they are strings
+  threadId: v.string(),
+  parentMessageId: v.optional(v.string()),
+  stepId: v.optional(v.string()),
+  embeddingId: v.optional(v.string()),
+  fileId: v.optional(v.string()),
+});
+export type MessageDoc = Infer<typeof vMessageDoc>;
 
 /**
  * Options to configure what messages are fetched as context,
