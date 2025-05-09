@@ -1717,7 +1717,7 @@ export declare const components: {
         "action",
         "internal",
         { cursor?: string; limit?: number; threadId: string },
-        { cursor: string; isDone: boolean }
+        null
       >;
       getThread: FunctionReference<
         "query",

@@ -112,18 +112,39 @@ const deleteThreadReturns = {
 };
 type DeleteThreadReturns = ObjectType<typeof deleteThreadReturns>;
 
+/**
+ * Use this to delete a thread and everything it contains.
+ * It will try to delete all pages synchronously.
+ * If it times out or fails, you'll have to run it again.
+ */
 export const deleteAllForThreadIdSync = action({
   args: deleteThreadArgs,
   handler: async (ctx, args) => {
-    const result: DeleteThreadReturns = await ctx.runMutation(
-      internal.threads._deletePageForThreadId,
-      { threadId: args.threadId, cursor: args.cursor, limit: args.limit }
-    );
-    return result;
+    let cursor = args.cursor;
+    while (true) {
+      const result = await ctx.runMutation(
+        internal.threads._deletePageForThreadId,
+        { threadId: args.threadId, cursor, limit: args.limit }
+      );
+      if (result.isDone) {
+        break;
+      }
+      cursor = result.cursor;
+    }
   },
+  returns: v.null(),
+});
+
+export const _deletePageForThreadId = internalMutation({
+  args: deleteThreadArgs,
+  handler: deletePageForThreadIdHandler,
   returns: deleteThreadReturns,
 });
 
+/**
+ * Use this to delete a thread and everything it contains.
+ * It will continue deleting pages asynchronously.
+ */
 export const deleteAllForThreadIdAsync = mutation({
   args: deleteThreadArgs,
   handler: async (ctx, args) => {
@@ -136,12 +157,6 @@ export const deleteAllForThreadIdAsync = mutation({
     }
     return result;
   },
-  returns: deleteThreadReturns,
-});
-
-export const _deletePageForThreadId = internalMutation({
-  args: deleteThreadArgs,
-  handler: deletePageForThreadIdHandler,
   returns: deleteThreadReturns,
 });
 
@@ -159,7 +174,9 @@ async function deletePageForThreadIdHandler(
       cursor: args.cursor ?? null,
     });
   await Promise.all(messages.page.map((m) => deleteMessage(ctx, m)));
-  await ctx.db.delete(args.threadId);
+  if (messages.isDone) {
+    await ctx.db.delete(args.threadId);
+  }
   return {
     cursor: messages.continueCursor,
     isDone: messages.isDone,

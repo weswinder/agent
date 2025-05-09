@@ -1646,7 +1646,7 @@ export type Mounts = {
       "action",
       "public",
       { cursor?: string; limit?: number; threadId: string },
-      { cursor: string; isDone: boolean }
+      null
     >;
     getThread: FunctionReference<
       "query",
