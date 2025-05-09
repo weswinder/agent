@@ -18,6 +18,8 @@ import {
 } from "../validators";
 import { assert } from "convex-helpers";
 
+export type PlaygroundAPI = ReturnType<typeof definePlaygroundAPI>;
+
 // Playground API definition
 export function definePlaygroundAPI<DataModel extends GenericDataModel>(
   component: UseApi<Mounts>,
@@ -133,7 +135,7 @@ export function definePlaygroundAPI<DataModel extends GenericDataModel>(
   });
 
   // Send a message (action)
-  const sendMessage = actionGeneric({
+  const generateText = actionGeneric({
     args: {
       apiKey: v.string(),
       agentName: v.string(),
@@ -188,7 +190,7 @@ export function definePlaygroundAPI<DataModel extends GenericDataModel>(
     listMessages,
     listAgents,
     createThread,
-    sendMessage,
+    generateText,
     fetchPromptContext,
   };
 }
