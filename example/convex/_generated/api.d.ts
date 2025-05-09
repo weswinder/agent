@@ -48,6 +48,29 @@ export declare const internal: FilterApi<
 
 export declare const components: {
   agent: {
+    apiKeys: {
+      destroy: FunctionReference<
+        "mutation",
+        "internal",
+        { apiKey?: string; name?: string },
+        | "missing"
+        | "deleted"
+        | "name mismatch"
+        | "must provide either apiKey or name"
+      >;
+      issue: FunctionReference<
+        "mutation",
+        "internal",
+        { name?: string },
+        string
+      >;
+      validate: FunctionReference<
+        "query",
+        "internal",
+        { apiKey: string },
+        boolean
+      >;
+    };
     files: {
       getFilesToDelete: FunctionReference<
         "query",

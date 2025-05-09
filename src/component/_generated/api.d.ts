@@ -9,6 +9,7 @@
  */
 
 import type * as apiKeys from "../apiKeys.js";
+import type * as files from "../files.js";
 import type * as messages from "../messages.js";
 import type * as threads from "../threads.js";
 import type * as users from "../users.js";
@@ -30,6 +31,7 @@ import type {
  * ```
  */
 declare const fullApi: ApiFromModules<{
+  apiKeys: typeof apiKeys;
   files: typeof files;
   messages: typeof messages;
   threads: typeof threads;
@@ -38,6 +40,19 @@ declare const fullApi: ApiFromModules<{
   "vector/tables": typeof vector_tables;
 }>;
 export type Mounts = {
+  apiKeys: {
+    destroy: FunctionReference<
+      "mutation",
+      "public",
+      { apiKey?: string; name?: string },
+      | "missing"
+      | "deleted"
+      | "name mismatch"
+      | "must provide either apiKey or name"
+    >;
+    issue: FunctionReference<"mutation", "public", { name?: string }, string>;
+    validate: FunctionReference<"query", "public", { apiKey: string }, boolean>;
+  };
   files: {
     getFilesToDelete: FunctionReference<
       "query",
