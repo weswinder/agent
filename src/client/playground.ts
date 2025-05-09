@@ -1,0 +1,175 @@
+import {
+  paginationOptsValidator,
+  queryGeneric,
+  mutationGeneric,
+  actionGeneric,
+} from "convex/server";
+import { vThreadDoc, type Agent } from "./index";
+import type { RunQueryCtx, UseApi } from "./types";
+import type { ToolSet } from "ai";
+import { v } from "convex/values";
+import { Mounts } from "../component/_generated/api";
+import {
+  paginationResultValidator,
+  vContextOptions,
+  vMessage,
+} from "../validators";
+import { assert } from "convex-helpers";
+
+// Playground API definition
+export function definePlaygroundAPI(
+  component: UseApi<Mounts>,
+  { agents }: { agents: Agent<ToolSet>[] }
+) {
+  // Map agent name to instance
+  const agentMap: Record<string, Agent<ToolSet>> = Object.fromEntries(
+    agents.map((agent) => [agent.options.name, agent])
+  );
+
+  async function validateApiKey(ctx: RunQueryCtx, apiKey: string) {
+    await ctx.runQuery(component.apiKeys.validate, { apiKey });
+  }
+
+  // List all agents
+  const listAgents = queryGeneric({
+    args: {
+      apiKey: v.string(),
+    },
+    handler: async (ctx, args) => {
+      await validateApiKey(ctx, args.apiKey);
+      return Object.keys(agentMap);
+    },
+    returns: v.array(v.string()),
+  });
+
+  const listUsers = queryGeneric({
+    args: {
+      apiKey: v.string(),
+      paginationOpts: paginationOptsValidator,
+    },
+    handler: async (ctx, args) => {
+      await validateApiKey(ctx, args.apiKey);
+      return ctx.runQuery(component.users.listUsersWithThreads, {
+        paginationOpts: args.paginationOpts,
+      });
+    },
+    returns: paginationResultValidator(v.string()),
+  });
+
+  // List threads for a user (query)
+  const listThreads = queryGeneric({
+    args: {
+      apiKey: v.string(),
+      userId: v.string(),
+      paginationOpts: paginationOptsValidator,
+    },
+    handler: async (ctx, args) => {
+      await validateApiKey(ctx, args.apiKey);
+      return ctx.runQuery(component.threads.getThreadsByUserId, {
+        userId: args.userId,
+        paginationOpts: args.paginationOpts,
+        order: "desc",
+      });
+    },
+    returns: paginationResultValidator(vThreadDoc),
+  });
+
+  // List messages for a thread (query)
+  const listMessages = queryGeneric({
+    args: {
+      apiKey: v.string(),
+      threadId: v.string(),
+      paginationOpts: paginationOptsValidator,
+    },
+    handler: async (ctx, args) => {
+      await validateApiKey(ctx, args.apiKey);
+      return ctx.runQuery(component.messages.getThreadMessages, {
+        threadId: args.threadId,
+        paginationOpts: args.paginationOpts,
+        order: "desc",
+        statuses: ["success", "failed", "pending"],
+      });
+    },
+  });
+
+  // Create a thread (mutation)
+  const createThread = mutationGeneric({
+    args: {
+      apiKey: v.string(),
+      agentName: v.string(),
+      userId: v.string(),
+      title: v.optional(v.string()),
+      summary: v.optional(v.string()),
+    },
+    handler: async (ctx, args) => {
+      await validateApiKey(ctx, args.apiKey);
+      const agent = agentMap[args.agentName];
+      if (!agent) throw new Error(`Unknown agent: ${args.agentName}`);
+      return agent.createThread(ctx, {
+        userId: args.userId,
+        title: args.title,
+        summary: args.summary,
+      });
+    },
+  });
+
+  // Send a message (action)
+  const sendMessage = actionGeneric({
+    args: {
+      apiKey: v.string(),
+      agentName: v.string(),
+      userId: v.string(),
+      threadId: v.string(),
+      prompt: v.optional(v.string()),
+      messages: v.optional(v.array(vMessage)),
+      // Add more args as needed
+    },
+    handler: async (ctx, args) => {
+      await validateApiKey(ctx, args.apiKey);
+      const { threadId, userId, messages, prompt, agentName } = args;
+      const agent = agentMap[agentName];
+      if (!agent) throw new Error(`Unknown agent: ${agentName}`);
+      const { thread } = await agent.continueThread(ctx, { threadId, userId });
+      // Prefer messages if provided, else prompt
+      assert(messages || prompt, "Must provide either messages or prompt");
+      assert(!messages || !prompt, "Provide messages or prompt, not both");
+      const result = await thread.generateText({ prompt, messages });
+      return result;
+    },
+  });
+
+  // Fetch prompt context (action)
+  const fetchPromptContext = actionGeneric({
+    args: {
+      apiKey: v.string(),
+      agentName: v.string(),
+      userId: v.optional(v.string()),
+      threadId: v.optional(v.string()),
+      messages: v.array(vMessage),
+      contextOptions: vContextOptions,
+      beforeMessageId: v.optional(v.string()),
+    },
+    handler: async (ctx, args) => {
+      await validateApiKey(ctx, args.apiKey);
+      const agent = agentMap[args.agentName];
+      if (!agent) throw new Error(`Unknown agent: ${args.agentName}`);
+      return agent.fetchContextMessages(ctx, {
+        userId: args.userId,
+        threadId: args.threadId,
+        messages: args.messages,
+        contextOptions: args.contextOptions,
+        beforeMessageId: args.beforeMessageId,
+      });
+    },
+  });
+
+  return {
+    listUsers,
+    listThreads,
+    listMessages,
+    listAgents,
+    createThread,
+    sendMessage,
+    fetchPromptContext,
+  };
+}
