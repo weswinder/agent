@@ -3,6 +3,8 @@ import {
   queryGeneric,
   mutationGeneric,
   actionGeneric,
+  GenericDataModel,
+  GenericQueryCtx,
 } from "convex/server";
 import { vThreadDoc, type Agent } from "./index";
 import type { RunQueryCtx, UseApi } from "./types";
@@ -17,9 +19,18 @@ import {
 import { assert } from "convex-helpers";
 
 // Playground API definition
-export function definePlaygroundAPI(
+export function definePlaygroundAPI<DataModel extends GenericDataModel>(
   component: UseApi<Mounts>,
-  { agents }: { agents: Agent<ToolSet>[] }
+  {
+    agents,
+    userNameLookup,
+  }: {
+    agents: Agent<ToolSet>[];
+    userNameLookup?: (
+      ctx: GenericQueryCtx<DataModel>,
+      userId: string
+    ) => string | Promise<string>;
+  }
 ) {
   // Map agent name to instance
   const agentMap: Record<string, Agent<ToolSet>> = Object.fromEntries(
@@ -49,9 +60,17 @@ export function definePlaygroundAPI(
     },
     handler: async (ctx, args) => {
       await validateApiKey(ctx, args.apiKey);
-      return ctx.runQuery(component.users.listUsersWithThreads, {
+      const users = await ctx.runQuery(component.users.listUsersWithThreads, {
         paginationOpts: args.paginationOpts,
       });
+      return {
+        ...users,
+        page: userNameLookup
+          ? await Promise.all(
+              users.page.map((userId) => userNameLookup(ctx, userId))
+            )
+          : users.page,
+      };
     },
     returns: paginationResultValidator(v.string()),
   });
