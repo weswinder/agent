@@ -80,14 +80,7 @@ export const updateThread = mutation({
   args: {
     threadId: v.id("threads"),
     patch: v.object(
-      partial(
-        pick(vThread.fields, [
-          "title",
-          "summary",
-          "defaultSystemPrompt",
-          "status",
-        ])
-      )
+      partial(pick(vThread.fields, ["title", "summary", "status"]))
     ),
   },
   handler: async (ctx, args) => {

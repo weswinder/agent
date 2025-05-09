@@ -336,7 +336,6 @@ export class Agent<AgentTools extends ToolSet> {
     const threadDoc = await ctx.runMutation(
       this.component.messages.createThread,
       {
-        defaultSystemPrompt: this.options.instructions,
         userId: args?.userId,
         title: args?.title,
         summary: args?.summary,

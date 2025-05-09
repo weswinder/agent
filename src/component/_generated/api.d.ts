@@ -1692,7 +1692,6 @@ export type Mounts = {
       "public",
       {
         patch: {
-          defaultSystemPrompt?: string;
           status?: "active" | "archived";
           summary?: string;
           title?: string;

@@ -16,12 +16,11 @@ import vectorTables, { vVectorId } from "./vector/tables.js";
 export const schema = defineSchema({
   threads: defineTable({
     userId: v.optional(v.string()), // Unset for anonymous
-    // TODO: is this bubbling up in continue?
-    defaultSystemPrompt: v.optional(v.string()),
     title: v.optional(v.string()),
     summary: v.optional(v.string()),
     status: vThreadStatus,
     // DEPRECATED
+    defaultSystemPrompt: v.optional(v.string()),
     parentThreadIds: v.optional(v.array(v.id("threads"))),
     order: /*DEPRECATED*/ v.optional(v.number()),
   }).index("userId", ["userId"]),
