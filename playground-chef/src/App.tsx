@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
 import Editor from "@monaco-editor/react";
@@ -10,161 +10,57 @@ import {
   SelectTrigger,
   SelectValue,
 } from "./components/ui/select";
-
+import {
+  extractText,
+  type ContextOptions,
+  type MessageDoc,
+  type StorageOptions,
+} from "@convex-dev/agent";
+import type { PlaygroundAPI } from "@convex-dev/agent/playground";
+import { anyApi } from "convex/server";
+import { useAction, usePaginatedQuery, useQuery } from "convex/react";
+import { assert } from "convex-helpers";
+import { toast } from "sonner";
+import { CoreMessage } from "ai";
 dayjs.extend(relativeTime);
 
-interface User {
-  id: string;
-  name: string;
-}
-
-interface Agent {
-  id: string;
-  name: string;
-}
-
-interface Tool {
-  id: string;
-  name: string;
-  description: string;
-}
-
-interface Thread {
-  id: string;
-  title: string;
-  subtitle: string;
-  latestMessage: string;
-  createdAt: string;
-  lastMessageAt: string;
-}
-
-interface Message {
-  id: string;
-  content: string;
-  type: "text" | "tool_call" | "tool_response";
-  sender: {
-    type: "user" | "bot" | "system";
-    name: string;
-  };
-  timestamp: string;
-  duration: number;
-  toolCall?: {
-    tool: string;
-    args: Record<string, unknown>;
-  };
-  toolResponse?: {
-    tool: string;
-    result: Record<string, unknown>;
-  };
-}
-
-interface ContextMessage {
-  id: string;
-  content: string;
-  vectorSearchRank: number | null;
-  textSearchRank: number | null;
-}
-
-// Example data
-const USERS: User[] = [
-  { id: "1", name: "Alice Johnson" },
-  { id: "2", name: "Bob Smith" },
-];
-
-const AGENTS: Agent[] = [
-  { id: "1", name: "Sales Assistant" },
-  { id: "2", name: "Support Agent" },
-];
-
-const TOOLS: Tool[] = [
-  { id: "getPricing", name: "Get Pricing", description: "Fetch product pricing" },
-  { id: "getFeatures", name: "Get Features", description: "List product features" },
-];
-
-const THREADS: Thread[] = [
-  {
-    id: "1",
-    title: "Product Inquiry",
-    subtitle: "Discussion about pricing",
-    latestMessage: "Thank you for the information",
-    createdAt: "2024-03-18T10:00:00",
-    lastMessageAt: "2024-03-18T11:30:00",
+const DEFAULT_CONTEXT_OPTIONS: ContextOptions = {
+  recentMessages: 10,
+  includeToolCalls: false,
+  searchOtherThreads: false,
+  searchOptions: {
+    limit: 10,
+    textSearch: true,
+    vectorSearch: true,
+    messageRange: { before: 0, after: 0 },
   },
-];
-
-const DEFAULT_CONTEXT_OPTIONS = {
-  maxMessages: 10,
-  includeSystemMessages: true,
-  temperature: 0.7,
 };
 
-const DEFAULT_STORAGE_OPTIONS = {
-  ttl: 3600,
-  cacheKey: "default",
+const DEFAULT_STORAGE_OPTIONS: StorageOptions = {
+  saveAllInputMessages: false,
+  saveAnyInputMessages: true,
+  saveOutputMessages: true,
 };
 
-const MESSAGES: Message[] = [
-  {
-    id: "1",
-    content: "Hi, I need help with pricing",
-    type: "text",
-    sender: { type: "user", name: "Alice Johnson" },
-    timestamp: "2024-03-18T10:00:00",
-    duration: 0,
-  },
-  {
-    id: "2",
-    content: "Let me check the pricing for you",
-    type: "tool_call",
-    sender: { type: "bot", name: "Sales Assistant" },
-    timestamp: "2024-03-18T10:01:00",
-    duration: 0.5,
-    toolCall: {
-      tool: "getPricing",
-      args: { product: "enterprise" },
-    },
-  },
-  {
-    id: "3",
-    content: "Here's the pricing information",
-    type: "tool_response",
-    sender: { type: "system", name: "Tool Response" },
-    timestamp: "2024-03-18T10:01:01",
-    duration: 0,
-    toolResponse: {
-      tool: "getPricing",
-      result: { price: 999, currency: "USD" },
-    },
-  },
-];
+if (!import.meta.env.VITE_PLAYGROUND_API_PATH) {
+  throw new Error("VITE_PLAYGROUND_API_PATH is not set");
+}
+const api = (import.meta.env.VITE_PLAYGROUND_API_PATH as string)
+  .trim()
+  .split("/")
+  .reduce((acc, part) => {
+    return acc[part];
+  }, anyApi) as unknown as PlaygroundAPI;
 
-const CONTEXT_MESSAGES: ContextMessage[] = [
-  {
-    id: "1",
-    content: "Previous pricing discussion",
-    vectorSearchRank: 1,
-    textSearchRank: 2,
-  },
-  {
-    id: "2",
-    content: "Product features overview",
-    vectorSearchRank: 2,
-    textSearchRank: null,
-  },
-  {
-    id: "3",
-    content: "Customer preferences",
-    vectorSearchRank: null,
-    textSearchRank: 1,
-  },
-];
+const apiKey = import.meta.env.VITE_PLAYGROUND_API_KEY!;
+assert(apiKey, "VITE_PLAYGROUND_API_KEY is not set");
 
 export default function App() {
   const [selectedUser, setSelectedUser] = useState<string>();
   const [selectedThread, setSelectedThread] = useState<string>();
   const [selectedAgent, setSelectedAgent] = useState<string>();
-  const [selectedTool, setSelectedTool] = useState<string>();
-  const [selectedMessage, setSelectedMessage] = useState<Message>(MESSAGES[0]);
+  // const [selectedTool, setSelectedTool] = useState<string>();
+  const [selectedMessage, setSelectedMessage] = useState<MessageDoc>();
   const [newMessage, setNewMessage] = useState("");
   const [contextOptions, setContextOptions] = useState(
     JSON.stringify(DEFAULT_CONTEXT_OPTIONS, null, 2)
@@ -172,6 +68,64 @@ export default function App() {
   const [storageOptions, setStorageOptions] = useState(
     JSON.stringify(DEFAULT_STORAGE_OPTIONS, null, 2)
   );
+  const [contextMessages, setContextMessages] = useState<CoreMessage[]>([]);
+  const users = usePaginatedQuery(
+    api.listUsers,
+    { apiKey },
+    { initialNumItems: 20 }
+  );
+  if (users.results.length > 0 && !selectedUser) {
+    setSelectedUser(users.results[0].id);
+  }
+
+  const threads = usePaginatedQuery(
+    api.listThreads,
+    selectedUser ? { apiKey, userId: selectedUser } : "skip",
+    { initialNumItems: 20 }
+  );
+  if (threads.results.length > 0 && !selectedThread) {
+    setSelectedThread(threads.results[0]._id);
+  }
+
+  const messages = usePaginatedQuery(
+    api.listMessages,
+    selectedThread ? { apiKey, threadId: selectedThread } : "skip",
+    { initialNumItems: 20 }
+  );
+  if (messages.results.length > 0 && !selectedMessage) {
+    setSelectedMessage(messages.results[0]);
+  }
+
+  const agents = useQuery(api.listAgents, { apiKey });
+
+  const fetchContext = useAction(api.fetchPromptContext);
+
+  const fetchContextMessages = useCallback(async () => {
+    if (!selectedMessage) {
+      toast.error("No message selected");
+      return;
+    }
+    if (!selectedAgent) {
+      toast.error("No agent selected");
+      return;
+    }
+    const context = await fetchContext({
+      apiKey,
+      agentName: selectedAgent,
+      threadId: selectedThread,
+      userId: selectedUser,
+      messages: [selectedMessage.message!],
+      contextOptions: JSON.parse(contextOptions),
+      beforeMessageId: selectedMessage?._id,
+    });
+    setContextMessages(context);
+  }, [
+    fetchContext,
+    messages.results,
+    selectedMessage?._id,
+    selectedThread,
+    contextOptions,
+  ]);
 
   return (
     <div className="min-h-screen flex">
@@ -182,7 +136,7 @@ export default function App() {
             <SelectValue placeholder="Select a user" />
           </SelectTrigger>
           <SelectContent>
-            {USERS.map((user) => (
+            {users.results.map((user) => (
               <SelectItem key={user.id} value={user.id}>
                 {user.name}
               </SelectItem>
@@ -191,36 +145,49 @@ export default function App() {
         </Select>
 
         <div className="mt-4 flex-1 overflow-auto">
-          {THREADS.map((thread) => (
+          {threads.results.map((thread) => (
             <div
-              key={thread.id}
+              key={thread._id}
               className={`p-3 cursor-pointer hover:bg-gray-50 ${
-                selectedThread === thread.id ? "bg-gray-100" : "bg-white"
+                selectedThread === thread._id ? "bg-gray-100" : "bg-white"
               }`}
-              onClick={() => setSelectedThread(thread.id)}
+              onClick={() => setSelectedThread(thread._id)}
             >
               <div className="font-medium">{thread.title}</div>
-              <div className="text-sm text-gray-600">{thread.subtitle}</div>
+              <div className="text-sm text-gray-600">{thread.summary}</div>
               <div className="text-sm text-gray-400 truncate">
                 {thread.latestMessage}
               </div>
               <div className="text-xs text-gray-400 mt-1 flex justify-between">
-                <span>Created {dayjs(thread.createdAt).fromNow()}</span>
-                <span>Last message {dayjs(thread.lastMessageAt).fromNow()}</span>
+                <span>Created {dayjs(thread._creationTime).fromNow()}</span>
+                <span>
+                  Last message{" "}
+                  {dayjs(
+                    thread.lastMessageAt ?? thread._creationTime
+                  ).fromNow()}
+                </span>
               </div>
             </div>
           ))}
         </div>
 
-        <Button variant="outline" className="mt-4">
-          Load More
-        </Button>
+        {threads.status === "CanLoadMore" && (
+          <Button
+            variant="outline"
+            className="mt-4"
+            onClick={() => {
+              threads.loadMore(10);
+            }}
+          >
+            Load More
+          </Button>
+        )}
       </div>
 
       {/* Middle Panel */}
       <div className="flex-1 p-4 border-r overflow-auto bg-gray-50">
-        <div className="flex flex-col space-y-4">
-          {MESSAGES.map((message) => (
+        <div className="flex flex-col-reverse space-y-4">
+          {messages.results.map((message) => (
             <div
               key={message.id}
               className={`flex flex-col rounded-lg bg-white p-4 shadow-sm cursor-pointer ${
@@ -232,61 +199,89 @@ export default function App() {
                 <div className="flex items-center gap-2">
                   <span
                     className={`${
-                      message.sender.type === "user"
+                      message.message?.role === "user"
                         ? "bg-blue-100 text-blue-800"
-                        : message.sender.type === "bot"
-                        ? "bg-green-100 text-green-800"
-                        : "bg-gray-100 text-gray-800"
+                        : message.message?.role === "assistant"
+                          ? "bg-green-100 text-green-800"
+                          : "bg-gray-100 text-gray-800"
                     } px-2 py-1 rounded-full text-sm`}
                   >
-                    {message.sender.type === "user"
+                    {message.message?.role === "user"
                       ? "👤"
-                      : message.sender.type === "bot"
-                      ? "🤖"
-                      : "⚙️"}{" "}
-                    {message.sender.name}
+                      : message.message?.role === "assistant"
+                        ? "🤖" + message.agentName
+                        : "⚙️"}{" "}
                   </span>
-                  {message.type === "tool_call" && (
+                  {message.message?.role === "assistant" && message.tool && (
                     <span className="bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full text-sm">
                       🧰 Tool Call
                     </span>
                   )}
-                  {message.type === "tool_response" && (
+                  {message.message?.role === "tool" && (
                     <span className="bg-purple-100 text-purple-800 px-2 py-1 rounded-full text-sm">
                       📦 Tool Response
                     </span>
                   )}
                 </div>
                 <span className="text-sm text-gray-400">
-                  {message.duration}s
+                  {message.usage?.totalTokens}
                 </span>
               </div>
 
-              <div className="mt-2">{message.content}</div>
+              <div className="mt-2">{message.text}</div>
 
-              {message.toolCall && (
-                <div className="mt-2 pl-4 border-l-2 border-yellow-200">
-                  <div className="text-sm text-gray-600">
-                    <div className="font-medium">Tool: {message.toolCall.tool}</div>
-                    <div className="font-mono bg-gray-50 p-2 mt-1 rounded">
-                      {JSON.stringify(message.toolCall.args, null, 2)}
+              {message.message &&
+                message.message?.role === "assistant" &&
+                message.tool &&
+                typeof message.message.content !== "string" && (
+                  <div className="mt-2 pl-4 border-l-2 border-yellow-200">
+                    <div className="text-sm text-gray-600">
+                      <div className="font-medium">
+                        Tool:{" "}
+                        {
+                          message.message.content.find(
+                            (c) => c.type === "tool-call"
+                          )?.toolName
+                        }
+                      </div>
+                      <div className="font-mono bg-gray-50 p-2 mt-1 rounded">
+                        {JSON.stringify(
+                          message.message.content.find(
+                            (c) => c.type === "tool-call"
+                          )?.args,
+                          null,
+                          2
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
-              )}
+                )}
 
-              {message.toolResponse && (
-                <div className="mt-2 pl-4 border-l-2 border-purple-200">
-                  <div className="text-sm text-gray-600">
-                    <div className="font-medium">
-                      Response from: {message.toolResponse.tool}
-                    </div>
-                    <div className="font-mono bg-gray-50 p-2 mt-1 rounded">
-                      {JSON.stringify(message.toolResponse.result, null, 2)}
+              {message.message &&
+                message.message?.role === "tool" &&
+                typeof message.message.content !== "string" && (
+                  <div className="mt-2 pl-4 border-l-2 border-purple-200">
+                    <div className="text-sm text-gray-600">
+                      <div className="font-medium">
+                        Response from:{" "}
+                        {
+                          message.message.content.find(
+                            (c) => c.type === "tool-result"
+                          )?.toolName
+                        }
+                      </div>
+                      <div className="font-mono bg-gray-50 p-2 mt-1 rounded">
+                        {JSON.stringify(
+                          message.message.content.find(
+                            (c) => c.type === "tool-result"
+                          )?.result,
+                          null,
+                          2
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
-              )}
+                )}
             </div>
           ))}
         </div>
@@ -314,22 +309,22 @@ export default function App() {
         {/* New Message Section */}
         <div className="border rounded-lg p-4">
           <h3 className="font-medium mb-2">New Message</h3>
-          
+
           <div className="space-y-4">
             <Select value={selectedAgent} onValueChange={setSelectedAgent}>
               <SelectTrigger className="bg-white">
                 <SelectValue placeholder="Select an agent" />
               </SelectTrigger>
               <SelectContent>
-                {AGENTS.map((agent) => (
-                  <SelectItem key={agent.id} value={agent.id}>
-                    {agent.name}
+                {agents?.map((agent) => (
+                  <SelectItem key={agent} value={agent}>
+                    {agent}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
 
-            <Select value={selectedTool} onValueChange={setSelectedTool}>
+            {/* <Select value={selectedTool} onValueChange={setSelectedTool}>
               <SelectTrigger className="bg-white">
                 <SelectValue placeholder="Select a tool (optional)" />
               </SelectTrigger>
@@ -338,15 +333,19 @@ export default function App() {
                   <SelectItem key={tool.id} value={tool.id}>
                     <div>
                       <div>{tool.name}</div>
-                      <div className="text-xs text-gray-500">{tool.description}</div>
+                      <div className="text-xs text-gray-500">
+                        {tool.description}
+                      </div>
                     </div>
                   </SelectItem>
                 ))}
               </SelectContent>
-            </Select>
+            </Select> */}
 
             <details>
-              <summary className="cursor-pointer font-medium">Context Options</summary>
+              <summary className="cursor-pointer font-medium">
+                Context Options
+              </summary>
               <div className="mt-2 h-32">
                 <Editor
                   height="100%"
@@ -362,7 +361,9 @@ export default function App() {
             </details>
 
             <details>
-              <summary className="cursor-pointer font-medium">Storage Options</summary>
+              <summary className="cursor-pointer font-medium">
+                Storage Options
+              </summary>
               <div className="mt-2 h-32">
                 <Editor
                   height="100%"
@@ -397,22 +398,22 @@ export default function App() {
         <div className="border rounded-lg p-4">
           <h3 className="font-medium mb-2">Context Messages</h3>
           <div className="space-y-2">
-            {CONTEXT_MESSAGES.map((msg) => (
-              <div key={msg.id} className="flex items-start gap-2 text-sm">
+            {contextMessages.map((msg, i) => (
+              <div key={i} className="flex items-start gap-2 text-sm">
                 <div className="w-20 flex-shrink-0">
-                  {msg.vectorSearchRank !== null && (
+                  {/* {msg.vectorSearchRank !== null && (
                     <span className="text-green-600">
                       ✓ ({msg.vectorSearchRank})
                     </span>
-                  )}
+                  )} */}
                 </div>
-                <div className="flex-1">{msg.content}</div>
+                <div className="flex-1">{extractText(msg)}</div>
                 <div className="w-20 flex-shrink-0 text-right">
-                  {msg.textSearchRank !== null && (
+                  {/* {msg.textSearchRank !== null && (
                     <span className="text-blue-600">
                       ✓ ({msg.textSearchRank})
                     </span>
-                  )}
+                  )} */}
                 </div>
               </div>
             ))}

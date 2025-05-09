@@ -5,6 +5,9 @@ import {
   actionGeneric,
   GenericDataModel,
   GenericQueryCtx,
+  FilterApi,
+  FunctionReference,
+  ApiFromModules,
 } from "convex/server";
 import { vThreadDoc, type Agent } from "./index";
 import type { RunQueryCtx, UseApi } from "./types";
@@ -18,7 +21,9 @@ import {
 } from "../validators";
 import { assert } from "convex-helpers";
 
-export type PlaygroundAPI = ReturnType<typeof definePlaygroundAPI>;
+export type PlaygroundAPI = ApiFromModules<{
+  playground: ReturnType<typeof definePlaygroundAPI<GenericDataModel>>;
+}>["playground"];
 
 // Playground API definition
 export function definePlaygroundAPI<DataModel extends GenericDataModel>(
@@ -67,14 +72,20 @@ export function definePlaygroundAPI<DataModel extends GenericDataModel>(
       });
       return {
         ...users,
-        page: userNameLookup
-          ? await Promise.all(
-              users.page.map((userId) => userNameLookup(ctx, userId))
-            )
-          : users.page,
+        page: await Promise.all(
+          users.page.map(async (userId) => ({
+            id: userId,
+            name: userNameLookup ? await userNameLookup(ctx, userId) : userId,
+          }))
+        ),
       };
     },
-    returns: paginationResultValidator(v.string()),
+    returns: paginationResultValidator(
+      v.object({
+        id: v.string(),
+        name: v.string(),
+      })
+    ),
   });
 
   // List threads for a user (query)
@@ -86,13 +97,34 @@ export function definePlaygroundAPI<DataModel extends GenericDataModel>(
     },
     handler: async (ctx, args) => {
       await validateApiKey(ctx, args.apiKey);
-      return ctx.runQuery(component.threads.getThreadsByUserId, {
+      const results = await ctx.runQuery(component.threads.getThreadsByUserId, {
         userId: args.userId,
         paginationOpts: args.paginationOpts,
         order: "desc",
       });
+      return {
+        ...results,
+        page: await Promise.all(
+          results.page.map(async (thread) => {
+            const {
+              page: [last],
+            } = await ctx.runQuery(component.messages.getThreadMessages, {
+              threadId: thread._id,
+              order: "desc",
+              paginationOpts: {
+                numItems: 1,
+                cursor: null,
+              },
+            });
+            return {
+              ...thread,
+              latestMessage: last?.text,
+              lastMessageAt: last?._creationTime,
+            };
+          })
+        ),
+      };
     },
-    returns: paginationResultValidator(vThreadDoc),
   });
 
   // List messages for a thread (query)
