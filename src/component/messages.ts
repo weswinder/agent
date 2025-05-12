@@ -32,7 +32,22 @@ import {
   VectorTableId,
   vVectorId,
 } from "./vector/tables.js";
+import {
+  listThreadsByUserId as _listThreadsByUserId,
+  getThread as _getThread,
+  updateThread as _updateThread,
+} from "./threads.js";
 import { paginationOptsValidator } from "convex/server";
+
+
+/** @deprecated Use *.threads.listMessagesByThreadId instead. */
+export const listThreadsByUserId= _listThreadsByUserId
+
+/** @deprecated Use *.threads.getThread */
+export const getThread = _getThread;
+
+/** @deprecated Use *.threads.updateThread instead */
+export const updateThread= _updateThread;
 
 export async function deleteMessage(
   ctx: MutationCtx,
@@ -328,7 +343,7 @@ async function commitMessageHandler(
   }
 }
 
-export const getThreadMessages = query({
+export const listMessagesByThreadId = query({
   args: {
     threadId: v.id("threads"),
     isTool: v.optional(v.boolean()),
@@ -375,6 +390,10 @@ export const getThreadMessages = query({
   },
   returns: paginationResultValidator(v.doc("messages")),
 });
+
+/** @deprecated Use listMessagesByThreadId instead. */
+export const getThreadMessages = listMessagesByThreadId;
+
 
 export const searchMessages = action({
   args: {

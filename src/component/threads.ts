@@ -36,7 +36,7 @@ export const getThread = query({
   returns: v.union(vThreadDoc, v.null()),
 });
 
-export const getThreadsByUserId = query({
+export const listThreadsByUserId = query({
   args: {
     userId: v.string(),
     order: v.optional(v.union(v.literal("asc"), v.literal("desc"))),

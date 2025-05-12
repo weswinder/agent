@@ -464,7 +464,7 @@ export class Agent<AgentTools extends ToolSet> {
     }
     if (args.threadId && opts.recentMessages !== 0) {
       const { page } = await ctx.runQuery(
-        this.component.messages.getThreadMessages,
+        this.component.messages.listMessagesByThreadId,
         {
           threadId: args.threadId,
           isTool: opts.includeToolCalls ? undefined : false,

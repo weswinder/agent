@@ -305,7 +305,7 @@ Fetch the full messages directly. These will include things like usage, etc.
 
 ```ts
 const messages = await ctx.runQuery(
-  components.agent.messages.getThreadMessages, {
+  components.agent.messages.listMessagesByThreadId, {
     threadId,
     order: "desc",
     paginationOpts: { cursor: null, numItems: 10 }
@@ -323,6 +323,35 @@ If you provide a `beforeMessageId`, it will only fetch messages from before that
 ```ts
 const coreMessages = await supportAgent.fetchContextMessages(ctx, {
   threadId, messages: [{ role, content }], contextOptions
+});
+```
+
+### Get and update thread information
+
+List threads for a user:
+
+```ts
+const threads = await ctx.runQuery(components.agent.threads.listThreadsByUserId, {
+  userId,
+  order: "desc",
+  paginationOpts: { cursor: null, numItems: 10 }
+});
+```
+
+Get a thread by id:
+
+```ts
+const thread = await ctx.runQuery(components.agent.threads.getThread, {
+  threadId,
+});
+```
+
+Update a thread's metadata:
+
+```ts
+await ctx.runMutation(components.agent.threads.updateThread, {
+  threadId,
+  { title, summary, status }
 });
 ```
 

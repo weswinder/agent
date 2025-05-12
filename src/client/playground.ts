@@ -97,18 +97,21 @@ export function definePlaygroundAPI<DataModel extends GenericDataModel>(
     },
     handler: async (ctx, args) => {
       await validateApiKey(ctx, args.apiKey);
-      const results = await ctx.runQuery(component.threads.getThreadsByUserId, {
-        userId: args.userId,
-        paginationOpts: args.paginationOpts,
-        order: "desc",
-      });
+      const results = await ctx.runQuery(
+        component.threads.listThreadsByUserId,
+        {
+          userId: args.userId,
+          paginationOpts: args.paginationOpts,
+          order: "desc",
+        }
+      );
       return {
         ...results,
         page: await Promise.all(
           results.page.map(async (thread) => {
             const {
               page: [last],
-            } = await ctx.runQuery(component.messages.getThreadMessages, {
+            } = await ctx.runQuery(component.messages.listMessagesByThreadId, {
               threadId: thread._id,
               order: "desc",
               paginationOpts: {
@@ -136,7 +139,7 @@ export function definePlaygroundAPI<DataModel extends GenericDataModel>(
     },
     handler: async (ctx, args) => {
       await validateApiKey(ctx, args.apiKey);
-      return ctx.runQuery(component.messages.getThreadMessages, {
+      return ctx.runQuery(component.messages.listMessagesByThreadId, {
         threadId: args.threadId,
         paginationOpts: args.paginationOpts,
         order: "desc",
