@@ -1120,22 +1120,7 @@ export type Mounts = {
     getThreadMessages: FunctionReference<
       "query",
       "public",
-      {
-        beforeMessageId?: string;
-        includeToolMessages?: boolean;
-        isTool?: "use includeToolMessages instead of this";
-        order?: "asc" | "desc";
-        paginationOpts?: {
-          cursor: string | null;
-          endCursor?: string | null;
-          id?: number;
-          maximumBytesRead?: number;
-          maximumRowsRead?: number;
-          numItems: number;
-        };
-        statuses?: Array<"pending" | "success" | "failed">;
-        threadId: string;
-      },
+      { deprecated: "Use listMessagesByThreadId instead" },
       {
         continueCursor: string;
         isDone: boolean;
@@ -1301,8 +1286,8 @@ export type Mounts = {
       "public",
       {
         beforeMessageId?: string;
-        includeToolMessages?: boolean;
-        isTool?: "use includeToolMessages instead of this";
+        excludeToolMessages?: boolean;
+        isTool?: "use excludeToolMessages instead of this";
         order?: "asc" | "desc";
         paginationOpts?: {
           cursor: string | null;

@@ -111,7 +111,7 @@ export type ContextOptions = {
    * Whether to include tool messages in the context.
    * By default, tool calls and results are not included.
    */
-  includeToolCalls?: boolean;
+  includeToolMessages?: boolean;
   /**
    * How many recent messages to include. These are added after the search
    * messages, and do not count against the search limit.
@@ -467,7 +467,7 @@ export class Agent<AgentTools extends ToolSet> {
         this.component.messages.listMessagesByThreadId,
         {
           threadId: args.threadId,
-          includeToolMessages: opts.includeToolCalls,
+          excludeToolMessages: !opts.includeToolMessages,
           paginationOpts: {
             numItems: opts.recentMessages ?? DEFAULT_RECENT_MESSAGES,
             cursor: null,

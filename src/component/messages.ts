@@ -346,9 +346,9 @@ async function commitMessageHandler(
 export const listMessagesByThreadId = query({
   args: {
     threadId: v.id("threads"),
-    includeToolMessages: v.optional(v.boolean()),
-    /** @deprecated Use includeToolMessages instead. */
-    isTool: v.optional(v.literal("use includeToolMessages instead of this")),
+    excludeToolMessages: v.optional(v.boolean()),
+    /** @deprecated Use excludeToolMessages instead. */
+    isTool: v.optional(v.literal("use excludeToolMessages instead of this")),
     order: v.optional(v.union(v.literal("asc"), v.literal("desc"))),
     paginationOpts: v.optional(paginationOptsValidator),
     statuses: v.optional(v.array(vMessageStatus)),
@@ -359,7 +359,7 @@ export const listMessagesByThreadId = query({
       args.statuses ?? vMessageStatus.members.map((m) => m.value);
     const before =
       args.beforeMessageId && (await ctx.db.get(args.beforeMessageId));
-    const toolOptions = args.includeToolMessages ? [true, false] : [false];
+    const toolOptions = args.excludeToolMessages ? [false] : [true, false];
     const order = args.order ?? "desc";
     const streams = toolOptions.flatMap((tool) =>
       statuses.map((status) =>
@@ -393,7 +393,13 @@ export const listMessagesByThreadId = query({
 });
 
 /** @deprecated Use listMessagesByThreadId instead. */
-export const getThreadMessages = listMessagesByThreadId;
+export const getThreadMessages = query({
+  args: { deprecated: v.literal("Use listMessagesByThreadId instead") },
+  handler: async () => {
+    throw new Error("Use listMessagesByThreadId instead of getThreadMessages");
+  },
+  returns: paginationResultValidator(v.doc("messages")),
+});
 
 
 export const searchMessages = action({
