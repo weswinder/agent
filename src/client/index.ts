@@ -454,7 +454,7 @@ export class Agent<AgentTools extends ToolSet> {
             cursor: null,
           },
           parentMessageId: args.parentMessageId,
-          order: "asc",
+          order: "desc",
           statuses: ["success"],
         }
       );
@@ -468,15 +468,7 @@ export class Agent<AgentTools extends ToolSet> {
 
     // When including tool calls, drop any orphaned tool messages at the start
     if (opts.includeToolCalls) {
-      while (sortedDocs.length > 0 && sortedDocs[0].tool) {
-        const firstDoc = sortedDocs[0];
-        const nextDoc = sortedDocs[1];
-
-        // Valid pair: first is assistant with tool-call, second is tool with result
-        if (firstDoc.message?.role === 'assistant' && nextDoc?.message?.role === 'tool') {
-          break;
-        }
-        // Otherwise this is an orphaned call or result -> drop it
+      if (sortedDocs.length > 0 && sortedDocs[0].tool && sortedDocs[0].message?.role === "tool") {
         sortedDocs.shift();
       }
     }
