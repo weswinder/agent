@@ -454,17 +454,35 @@ export class Agent<AgentTools extends ToolSet> {
             cursor: null,
           },
           parentMessageId: args.parentMessageId,
-          order: "desc",
+          order: "asc",
           statuses: ["success"],
         }
       );
       contextMessages.push(...page.filter((m) => !included?.has(m._id)));
     }
-    return contextMessages
-      .sort((a, b) =>
-        a.order === b.order ? a.stepOrder - b.stepOrder : a.order - b.order
-      )
-      .map((m) => deserializeMessage(m.message!));
+
+    // Sort the raw MessageDocs by order and stepOrder
+    const sortedDocs = contextMessages.sort((a, b) =>
+      a.order === b.order ? a.stepOrder - b.stepOrder : a.order - b.order
+    );
+
+    // When including tool calls, drop any orphaned tool messages at the start
+    if (opts.includeToolCalls) {
+      while (sortedDocs.length > 0 && sortedDocs[0].tool) {
+        const firstDoc = sortedDocs[0];
+        const nextDoc = sortedDocs[1];
+
+        // Valid pair: first is assistant with tool-call, second is tool with result
+        if (firstDoc.message?.role === 'assistant' && nextDoc?.message?.role === 'tool') {
+          break;
+        }
+        // Otherwise this is an orphaned call or result -> drop it
+        sortedDocs.shift();
+      }
+    }
+
+    // Deserialize and return
+    return sortedDocs.map((m) => deserializeMessage(m.message!));
   }
 
   /**
