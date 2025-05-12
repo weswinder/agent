@@ -346,7 +346,9 @@ async function commitMessageHandler(
 export const listMessagesByThreadId = query({
   args: {
     threadId: v.id("threads"),
-    isTool: v.optional(v.boolean()),
+    includeToolMessages: v.optional(v.boolean()),
+    /** @deprecated Use includeToolMessages instead. */
+    isTool: v.optional(v.literal("use includeToolMessages instead of this")),
     order: v.optional(v.union(v.literal("asc"), v.literal("desc"))),
     paginationOpts: v.optional(paginationOptsValidator),
     statuses: v.optional(v.array(vMessageStatus)),
@@ -357,8 +359,7 @@ export const listMessagesByThreadId = query({
       args.statuses ?? vMessageStatus.members.map((m) => m.value);
     const before =
       args.beforeMessageId && (await ctx.db.get(args.beforeMessageId));
-    const toolOptions =
-      args.isTool === undefined ? [true, false] : [args.isTool];
+    const toolOptions = args.includeToolMessages ? [true, false] : [false];
     const order = args.order ?? "desc";
     const streams = toolOptions.flatMap((tool) =>
       statuses.map((status) =>

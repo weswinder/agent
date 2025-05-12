@@ -1191,7 +1191,8 @@ export declare const components: {
         "internal",
         {
           beforeMessageId?: string;
-          isTool?: boolean;
+          includeToolMessages?: boolean;
+          isTool?: "use includeToolMessages instead of this";
           order?: "asc" | "desc";
           paginationOpts?: {
             cursor: string | null;
@@ -1373,7 +1374,8 @@ export declare const components: {
         "internal",
         {
           beforeMessageId?: string;
-          isTool?: boolean;
+          includeToolMessages?: boolean;
+          isTool?: "use includeToolMessages instead of this";
           order?: "asc" | "desc";
           paginationOpts?: {
             cursor: string | null;

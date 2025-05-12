@@ -467,7 +467,7 @@ export class Agent<AgentTools extends ToolSet> {
         this.component.messages.listMessagesByThreadId,
         {
           threadId: args.threadId,
-          isTool: opts.includeToolCalls ? undefined : false,
+          includeToolMessages: opts.includeToolCalls,
           paginationOpts: {
             numItems: opts.recentMessages ?? DEFAULT_RECENT_MESSAGES,
             cursor: null,
