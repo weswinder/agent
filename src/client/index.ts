@@ -107,11 +107,13 @@ export type MessageDoc = Infer<typeof vMessageDoc>;
  * automatically with thread.generateText, or directly via search.
  */
 export type ContextOptions = {
+  /** @deprecated Use excludeToolMessages instead. */
+  includeToolCalls?: boolean;
   /**
    * Whether to include tool messages in the context.
    * By default, tool calls and results are not included.
    */
-  includeToolMessages?: boolean;
+  excludeToolMessages?: boolean;
   /**
    * How many recent messages to include. These are added after the search
    * messages, and do not count against the search limit.
@@ -467,7 +469,8 @@ export class Agent<AgentTools extends ToolSet> {
         this.component.messages.listMessagesByThreadId,
         {
           threadId: args.threadId,
-          excludeToolMessages: !opts.includeToolMessages,
+          excludeToolMessages:
+            opts.includeToolCalls === true ? false : opts.excludeToolMessages,
           paginationOpts: {
             numItems: opts.recentMessages ?? DEFAULT_RECENT_MESSAGES,
             cursor: null,
