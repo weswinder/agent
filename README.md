@@ -304,7 +304,9 @@ This allows you to create tools in a context that is convenient.
 Fetch the full messages directly. These will include things like usage, etc.
 
 ```ts
-const messages = await ctx.runQuery(
+import type { MessageDoc } from "@convex-dev/agent";
+
+const messages: MessageDoc[] = await ctx.runQuery(
   components.agent.messages.listMessagesByThreadId, {
     threadId,
     order: "desc",
