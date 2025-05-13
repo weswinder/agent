@@ -1313,32 +1313,32 @@ export class Agent<AgentTools extends ToolSet> {
   }
 }
 
-  function filterOutOrphanedToolMessages(docs: MessageDoc[]) {
-    const toolCallIds = new Set<string>();
-    const result: MessageDoc[] = [];
-    for (const doc of docs) {
-      if (
-        doc.message?.role === "assistant" &&
-        Array.isArray(doc.message.content)
-      ) {
-        for (const content of doc.message.content) {
-          if (content.type === "tool-call") {
-            toolCallIds.add(content.toolCallId);
-          }
+export function filterOutOrphanedToolMessages(docs: MessageDoc[]) {
+  const toolCallIds = new Set<string>();
+  const result: MessageDoc[] = [];
+  for (const doc of docs) {
+    if (
+      doc.message?.role === "assistant" &&
+      Array.isArray(doc.message.content)
+    ) {
+      for (const content of doc.message.content) {
+        if (content.type === "tool-call") {
+          toolCallIds.add(content.toolCallId);
         }
-        result.push(doc);
-      } else if (doc.message?.role === "tool") {
-        if (doc.message.content.every((c) => toolCallIds.has(c.toolCallId))) {
-          result.push(doc);
-        } else {
-          console.debug("Filtering out orphaned tool message", doc);
-        }
-      } else {
-        result.push(doc);
       }
+      result.push(doc);
+    } else if (doc.message?.role === "tool") {
+      if (doc.message.content.every((c) => toolCallIds.has(c.toolCallId))) {
+        result.push(doc);
+      } else {
+        console.debug("Filtering out orphaned tool message", doc);
+      }
+    } else {
+      result.push(doc);
     }
-    return result;
   }
+  return result;
+}
 
 
 export type ToolCtx = RunActionCtx & {
