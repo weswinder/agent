@@ -458,7 +458,10 @@ export class Agent<AgentTools extends ToolSet> {
           statuses: ["success"],
         }
       );
-      contextMessages.push(...page.filter((m) => !included?.has(m._id)));
+      contextMessages.push(
+        // Reverse since we fetched in descending order
+        ...page.filter((m) => !included?.has(m._id)).reverse()
+      );
     }
 
     // Sort the raw MessageDocs by order and stepOrder
@@ -466,15 +469,10 @@ export class Agent<AgentTools extends ToolSet> {
       a.order === b.order ? a.stepOrder - b.stepOrder : a.order - b.order
     );
 
-    // When including tool calls, drop any orphaned tool messages at the start
-    if (opts.includeToolCalls) {
-      if (sortedDocs.length > 0 && sortedDocs[0].tool && sortedDocs[0].message?.role === "tool") {
-        sortedDocs.shift();
-      }
-    }
-
-    // Deserialize and return
-    return sortedDocs.map((m) => deserializeMessage(m.message!));
+    // Ensure we don't include tool messages without a corresponding tool call
+    return filterOutOrphanedToolMessages(sortedDocs).map((m) =>
+      deserializeMessage(m.message!)
+    );
   }
 
   /**
@@ -1314,6 +1312,34 @@ export class Agent<AgentTools extends ToolSet> {
     });
   }
 }
+
+  function filterOutOrphanedToolMessages(docs: MessageDoc[]) {
+    const toolCallIds = new Set<string>();
+    const result: MessageDoc[] = [];
+    for (const doc of docs) {
+      if (
+        doc.message?.role === "assistant" &&
+        Array.isArray(doc.message.content)
+      ) {
+        for (const content of doc.message.content) {
+          if (content.type === "tool-call") {
+            toolCallIds.add(content.toolCallId);
+          }
+        }
+        result.push(doc);
+      } else if (doc.message?.role === "tool") {
+        if (doc.message.content.every((c) => toolCallIds.has(c.toolCallId))) {
+          result.push(doc);
+        } else {
+          console.debug("Filtering out orphaned tool message", doc);
+        }
+      } else {
+        result.push(doc);
+      }
+    }
+    return result;
+  }
+
 
 export type ToolCtx = RunActionCtx & {
   userId?: string;
