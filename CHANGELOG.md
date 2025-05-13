@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.0.16
+
+- Fixes a bug with providing out-of-order tool messages in the prompt context. (author: @apostolisCodpal)
+
+
 ## 0.0.15
 
 - You can pass tools at the agent definition, thread definition, or per-message call, making it easier to define tools at runtime with runtime context.
