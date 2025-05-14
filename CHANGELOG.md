@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.0.16 alpha
+
+- UI Playground, to host locally or embed into your app.
+- API key management (to authenticate into the UI Playground)
+- The README is a better resource.
+
+### Breaking
+
+- `isTool` configuration for context has been changed to `excludeToolMessages` - where `false`/`undefined` is the default and includes tool messages, and `true` will only return user/assistant messages.
+- Reorganization of API (split `agent.messages.*` into `agent.threads.*`, `agent.messages.*`, `agent.files.*`, and `agent.users.*`.
+- Parameters like `parentMessageId` have generally been renamed to `beforeMessageId` to better clarify their use for things like looking up context. The `generate*` / `stream*` functions do not take a parentMessageId.
+- Calls to steps and objects now take a parentMessageId instead of messageId parameter, as this is the true meaning of parent message (the message being responded to).
+
 ## 0.0.15
 
 - You can pass tools at the agent definition, thread definition, or per-message call, making it easier to define tools at runtime with runtime context.
