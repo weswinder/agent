@@ -135,7 +135,8 @@ const supportAgent = new Agent(components.agent, {
     myConvexTool: createTool({
       description: "My Convex tool",
       args: z.object({...}),
-      handler: async (ctx, args) => {
+      // Note: annotate the return type of the handler to avoid type cycles.
+      handler: async (ctx, args): Promise<string> => {
         return "Hello, world!";
       },
     }),
