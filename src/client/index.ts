@@ -49,16 +49,18 @@ import {
 } from "../shared.js";
 import {
   type CallSettings,
-  MessageWithMetadata,
+  type MessageWithMetadata as InnerMessageWithMetadata,
   type ProviderMetadata,
   type ProviderOptions,
   type SearchOptions,
   type Usage,
+  vFileWithStringId,
   vSafeObjectArgs,
   vTextArgs,
   vThreadStatus,
 } from "../validators.js";
 import type {
+  OpaqueIds,
   RunActionCtx,
   RunMutationCtx,
   RunQueryCtx,
@@ -98,9 +100,11 @@ export const vMessageDoc = v.object({
   parentMessageId: v.optional(v.string()),
   stepId: v.optional(v.string()),
   embeddingId: v.optional(v.string()),
-  fileId: v.optional(v.string()),
+  files: v.optional(v.array(vFileWithStringId)),
 });
 export type MessageDoc = Infer<typeof vMessageDoc>;
+
+type MessageWithMetadata = OpaqueIds<InnerMessageWithMetadata>;
 
 /**
  * Options to configure what messages are fetched as context,

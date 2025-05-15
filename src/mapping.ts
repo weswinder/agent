@@ -39,9 +39,11 @@ export type SerializedMessage = SerializeUrlsAndUint8Arrays<CoreMessage>;
 export function serializeMessage(
   messageWithId: CoreMessage & { id?: string }
 ): SerializedMessage {
-  const { id: _, ...message } = messageWithId;
+  const { id: _, experimental_providerMetadata, ...message } = messageWithId;
   const content = message.content;
   return {
+    // for backwards compatibility
+    providerOptions: experimental_providerMetadata,
     ...message,
     content: serializeContent(content),
   } as SerializedMessage;
@@ -90,6 +92,7 @@ export function serializeNewMessagesInStep<TOOLS extends ToolSet>(
     provider: metadata.provider,
     providerMetadata: step.providerMetadata,
     reasoning: step.reasoning,
+    reasoningDetails: step.reasoningDetails,
     usage: step.usage,
     warnings: step.warnings,
     finishReason: step.finishReason,
@@ -101,33 +104,41 @@ export function serializeNewMessagesInStep<TOOLS extends ToolSet>(
     step.toolResults.length > 0
       ? step.response.messages.slice(-2)
       : step.response.messages.slice(-1)
-  ).map((message) => ({
-    message: serializeMessage(message),
-    id: message.id,
-    ...(message.role === "tool" ? toolFields : assistantFields),
-    // fileId: message.fileId,
-  }));
+  ).map(
+    (message): MessageWithMetadata => ({
+      message: serializeMessage(message),
+      id: message.id,
+      ...(message.role === "tool" ? toolFields : assistantFields),
+      text: step.text,
+      // fileId: message.fileId,
+      files: step.files.map((file) => ({
+        mimeType: file.mimeType,
+        data: serializeDataOrUrl(file.uint8Array ?? file.base64),
+        // TODO: if the file is big, store it and populate url, fileId
+      })),
+    })
+  );
   return messages;
 }
 
 export function serializeObjectResult(
-  step: GenerateObjectResult<unknown>,
+  result: GenerateObjectResult<unknown>,
   metadata: { model: string; provider: string }
 ): StepWithMessagesWithMetadata {
-  const text = JSON.stringify(step.object);
+  const text = JSON.stringify(result.object);
 
   return {
     messages: [
       {
         message: { role: "assistant" as const, content: text },
-        id: step.response.id,
+        id: result.response.id,
         model: metadata.model,
         provider: metadata.provider,
-        providerMetadata: step.providerMetadata,
-        finishReason: step.finishReason,
+        providerMetadata: result.providerMetadata,
+        finishReason: result.finishReason,
         text,
-        usage: step.usage,
-        warnings: step.warnings,
+        usage: result.usage,
+        warnings: result.warnings,
       },
     ],
     step: {
@@ -136,23 +147,22 @@ export function serializeObjectResult(
       stepType: "initial",
       toolCalls: [],
       toolResults: [],
-      usage: step.usage,
-      warnings: step.warnings,
-      finishReason: step.finishReason,
-      request: step.request,
+      usage: result.usage,
+      warnings: result.warnings,
+      finishReason: result.finishReason,
+      providerMetadata: result.providerMetadata,
+      request: result.request,
       response: {
-        ...step.response,
-        timestamp: step.response.timestamp.getTime(),
+        ...result.response,
+        timestamp: result.response.timestamp.getTime(),
         messages: [
           serializeMessageWithId({
             role: "assistant" as const,
             content: text,
-            id: step.response.id,
+            id: result.response.id,
           }),
         ],
       },
-      providerMetadata: step.providerMetadata,
-      experimental_providerMetadata: step.experimental_providerMetadata,
     },
   };
 }
@@ -161,16 +171,19 @@ export function serializeContent(content: Content): SerializedContent {
   if (typeof content === "string") {
     return content;
   }
-  const serialized = content.map((part) => {
-    switch (part.type) {
-      case "image":
-        return { ...part, image: serializeDataOrUrl(part.image) };
-      case "file":
-        return { ...part, file: serializeDataOrUrl(part.data) };
-      default:
-        return part;
+  const serialized = content.map(
+    ({ experimental_providerMetadata, ...rest }) => {
+      const part = { providerOptions: experimental_providerMetadata, ...rest };
+      switch (part.type) {
+        case "image":
+          return { ...part, image: serializeDataOrUrl(part.image) };
+        case "file":
+          return { ...part, file: serializeDataOrUrl(part.data) };
+        default:
+          return part;
+      }
     }
-  });
+  );
   return serialized as SerializedContent;
 }
 

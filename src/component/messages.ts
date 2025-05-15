@@ -57,10 +57,11 @@ export async function deleteMessage(
   if (messageDoc.embeddingId) {
     await ctx.db.delete(messageDoc.embeddingId);
   }
-  if (messageDoc.fileId) {
-    const file = await ctx.db.get(messageDoc.fileId);
+  for (const { fileId } of messageDoc.files ?? []) {
+    if (!fileId) continue;
+    const file = await ctx.db.get(fileId);
     if (file) {
-      await ctx.db.patch(messageDoc.fileId, { refcount: file.refcount - 1 });
+      await ctx.db.patch(fileId, { refcount: file.refcount - 1 });
     }
   }
 }
@@ -121,7 +122,7 @@ async function addMessagesHandler(
   let lastMessageIsTool = maxMessage?.tool ?? false;
   const toReturn: Doc<"messages">[] = [];
   if (messages.length > 0) {
-    for (const { message, fileId, embedding, ...fields } of messages) {
+    for (const { message, files, embedding, ...fields } of messages) {
       let embeddingId: VectorTableId | undefined;
       if (embedding) {
         embeddingId = await insertVector(ctx, embedding.dimension, {
@@ -151,11 +152,12 @@ async function addMessagesHandler(
         order,
         tool,
         text,
-        fileId,
+        files,
         status: pending ? "pending" : "success",
         stepOrder,
       });
-      if (fileId) {
+      for (const { fileId } of files ?? []) {
+        if (!fileId) continue;
         await ctx.db.patch(fileId, {
           refcount: (await ctx.db.get(fileId))!.refcount + 1,
         });

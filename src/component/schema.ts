@@ -9,8 +9,12 @@ import {
   vSource,
   vLanguageModelV1CallWarning,
   vFinishReason,
+  vProviderOptions,
+  vProviderMetadata,
+  vReasoningDetails,
+  vFile,
 } from "../validators.js";
-import { pretendRequired, typedV } from "convex-helpers/validators";
+import { typedV } from "convex-helpers/validators";
 import vectorTables, { vVectorId } from "./vector/tables.js";
 
 export const schema = defineSchema({
@@ -43,22 +47,23 @@ export const schema = defineSchema({
     agentName: v.optional(v.string()),
     model: v.optional(v.string()),
     provider: v.optional(v.string()),
-    usage: v.optional(vUsage),
-    providerMetadata: v.optional(v.record(v.string(), v.any())),
-    warnings: v.optional(v.array(vLanguageModelV1CallWarning)),
+    providerOptions: v.optional(vProviderOptions), // Sent to model
 
     // The result
     message: v.optional(vMessage),
-    // Convenience fields extracted from the step / message
-    role: pretendRequired(
-      v.union(v.literal("user"), v.literal("assistant"), v.literal("tool"))
-    ),
-    text: v.optional(v.string()),
+    // Convenience fields extracted from the message
     tool: v.boolean(), // either tool call (assistant) or tool result (tool)
-    finishReason: v.optional(vFinishReason),
+    text: v.optional(v.string()),
+    files: v.optional(v.array(vFile)),
+
+    // Result metadata
+    usage: v.optional(vUsage),
+    providerMetadata: v.optional(vProviderMetadata), // Received from model
     sources: v.optional(v.array(vSource)),
     reasoning: v.optional(v.string()),
-    fileId: v.optional(v.id("files")),
+    reasoningDetails: v.optional(vReasoningDetails),
+    warnings: v.optional(v.array(vLanguageModelV1CallWarning)),
+    finishReason: v.optional(vFinishReason),
   })
     // Allows finding successful visible messages in order
     // Also surface pending messages separately to e.g. stream
