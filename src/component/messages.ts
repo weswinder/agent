@@ -117,6 +117,7 @@ async function addMessagesHandler(
   }
   const maxMessage = await getMaxMessage(ctx, threadId, userId);
   let order = maxMessage?.order ?? -1;
+  let stepOrder = maxMessage?.stepOrder ?? 0;
   const toReturn: Doc<"messages">[] = [];
   if (messages.length > 0) {
     for (const { message, fileId, embedding, ...fields } of messages) {
@@ -131,7 +132,9 @@ async function addMessagesHandler(
         });
       }
       const tool = isTool(message);
-      if (!tool) {
+      if (tool) {
+        stepOrder++;
+      } else {
         order++;
       }
       const text = extractText(message);
@@ -147,7 +150,7 @@ async function addMessagesHandler(
         text,
         fileId,
         status: pending ? "pending" : "success",
-        stepOrder: 0,
+        stepOrder,
       });
       if (fileId) {
         await ctx.db.patch(fileId, {
@@ -225,6 +228,7 @@ async function addStepHandler(
   assert(parentMessage, `Message ${args.parentMessageId} not found`);
   const order = parentMessage.order;
   assert(order !== undefined, `${args.parentMessageId} has no order`);
+  // TODO: only fetch the last one if we aren't failing pending steps
   let steps = await ctx.db
     .query("steps")
     .withIndex("parentMessageId_order_stepOrder", (q) =>
