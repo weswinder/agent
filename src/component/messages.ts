@@ -118,6 +118,7 @@ async function addMessagesHandler(
   const maxMessage = await getMaxMessage(ctx, threadId, userId);
   let order = maxMessage?.order ?? -1;
   let stepOrder = maxMessage?.stepOrder ?? 0;
+  let lastMessageIsTool = maxMessage?.tool ?? false;
   const toReturn: Doc<"messages">[] = [];
   if (messages.length > 0) {
     for (const { message, fileId, embedding, ...fields } of messages) {
@@ -132,11 +133,13 @@ async function addMessagesHandler(
         });
       }
       const tool = isTool(message);
-      if (tool) {
+      if (lastMessageIsTool) {
         stepOrder++;
       } else {
         order++;
+        stepOrder = 0;
       }
+      lastMessageIsTool = tool;
       const text = extractText(message);
       const messageId = await ctx.db.insert("messages", {
         ...rest,
@@ -163,7 +166,8 @@ async function addMessagesHandler(
   return { messages: toReturn };
 }
 
-async function getMaxMessage(
+// exported for tests
+export async function getMaxMessage(
   ctx: QueryCtx,
   threadId: Id<"threads"> | undefined,
   userId: string | undefined
@@ -171,39 +175,32 @@ async function getMaxMessage(
   assert(threadId || userId, "One of threadId or userId is required");
   if (threadId) {
     return mergedStream(
-      ["success" as const, "pending" as const].map((status) =>
-        stream(ctx.db, schema)
-          .query("messages")
-          .withIndex("threadId_status_tool_order_stepOrder", (q) =>
-            q.eq("threadId", threadId).eq("status", status).eq("tool", false)
-          )
-          .order("desc")
+      [true, false].flatMap((tool) =>
+        ["success" as const, "pending" as const].map((status) =>
+          stream(ctx.db, schema)
+            .query("messages")
+            .withIndex("threadId_status_tool_order_stepOrder", (q) =>
+              q.eq("threadId", threadId).eq("status", status).eq("tool", tool)
+            )
+            .order("desc")
+        )
       ),
       ["order", "stepOrder"]
     ).first();
   } else {
-    // DO explicitly
-    const maxPending = await ctx.db
-      .query("messages")
-      .withIndex("userId_status_tool_order_stepOrder", (q) =>
-        q.eq("userId", userId).eq("status", "pending").eq("tool", false)
-      )
-      .order("desc")
-      .first();
-    const maxSuccess = await ctx.db
-      .query("messages")
-      .withIndex("userId_status_tool_order_stepOrder", (q) =>
-        q.eq("userId", userId).eq("status", "success").eq("tool", false)
-      )
-      .order("desc")
-      .first();
-    return maxPending
-      ? maxSuccess
-        ? maxPending.order > maxSuccess.order
-          ? maxPending
-          : maxSuccess
-        : maxPending
-      : maxSuccess ?? null;
+    return mergedStream(
+      [true, false].flatMap((tool) =>
+        ["success" as const, "pending" as const].map((status) =>
+          stream(ctx.db, schema)
+            .query("messages")
+            .withIndex("userId_status_tool_order_stepOrder", (q) =>
+              q.eq("userId", userId).eq("status", status).eq("tool", tool)
+            )
+            .order("desc")
+        )
+      ),
+      ["order", "stepOrder"]
+    ).first();
   }
 }
 
