@@ -56,9 +56,9 @@ const apiKey = import.meta.env.VITE_PLAYGROUND_API_KEY!;
 assert(apiKey, "VITE_PLAYGROUND_API_KEY is not set");
 
 export default function App() {
-  const [selectedUser, setSelectedUser] = useState<string>();
-  const [selectedThread, setSelectedThread] = useState<string>();
-  const [selectedAgent, setSelectedAgent] = useState<string>();
+  const [selectedUserId, setSelectedUserId] = useState<string>();
+  const [selectedThreadId, setSelectedThreadId] = useState<string>();
+  const [selectedAgentName, setSelectedAgentName] = useState<string>();
   // const [selectedTool, setSelectedTool] = useState<string>();
   const [selectedMessage, setSelectedMessage] = useState<MessageDoc>();
   const [newMessage, setNewMessage] = useState("");
@@ -74,22 +74,22 @@ export default function App() {
     { apiKey },
     { initialNumItems: 20 }
   );
-  if (users.results.length > 0 && !selectedUser) {
-    setSelectedUser(users.results[0].id);
+  if (users.results.length > 0 && !selectedUserId) {
+    setSelectedUserId(users.results[0].id);
   }
 
   const threads = usePaginatedQuery(
     api.listThreads,
-    selectedUser ? { apiKey, userId: selectedUser } : "skip",
+    selectedUserId ? { apiKey, userId: selectedUserId } : "skip",
     { initialNumItems: 20 }
   );
-  if (threads.results.length > 0 && !selectedThread) {
-    setSelectedThread(threads.results[0]._id);
+  if (threads.results.length > 0 && !selectedThreadId) {
+    setSelectedThreadId(threads.results[0]._id);
   }
 
   const messages = usePaginatedQuery(
     api.listMessages,
-    selectedThread ? { apiKey, threadId: selectedThread } : "skip",
+    selectedThreadId ? { apiKey, threadId: selectedThreadId } : "skip",
     { initialNumItems: 20 }
   );
   if (messages.results.length > 0 && !selectedMessage) {
@@ -105,15 +105,15 @@ export default function App() {
       toast.error("No message selected");
       return;
     }
-    if (!selectedAgent) {
+    if (!selectedAgentName) {
       toast.error("No agent selected");
       return;
     }
     const context = await fetchContext({
       apiKey,
-      agentName: selectedAgent,
-      threadId: selectedThread,
-      userId: selectedUser,
+      agentName: selectedAgentName,
+      threadId: selectedThreadId,
+      userId: selectedUserId,
       messages: [selectedMessage.message!],
       contextOptions: JSON.parse(contextOptions),
       beforeMessageId: selectedMessage?._id,
@@ -123,7 +123,7 @@ export default function App() {
     fetchContext,
     messages.results,
     selectedMessage?._id,
-    selectedThread,
+    selectedThreadId,
     contextOptions,
   ]);
 
@@ -131,7 +131,7 @@ export default function App() {
     <div className="min-h-screen flex">
       {/* Left Panel */}
       <div className="w-80 border-r p-4 flex flex-col bg-white">
-        <Select value={selectedUser} onValueChange={setSelectedUser}>
+        <Select value={selectedUserId} onValueChange={setSelectedUserId}>
           <SelectTrigger className="bg-white">
             <SelectValue placeholder="Select a user" />
           </SelectTrigger>
@@ -149,9 +149,9 @@ export default function App() {
             <div
               key={thread._id}
               className={`p-3 cursor-pointer hover:bg-gray-50 ${
-                selectedThread === thread._id ? "bg-gray-100" : "bg-white"
+                selectedThreadId === thread._id ? "bg-gray-100" : "bg-white"
               }`}
-              onClick={() => setSelectedThread(thread._id)}
+              onClick={() => setSelectedThreadId(thread._id)}
             >
               <div className="font-medium">{thread.title}</div>
               <div className="text-sm text-gray-600">{thread.summary}</div>
@@ -311,7 +311,10 @@ export default function App() {
           <h3 className="font-medium mb-2">New Message</h3>
 
           <div className="space-y-4">
-            <Select value={selectedAgent} onValueChange={setSelectedAgent}>
+            <Select
+              value={selectedAgentName}
+              onValueChange={setSelectedAgentName}
+            >
               <SelectTrigger className="bg-white">
                 <SelectValue placeholder="Select an agent" />
               </SelectTrigger>
