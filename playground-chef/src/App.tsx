@@ -108,7 +108,8 @@ export default function App() {
 
   const fetchContext = useAction(api.fetchPromptContext);
 
-  const fetchContextMessages = useCallback(async () => {
+  // TODO: calls this from somewhere
+  const _fetchContextMessages = useCallback(async () => {
     if (!selectedMessage) {
       toast.error("No message selected");
       return;
@@ -129,10 +130,11 @@ export default function App() {
     setContextMessages(context);
   }, [
     fetchContext,
-    messages.results,
-    selectedMessage?._id,
+    selectedMessage,
     selectedThreadId,
     contextOptions,
+    selectedUserId,
+    selectedAgentName,
   ]);
 
   return (
