@@ -21,7 +21,7 @@ import { anyApi } from "convex/server";
 import { useAction, usePaginatedQuery, useQuery } from "convex/react";
 import { assert } from "convex-helpers";
 import { toast } from "sonner";
-import { CoreMessage } from "ai";
+import type { CoreMessage } from "ai";
 dayjs.extend(relativeTime);
 
 const DEFAULT_CONTEXT_OPTIONS: ContextOptions = {
@@ -42,15 +42,23 @@ const DEFAULT_STORAGE_OPTIONS: StorageOptions = {
   saveOutputMessages: true,
 };
 
-if (!import.meta.env.VITE_PLAYGROUND_API_PATH) {
-  throw new Error("VITE_PLAYGROUND_API_PATH is not set");
+let apiPath = import.meta.env.VITE_PLAYGROUND_API_PATH as string;
+if (!apiPath) {
+  console.warn(
+    "VITE_PLAYGROUND_API_PATH is not set, assuming it's in convex/playground.ts"
+  );
+  apiPath = "playground";
 }
-const api = (import.meta.env.VITE_PLAYGROUND_API_PATH as string)
-  .trim()
-  .split("/")
-  .reduce((acc, part) => {
-    return acc[part];
-  }, anyApi) as unknown as PlaygroundAPI;
+apiPath = apiPath.trim();
+if (apiPath.startsWith("/")) {
+  apiPath = apiPath.slice(1);
+}
+if (apiPath.endsWith("/")) {
+  apiPath = apiPath.slice(0, -1);
+}
+const api = apiPath.split("/").reduce((acc, part) => {
+  return acc[part];
+}, anyApi) as unknown as PlaygroundAPI;
 
 const apiKey = import.meta.env.VITE_PLAYGROUND_API_KEY!;
 assert(apiKey, "VITE_PLAYGROUND_API_KEY is not set");

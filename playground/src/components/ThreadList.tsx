@@ -7,32 +7,32 @@ import { Thread } from '../types';
 
 interface ThreadListProps {
   threads: Thread[];
-  selectedThreadId: string | null;
-  onSelectThread: (threadId: string) => void;
+  selectedThreadId: string | undefined;
+  onSelectThread: (thread: Thread) => void;
   onLoadMore: () => void;
 }
 
-const ThreadList: React.FC<ThreadListProps> = ({ 
-  threads, 
-  selectedThreadId, 
+const ThreadList: React.FC<ThreadListProps> = ({
+  threads,
+  selectedThreadId,
   onSelectThread,
-  onLoadMore
+  onLoadMore,
 }) => {
   return (
     <div className="flex flex-col h-full">
       <div className="flex-grow overflow-y-auto">
-        {threads.map(thread => (
-          <ThreadItem 
-            key={thread.id} 
+        {threads.map((thread) => (
+          <ThreadItem
+            key={thread._id}
             thread={thread}
-            isSelected={thread.id === selectedThreadId}
-            onClick={() => onSelectThread(thread.id)}
+            isSelected={thread._id === selectedThreadId}
+            onClick={() => onSelectThread(thread)}
           />
         ))}
       </div>
-      
-      <Button 
-        variant="outline" 
+
+      <Button
+        variant="outline"
         className="m-3 flex items-center justify-center gap-2"
         onClick={onLoadMore}
       >

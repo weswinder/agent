@@ -1,20 +1,22 @@
 
 import React from 'react';
 import MessageList from './MessageList';
-import { Message } from '../types';
+import { Message, User } from "../types";
 
 interface MiddlePanelProps {
+  users: User[];
   messages: Message[];
-  selectedMessageId: string | null;
+  selectedMessageId: string | undefined;
   onSelectMessage: (messageId: string) => void;
   selectedThreadTitle?: string;
 }
 
-const MiddlePanel: React.FC<MiddlePanelProps> = ({ 
-  messages, 
-  selectedMessageId, 
+const MiddlePanel: React.FC<MiddlePanelProps> = ({
+  users,
+  messages,
+  selectedMessageId,
   onSelectMessage,
-  selectedThreadTitle
+  selectedThreadTitle,
 }) => {
   return (
     <div className="flex flex-col h-full">
@@ -23,10 +25,11 @@ const MiddlePanel: React.FC<MiddlePanelProps> = ({
           {selectedThreadTitle || "Select a thread"}
         </h2>
       </div>
-      
+
       <div className="panel-content">
         {messages.length > 0 ? (
-          <MessageList 
+          <MessageList
+            users={users}
             messages={messages}
             selectedMessageId={selectedMessageId}
             onSelectMessage={onSelectMessage}

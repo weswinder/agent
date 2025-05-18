@@ -1,11 +1,20 @@
 import React, { useState } from "react";
 import { formatDistanceToNow } from "date-fns";
-import { Message } from "../types";
+import type { Message, User } from "../types";
 import { Button } from "@/components/ui/button";
-import { ChevronDown, ChevronUp, Bot, User, Wrench } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronUp,
+  Bot,
+  User as UserIcon,
+  Wrench,
+  FileIcon,
+} from "lucide-react";
+import { UIMessage } from "ai";
 
 interface MessageItemProps {
-  message: Message;
+  user: User;
+  message: Omit<Message, "message"> & { message: UIMessage };
   isSelected: boolean;
   onClick: () => void;
   onSelectToolCall?: (toolCallId: string) => void;
@@ -13,6 +22,7 @@ interface MessageItemProps {
 }
 
 const MessageItem: React.FC<MessageItemProps> = ({
+  user,
   message,
   isSelected,
   onClick,
@@ -21,7 +31,7 @@ const MessageItem: React.FC<MessageItemProps> = ({
 }) => {
   const [expandedToolCall, setExpandedToolCall] = useState<string | null>(null);
 
-  const messageDate = new Date(message.timestamp);
+  const messageDate = new Date(message._creationTime);
   const relativeTime = formatDistanceToNow(messageDate, { addSuffix: true });
 
   const toggleToolCall = (toolCallId: string, e: React.MouseEvent) => {
@@ -38,115 +48,156 @@ const MessageItem: React.FC<MessageItemProps> = ({
     >
       <div className="flex justify-between items-start mb-2">
         <div className="flex items-center gap-2">
-          {message.role === "user" ? (
+          {message.message?.role === "user" ? (
             <>
               <div className="w-6 h-6 flex items-center justify-center rounded-full bg-primary text-primary-foreground">
-                <User size={14} />
+                <UserIcon size={14} />
               </div>
-              <span className="font-medium">{message.sender}</span>
+              <span className="font-medium">{user.name}</span>
             </>
           ) : (
             <>
               <div className="w-6 h-6 flex items-center justify-center rounded-full bg-ai text-white">
                 <Bot size={14} />
               </div>
-              <span className="font-medium text-ai">{message.sender}</span>
+              <span className="font-medium text-ai">{message.agentName}</span>
             </>
           )}
         </div>
 
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
           <span>{relativeTime}</span>
-          {message.generationTime && (
+          {message.usage?.totalTokens && (
             <span className="bg-secondary px-2 py-0.5 rounded-full">
-              {message.generationTime.toFixed(1)}s
+              {message.usage.totalTokens} tokens
             </span>
           )}
         </div>
       </div>
 
-      {message.contentType === "text" ? (
+      {message.text ? (
         <div
           className={
-            message.role === "user"
+            message.message?.role === "user"
               ? "message-bubble-user"
               : "message-bubble-agent"
           }
         >
-          {message.content.split("\n").map((line, i) => (
+          {message.text.split("\n").map((line, i) => (
             <div key={i}>{line}</div>
           ))}
         </div>
       ) : (
-        <div className="mt-2">
-          <img
-            src={message.imageUrl}
-            alt="Message content"
-            className="rounded-lg max-w-full max-h-[300px]"
-          />
-        </div>
+        message.files &&
+        message.files.map((file, i) =>
+          file.url ? (
+            <div key={i} className="mt-2">
+              <img
+                src={file.url}
+                className="rounded-lg max-w-full max-h-[300px]"
+              />
+            </div>
+          ) : (
+            file.bytes &&
+            (file.mimeType.startsWith("image/") ? (
+              <div key={i} className="mt-2">
+                <img
+                  src={URL.createObjectURL(
+                    new Blob([file.bytes], {
+                      type: file.mimeType,
+                    })
+                  )}
+                  className="rounded-lg max-w-full max-h-[300px]"
+                />
+              </div>
+            ) : (
+              <div key={i} className="mt-2">
+                <FileIcon size={14} />
+                <span>{file.mimeType}</span>
+              </div>
+            ))
+          )
+        )
       )}
 
-      {message.toolCalls && message.toolCalls.length > 0 && (
-        <div className="ml-6 mt-2">
-          {message.toolCalls.map((toolCall) => {
-            const isToolCallExpanded = expandedToolCall === toolCall.id;
-            return (
-              <div
-                key={toolCall.id}
-                className={`tool-call-bubble mt-2 ${
-                  isToolCallExpanded
-                    ? "bg-secondary border border-primary/30 rounded-lg"
-                    : ""
-                }`}
-              >
+      <div className="ml-6 mt-2">
+        {message.message?.parts.map((part, i) => {
+          switch (part.type) {
+            case "tool-invocation": {
+              const toolCall = part.toolInvocation;
+              const isToolCallExpanded =
+                expandedToolCall === toolCall.toolCallId;
+              return (
                 <div
-                  className="flex items-center gap-2 p-2 cursor-pointer"
-                  onClick={(e) => toggleToolCall(toolCall.id, e)}
+                  key={toolCall.toolCallId}
+                  className={`tool-call-bubble mt-2 ${
+                    isToolCallExpanded
+                      ? "bg-secondary border border-primary/30 rounded-lg"
+                      : ""
+                  }`}
                 >
-                  <div className="w-5 h-5 flex items-center justify-center rounded-full bg-muted-foreground text-muted">
-                    <Wrench size={12} />
-                  </div>
-                  <span className="font-medium text-sm">{toolCall.name}</span>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="p-0 h-5 w-5 ml-auto"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      toggleToolCall(toolCall.id, e);
-                    }}
+                  <div
+                    className="flex items-center gap-2 p-2 cursor-pointer"
+                    onClick={(e) => toggleToolCall(toolCall.toolCallId, e)}
                   >
-                    {isToolCallExpanded ? (
-                      <ChevronUp size={14} />
-                    ) : (
-                      <ChevronDown size={14} />
-                    )}
-                  </Button>
-                </div>
-                {isToolCallExpanded && (
-                  <div className="mt-2 text-sm p-2">
-                    <div className="mb-2">
-                      <div className="font-medium mb-1">Arguments:</div>
-                      <pre className="bg-secondary p-2 rounded-md overflow-x-auto text-xs">
-                        {JSON.stringify(toolCall.args, null, 2)}
-                      </pre>
+                    <div className="w-5 h-5 flex items-center justify-center rounded-full bg-muted-foreground text-muted">
+                      <Wrench size={12} />
                     </div>
-                    {toolCall.returnValue && (
-                      <div>
-                        <div className="font-medium mb-1">Return Value:</div>
+                    <span className="font-medium text-sm">
+                      {toolCall.toolName}
+                    </span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="p-0 h-5 w-5 ml-auto"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleToolCall(toolCall.toolCallId, e);
+                      }}
+                    >
+                      {isToolCallExpanded ? (
+                        <ChevronUp size={14} />
+                      ) : (
+                        <ChevronDown size={14} />
+                      )}
+                    </Button>
+                  </div>
+                  {isToolCallExpanded && (
+                    <div className="mt-2 text-sm p-2">
+                      <div className="mb-2">
+                        <div className="font-medium mb-1">Arguments:</div>
                         <pre className="bg-secondary p-2 rounded-md overflow-x-auto text-xs">
-                          {JSON.stringify(toolCall.returnValue, null, 2)}
+                          {JSON.stringify(toolCall.args, null, 2)}
                         </pre>
                       </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      )}
+                      {toolCall.state === "result" && (
+                        <div>
+                          <div className="font-medium mb-1">Return Value:</div>
+                          <pre className="bg-secondary p-2 rounded-md overflow-x-auto text-xs">
+                            {JSON.stringify(toolCall.result, null, 2)}
+                          </pre>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            }
+            case "reasoning":
+              return <div key={i}>{part.reasoning}</div>;
+            case "source":
+              return (
+                <div key={i}>
+                  <a href={part.source.url} target="_blank">
+                    {part.source.title ?? part.source.url}
+                  </a>
+                </div>
+              );
+            default:
+              return <div key={part.type}>{part.type}</div>;
+          }
+        })}
+      </div>
     </div>
   );
 };

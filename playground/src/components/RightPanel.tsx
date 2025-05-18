@@ -1,28 +1,34 @@
 
 import React from 'react';
-import { Message, Agent, ContextMessage } from '../types';
+import { Message, ContextMessage } from "../types";
 import MessageComposer from './MessageComposer';
 import ContextMessages from './ContextMessages';
+import { ContextOptions, StorageOptions } from "../../../dist/esm/client";
 
 interface RightPanelProps {
   selectedMessage: Message | null;
-  agents: Agent[];
+  agents: string[];
   contextMessages: ContextMessage[];
-  onSendMessage: (message: string, agentId: string, context: any, storage: any) => void;
+  onSendMessage: (
+    message: string,
+    agentName: string,
+    context: ContextOptions,
+    storage: StorageOptions
+  ) => void;
 }
 
-const RightPanel: React.FC<RightPanelProps> = ({ 
-  selectedMessage, 
+const RightPanel: React.FC<RightPanelProps> = ({
+  selectedMessage,
   agents,
   contextMessages,
-  onSendMessage
+  onSendMessage,
 }) => {
   return (
     <div className="flex flex-col h-full border-l">
       <div className="panel-header">
         <h2 className="font-medium">Message Details</h2>
       </div>
-      
+
       <div className="panel-content p-4 overflow-y-auto">
         {selectedMessage ? (
           <>
@@ -32,15 +38,10 @@ const RightPanel: React.FC<RightPanelProps> = ({
                 {JSON.stringify(selectedMessage, null, 2)}
               </pre>
             </div>
-            
-            <MessageComposer 
-              agents={agents}
-              onSendMessage={onSendMessage}
-            />
-            
-            <ContextMessages 
-              messages={contextMessages}
-            />
+
+            <MessageComposer agents={agents} onSendMessage={onSendMessage} />
+
+            <ContextMessages messages={contextMessages} />
           </>
         ) : (
           <div className="text-muted-foreground">

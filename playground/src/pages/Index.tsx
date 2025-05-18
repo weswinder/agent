@@ -1,36 +1,100 @@
-
-import React, { useState, useMemo } from 'react';
-import LeftPanel from '@/components/LeftPanel';
-import MiddlePanel from '@/components/MiddlePanel';
-import RightPanel from '@/components/RightPanel';
+import React, { useState, useMemo, useCallback } from "react";
+import LeftPanel from "@/components/LeftPanel";
+import MiddlePanel from "@/components/MiddlePanel";
+import RightPanel from "@/components/RightPanel";
 import { useToast } from "@/components/ui/use-toast";
-import { agents, contextMessages, messages, threads, users } from '@/data/mockData';
+import { usePaginatedQuery, useQuery, useAction } from "convex/react";
+import { assert } from "convex-helpers";
+import type { PlaygroundAPI } from "@convex-dev/agent/playground";
+import { anyApi } from "convex/server";
+import { CoreMessage } from "ai";
+import { ContextMessage, Thread } from "@/types";
+import { ContextOptions, StorageOptions } from "@convex-dev/agent";
+
+const api = (import.meta.env.VITE_PLAYGROUND_API_PATH as string)
+  .trim()
+  .split("/")
+  .reduce((acc, part) => acc[part], anyApi) as unknown as PlaygroundAPI;
+
+// TODO: have a UI to set the API key
+const apiKey = import.meta.env.VITE_PLAYGROUND_API_KEY!;
+assert(apiKey, "VITE_PLAYGROUND_API_KEY is not set");
 
 const Index = () => {
   const { toast } = useToast();
-  const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
-  const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null);
+  const [selectedUserId, setSelectedUserId] = useState<string | undefined>();
+  const [selectedThreadId, setSelectedThreadId] = useState<
+    string | undefined
+  >();
+  const [selectedMessageId, setSelectedMessageId] = useState<
+    string | undefined
+  >();
+  const [selectedAgentName, setSelectedAgentName] = useState<
+    string | undefined
+  >();
+  const [contextMessages, setContextMessages] = useState<ContextMessage[]>([]);
 
-  const selectedThread = useMemo(() => {
-    if (!selectedThreadId) return null;
-    return threads.find((thread) => thread.id === selectedThreadId) || null;
-  }, [selectedThreadId]);
+  // Users
+  const users = usePaginatedQuery(
+    api.listUsers,
+    { apiKey },
+    { initialNumItems: 20 }
+  );
+  React.useEffect(() => {
+    if (users.results.length > 0 && !selectedUserId) {
+      setSelectedUserId(users.results[0]._id);
+    }
+  }, [users.results, selectedUserId]);
 
-  const threadMessages = useMemo(() => {
-    if (!selectedThreadId) return [];
-    return messages[selectedThreadId] || [];
-  }, [selectedThreadId]);
+  // Threads
+  const threads = usePaginatedQuery(
+    api.listThreads,
+    selectedUserId ? { apiKey, userId: selectedUserId } : "skip",
+    { initialNumItems: 20 }
+  );
+  React.useEffect(() => {
+    if (threads.results.length > 0 && !selectedThreadId) {
+      setSelectedThreadId(threads.results[0]._id);
+    }
+  }, [threads.results, selectedThreadId]);
 
-  const selectedMessage = useMemo(() => {
-    if (!selectedMessageId || !threadMessages.length) return null;
-    return (
-      threadMessages.find((message) => message.id === selectedMessageId) || null
-    );
-  }, [selectedMessageId, threadMessages]);
+  // Messages
+  const messages = usePaginatedQuery(
+    api.listMessages,
+    selectedThreadId ? { apiKey, threadId: selectedThreadId } : "skip",
+    { initialNumItems: 20 }
+  );
+  React.useEffect(() => {
+    if (messages.results.length > 0 && !selectedMessageId) {
+      setSelectedMessageId(messages.results[0].id);
+    }
+  }, [messages.results, selectedMessageId]);
 
-  const handleSelectThread = (threadId: string) => {
-    setSelectedThreadId(threadId);
-    setSelectedMessageId(null);
+  // Agents
+  const agents = useQuery(api.listAgents, { apiKey }) || [];
+
+  // Selected thread and message
+  const selectedThread = threads.results.find(
+    (thread) => thread._id === selectedThreadId
+  );
+
+  const selectedMessage = messages.results.find(
+    (message) => message._id === selectedMessageId
+  );
+
+  // Context fetch (stub for now)
+  // const fetchContext = useAction(api.fetchPromptContext);
+  // const fetchContextMessages = useCallback(async () => { ... });
+
+  const handleSelectUserId = (userId: string) => {
+    setSelectedUserId(userId);
+    setSelectedThreadId(undefined);
+    setSelectedMessageId(undefined);
+  };
+
+  const handleSelectThread = (thread: Thread) => {
+    setSelectedThreadId(thread._id);
+    setSelectedMessageId(undefined);
   };
 
   const handleSelectMessage = (messageId: string) => {
@@ -39,17 +103,17 @@ const Index = () => {
 
   const handleSendMessage = (
     message: string,
-    agentId: string,
-    context: any,
-    storage: any
+    agentName: string,
+    context: ContextOptions,
+    storage: StorageOptions
   ) => {
     console.log("Sending message:", message);
-    console.log("Agent:", agentId);
+    console.log("Agent:", agentName);
     console.log("Context options:", context);
     console.log("Storage options:", storage);
 
     toast({
-      title: "Message sent",
+      title: "(TODO) Message sent",
       description: "Your message has been sent to the agent.",
     });
   };
@@ -63,16 +127,21 @@ const Index = () => {
       <div className="flex-grow flex overflow-hidden">
         <div className="w-1/4 h-full">
           <LeftPanel
-            users={users}
-            threads={threads}
+            users={users.results}
+            threads={threads.results}
+            selectedUserId={selectedUserId}
             selectedThreadId={selectedThreadId}
+            onSelectUserId={handleSelectUserId}
             onSelectThread={handleSelectThread}
+            onLoadMoreThreads={threads.loadMore}
+            canLoadMoreThreads={threads.status === "CanLoadMore"}
           />
         </div>
 
         <div className="w-1/2 h-full border-x">
           <MiddlePanel
-            messages={threadMessages}
+            users={users.results}
+            messages={messages.results}
             selectedMessageId={selectedMessageId}
             onSelectMessage={handleSelectMessage}
             selectedThreadTitle={selectedThread?.title}
