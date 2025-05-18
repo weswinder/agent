@@ -11,6 +11,7 @@ import {
   type Message as AIMessage,
   type UserContent,
 } from "ai";
+import type { FileUIPart } from "@ai-sdk/ui-utils";
 import { assert } from "convex-helpers";
 import {
   MessageWithMetadata,
@@ -233,6 +234,25 @@ function deserializeUrl(urlOrString: string | ArrayBuffer): URL | DataContent {
     return urlOrString;
   }
   return urlOrString;
+}
+
+export function toUIFilePart(file: {
+  data?: ArrayBuffer | string;
+  url?: string;
+  mimeType: string;
+}): FileUIPart {
+  return {
+    type: "file",
+    data:
+      file.data instanceof ArrayBuffer
+        ? encodeBase64(file.data)
+        : file.url ?? file.data ?? "",
+    mimeType: file.mimeType,
+  };
+}
+
+function encodeBase64(data: ArrayBuffer): string {
+  return Buffer.from(data).toString("base64");
 }
 
 export function promptOrMessagesToCoreMessages(args: {
