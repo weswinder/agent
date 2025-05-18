@@ -75,7 +75,7 @@ export default function App() {
     { initialNumItems: 20 }
   );
   if (users.results.length > 0 && !selectedUserId) {
-    setSelectedUserId(users.results[0].id);
+    setSelectedUserId(users.results[0]._id);
   }
 
   const threads = usePaginatedQuery(
@@ -137,7 +137,7 @@ export default function App() {
           </SelectTrigger>
           <SelectContent>
             {users.results.map((user) => (
-              <SelectItem key={user.id} value={user.id}>
+              <SelectItem key={user._id} value={user._id}>
                 {user.name}
               </SelectItem>
             ))}
@@ -189,9 +189,11 @@ export default function App() {
         <div className="flex flex-col-reverse space-y-4">
           {messages.results.map((message) => (
             <div
-              key={message.id}
+              key={message._id}
               className={`flex flex-col rounded-lg bg-white p-4 shadow-sm cursor-pointer ${
-                selectedMessage?.id === message.id ? "ring-2 ring-blue-500" : ""
+                selectedMessage?._id === message._id
+                  ? "ring-2 ring-blue-500"
+                  : ""
               }`}
               onClick={() => setSelectedMessage(message)}
             >

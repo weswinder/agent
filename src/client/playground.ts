@@ -5,11 +5,9 @@ import {
   actionGeneric,
   GenericDataModel,
   GenericQueryCtx,
-  FilterApi,
-  FunctionReference,
   ApiFromModules,
 } from "convex/server";
-import { vThreadDoc, type Agent } from "./index";
+import { vMessageDoc, vThreadDoc, type Agent } from "./index";
 import type { RunQueryCtx, UseApi } from "./types";
 import type { ToolSet } from "ai";
 import { v } from "convex/values";
@@ -22,18 +20,18 @@ import {
 import { assert } from "convex-helpers";
 
 export type PlaygroundAPI = ApiFromModules<{
-  playground: ReturnType<typeof definePlaygroundAPI<GenericDataModel>>;
+  playground: ReturnType<typeof definePlaygroundAPI>;
 }>["playground"];
 
 // Playground API definition
-export function definePlaygroundAPI<DataModel extends GenericDataModel>(
+export function definePlaygroundAPI(
   component: UseApi<Mounts>,
   {
     agents,
     userNameLookup,
   }: {
     agents: Agent<ToolSet>[];
-    userNameLookup?: (
+    userNameLookup?: <DataModel extends GenericDataModel>(
       ctx: GenericQueryCtx<DataModel>,
       userId: string
     ) => string | Promise<string>;
@@ -74,7 +72,7 @@ export function definePlaygroundAPI<DataModel extends GenericDataModel>(
         ...users,
         page: await Promise.all(
           users.page.map(async (userId) => ({
-            id: userId,
+            _id: userId,
             name: userNameLookup ? await userNameLookup(ctx, userId) : userId,
           }))
         ),
@@ -82,7 +80,7 @@ export function definePlaygroundAPI<DataModel extends GenericDataModel>(
     },
     returns: paginationResultValidator(
       v.object({
-        id: v.string(),
+        _id: v.string(),
         name: v.string(),
       })
     ),
@@ -128,6 +126,13 @@ export function definePlaygroundAPI<DataModel extends GenericDataModel>(
         ),
       };
     },
+    returns: paginationResultValidator(
+      v.object({
+        ...vThreadDoc.fields,
+        latestMessage: v.optional(v.string()),
+        lastMessageAt: v.optional(v.number()),
+      })
+    ),
   });
 
   // List messages for a thread (query)
@@ -146,6 +151,7 @@ export function definePlaygroundAPI<DataModel extends GenericDataModel>(
         statuses: ["success", "failed", "pending"],
       });
     },
+    returns: paginationResultValidator(vMessageDoc),
   });
 
   // Create a thread (mutation)
@@ -167,6 +173,7 @@ export function definePlaygroundAPI<DataModel extends GenericDataModel>(
         summary: args.summary,
       });
     },
+    returns: v.object({ threadId: v.string() }),
   });
 
   // Send a message (action)
