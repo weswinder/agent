@@ -98,7 +98,7 @@ export type Mounts = {
           };
           error?: string;
           files?: Array<{
-            bytes?: ArrayBuffer;
+            data?: ArrayBuffer | string;
             fileId?: string;
             mimeType: string;
             url?: string;
@@ -247,7 +247,7 @@ export type Mounts = {
             | string;
           error?: string;
           files?: Array<{
-            bytes?: ArrayBuffer;
+            data?: ArrayBuffer | string;
             fileId?: string;
             mimeType: string;
             url?: string;
@@ -398,7 +398,7 @@ export type Mounts = {
             | string;
           error?: string;
           files?: Array<{
-            bytes?: ArrayBuffer;
+            data?: ArrayBuffer | string;
             fileId?: string;
             mimeType: string;
             url?: string;
@@ -559,7 +559,7 @@ export type Mounts = {
             };
             error?: string;
             files?: Array<{
-              bytes?: ArrayBuffer;
+              data?: ArrayBuffer | string;
               fileId?: string;
               mimeType: string;
               url?: string;
@@ -1130,7 +1130,7 @@ export type Mounts = {
             | string;
           error?: string;
           files?: Array<{
-            bytes?: ArrayBuffer;
+            data?: ArrayBuffer | string;
             fileId?: string;
             mimeType: string;
             url?: string;
@@ -1307,7 +1307,7 @@ export type Mounts = {
             | string;
           error?: string;
           files?: Array<{
-            bytes?: ArrayBuffer;
+            data?: ArrayBuffer | string;
             fileId?: string;
             mimeType: string;
             url?: string;
@@ -1482,7 +1482,7 @@ export type Mounts = {
           | string;
         error?: string;
         files?: Array<{
-          bytes?: ArrayBuffer;
+          data?: ArrayBuffer | string;
           fileId?: string;
           mimeType: string;
           url?: string;
@@ -1638,7 +1638,7 @@ export type Mounts = {
           | string;
         error?: string;
         files?: Array<{
-          bytes?: ArrayBuffer;
+          data?: ArrayBuffer | string;
           fileId?: string;
           mimeType: string;
           url?: string;

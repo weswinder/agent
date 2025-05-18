@@ -127,7 +127,7 @@ export declare const components: {
             };
             error?: string;
             files?: Array<{
-              bytes?: ArrayBuffer;
+              data?: ArrayBuffer | string;
               fileId?: string;
               mimeType: string;
               url?: string;
@@ -304,7 +304,7 @@ export declare const components: {
               | string;
             error?: string;
             files?: Array<{
-              bytes?: ArrayBuffer;
+              data?: ArrayBuffer | string;
               fileId?: string;
               mimeType: string;
               url?: string;
@@ -483,7 +483,7 @@ export declare const components: {
               | string;
             error?: string;
             files?: Array<{
-              bytes?: ArrayBuffer;
+              data?: ArrayBuffer | string;
               fileId?: string;
               mimeType: string;
               url?: string;
@@ -672,7 +672,7 @@ export declare const components: {
               };
               error?: string;
               files?: Array<{
-                bytes?: ArrayBuffer;
+                data?: ArrayBuffer | string;
                 fileId?: string;
                 mimeType: string;
                 url?: string;
@@ -1250,7 +1250,7 @@ export declare const components: {
               | string;
             error?: string;
             files?: Array<{
-              bytes?: ArrayBuffer;
+              data?: ArrayBuffer | string;
               fileId?: string;
               mimeType: string;
               url?: string;
@@ -1455,7 +1455,7 @@ export declare const components: {
               | string;
             error?: string;
             files?: Array<{
-              bytes?: ArrayBuffer;
+              data?: ArrayBuffer | string;
               fileId?: string;
               mimeType: string;
               url?: string;
@@ -1658,7 +1658,7 @@ export declare const components: {
             | string;
           error?: string;
           files?: Array<{
-            bytes?: ArrayBuffer;
+            data?: ArrayBuffer | string;
             fileId?: string;
             mimeType: string;
             url?: string;
@@ -1814,7 +1814,7 @@ export declare const components: {
             | string;
           error?: string;
           files?: Array<{
-            bytes?: ArrayBuffer;
+            data?: ArrayBuffer | string;
             fileId?: string;
             mimeType: string;
             url?: string;
