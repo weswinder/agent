@@ -152,7 +152,8 @@ export function toUIMessages(messages: MessageDoc[]): UIMessage[] {
       }
       if (
         !assistantMessage ||
-        !nonStringContent.find((part) => part.type === "tool-call")
+        (coreMessage.role === "assistant" &&
+          !nonStringContent.find((part) => part.type === "tool-call"))
       ) {
         assistantMessage = {
           id: message.id ?? message._id,
@@ -210,22 +211,21 @@ export function toUIMessages(messages: MessageDoc[]): UIMessage[] {
               (part) =>
                 part.type === "tool-invocation" &&
                 part.toolInvocation.toolCallId === contentPart.toolCallId
-            );
+            ) as ToolInvocationUIPart | undefined;
             const toolInvocation: ToolInvocationUIPart["toolInvocation"] = {
               state: "result",
               toolCallId: contentPart.toolCallId,
               toolName: contentPart.toolName,
-              args: contentPart.args,
+              args: contentPart.args ?? call?.toolInvocation.args,
               result: contentPart.result,
-              step: assistantMessage.parts.filter(
-                (part) => part.type === "tool-invocation"
-              ).length,
+              step:
+                call?.toolInvocation.step ??
+                assistantMessage.parts.filter(
+                  (part) => part.type === "tool-invocation"
+                ).length,
             };
             if (call) {
-              (call as ToolInvocationUIPart).toolInvocation = {
-                ...toolInvocation,
-                step: (call as ToolInvocationUIPart).toolInvocation.step,
-              };
+              (call as ToolInvocationUIPart).toolInvocation = toolInvocation;
             } else {
               console.warn(
                 "Tool result without preceding tool call.. adding anyways",
@@ -238,8 +238,6 @@ export function toUIMessages(messages: MessageDoc[]): UIMessage[] {
             }
             break;
           }
-          default:
-            throw new Error(`Unknown part type: ${contentPart.type}`);
         }
       }
     }
