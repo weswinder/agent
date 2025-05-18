@@ -16,8 +16,8 @@ import {
   paginationResultValidator,
   vContextOptions,
   vMessage,
+  vStorageOptions,
 } from "../validators";
-import { assert } from "convex-helpers";
 
 export type PlaygroundAPI = ApiFromModules<{
   playground: ReturnType<typeof definePlaygroundAPI>;
@@ -183,20 +183,19 @@ export function definePlaygroundAPI(
       agentName: v.string(),
       userId: v.string(),
       threadId: v.string(),
+      // Args passed through to generateText
       prompt: v.optional(v.string()),
       messages: v.optional(v.array(vMessage)),
-      // Add more args as needed
+      contextOptions: v.optional(vContextOptions),
+      storageOptions: v.optional(vStorageOptions),
     },
     handler: async (ctx, args) => {
-      await validateApiKey(ctx, args.apiKey);
-      const { threadId, userId, messages, prompt, agentName } = args;
+      const { apiKey, agentName, userId, threadId, ...rest } = args;
+      await validateApiKey(ctx, apiKey);
       const agent = agentMap[agentName];
       if (!agent) throw new Error(`Unknown agent: ${agentName}`);
       const { thread } = await agent.continueThread(ctx, { threadId, userId });
-      // Prefer messages if provided, else prompt
-      assert(messages || prompt, "Must provide either messages or prompt");
-      assert(!messages || !prompt, "Provide messages or prompt, not both");
-      const result = await thread.generateText({ prompt, messages });
+      const result = await thread.generateText(rest);
       return result;
     },
   });
