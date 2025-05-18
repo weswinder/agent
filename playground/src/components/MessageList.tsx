@@ -21,8 +21,8 @@ const MessageList: React.FC<MessageListProps> = ({
     null
   );
   const uiMessages = useMemo(() => {
-    const uiMessages = toUIMessages(messages);
-    return uiMessages.map((uiMessage, i) => {
+    const uiMessages = toUIMessages([...messages].reverse());
+    return uiMessages.map((uiMessage) => {
       const message =
         messages.find((message) => message._id === uiMessage.id) ??
         messages.find((m) => m.id === uiMessage.id)!;
@@ -43,12 +43,12 @@ const MessageList: React.FC<MessageListProps> = ({
     <div className="flex flex-col min-h-0 h-full overflow-y-auto">
       {uiMessages.map((message) => (
         <MessageItem
-          key={message.id}
+          key={message._id}
           user={users.find((user) => user._id === message.userId)}
           message={message}
-          isSelected={message.id === selectedMessageId}
+          isSelected={message._id === selectedMessageId}
           onClick={() => {
-            onSelectMessage(message.id);
+            onSelectMessage(message._id);
             setSelectedToolCallId(null);
           }}
           onSelectToolCall={handleSelectToolCall}

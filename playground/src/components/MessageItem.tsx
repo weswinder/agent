@@ -91,7 +91,7 @@ const MessageItem: React.FC<MessageItemProps> = ({
         message.files &&
         message.files.map((file, i) =>
           file.url ? (
-            <div key={i} className="mt-2">
+            <div key={message._id + " file " + i} className="mt-2">
               <img
                 src={file.url}
                 className="rounded-lg max-w-full max-h-[300px]"
@@ -184,17 +184,19 @@ const MessageItem: React.FC<MessageItemProps> = ({
               );
             }
             case "reasoning":
-              return <div key={i}>{part.reasoning}</div>;
+              return (
+                <div key={message._id + " reasoning " + i}>
+                  {part.reasoning}
+                </div>
+              );
             case "source":
               return (
-                <div key={i}>
+                <div key={message._id + " source " + i}>
                   <a href={part.source.url} target="_blank">
                     {part.source.title ?? part.source.url}
                   </a>
                 </div>
               );
-            default:
-              return <div key={part.type}>{part.type}</div>;
           }
         })}
       </div>
