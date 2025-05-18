@@ -156,6 +156,11 @@ async function addMessagesHandler(
         status: pending ? "pending" : "success",
         stepOrder,
       });
+      if (!fields.id) {
+        await ctx.db.patch(messageId, {
+          id: messageId,
+        });
+      }
       for (const { fileId } of files ?? []) {
         if (!fileId) continue;
         await ctx.db.patch(fileId, {
