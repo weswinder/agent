@@ -348,7 +348,8 @@ export const vContextOptions = v.object({
 
 export const vStorageOptions = v.object({
   saveAllInputMessages: v.optional(v.boolean()),
-  saveAllOutputMessages: v.optional(v.boolean()),
+  saveAnyInputMessages: v.optional(v.boolean()),
+  saveOutputMessages: v.optional(v.boolean()),
 });
 
 const vPromptFields = {
