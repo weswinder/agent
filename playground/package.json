@@ -1,7 +1,6 @@
 {
-  "name": "vite_react_shadcn_ts",
-  "private": true,
-  "version": "0.0.0",
+  "name": "@convex-dev/agent-playground",
+  "version": "0.0.1",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -10,6 +9,22 @@
     "lint": "eslint .",
     "preview": "vite preview"
   },
+  "bin": {
+    "agent-playground": "npx vite --open"
+  },
+  "exports": {
+    "./src": "./src/App.tsx",
+    "./src/*": "./src/*"
+  },
+  "files": [
+    "public",
+    "src",
+    "components.json",
+    "index.html",
+    "postcss.config.js",
+    "tailwind.config.ts",
+    "vite.config.ts"
+  ],
   "dependencies": {
     "@convex-dev/agent": "../",
     "@hookform/resolvers": "^3.9.0",
