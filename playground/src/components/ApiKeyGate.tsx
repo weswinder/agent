@@ -1,7 +1,8 @@
-import { useState, useEffect, ReactNode, useMemo } from "react";
+import { useState, useEffect, ReactNode } from "react";
 import { useConvex } from "convex/react";
 import type { PlaygroundAPI } from "../definePlaygroundAPI";
 import { anyApi } from "convex/server";
+import { Button } from "./ui/button";
 
 const API_KEY_STORAGE_KEY = "playground_api_key";
 const API_PATH_STORAGE_KEY = "playground_api_path";
@@ -35,55 +36,51 @@ function ApiKeyGate({
 }: {
   children: (apiKey: string, api: PlaygroundAPI) => ReactNode;
 }) {
-  const [apiKey, setApiKey] = useState<string | null>(null);
-  const [inputValue, setInputValue] = useState("");
-  const [apiPath, setApiPath] = useState<string>("playground");
-  const [apiPathInput, setApiPathInput] = useState("playground");
-  const [copied, setCopied] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-  const convex = useConvex();
-
-  useEffect(() => {
+  const [apiKey, setApiKey] = useState<string>(() => {
     const storedKey = sessionStorage.getItem(API_KEY_STORAGE_KEY);
+    if (storedKey) {
+      return storedKey;
+    }
+    return "";
+  });
+  const [apiKeyValid, setApiKeyValid] = useState<boolean>(!!apiKey);
+  const [apiKeyInput, setApiKeyInput] = useState(apiKey || "");
+  const [apiPath, setApiPath] = useState<string>(() => {
     const storedPath = sessionStorage.getItem(API_PATH_STORAGE_KEY);
     if (storedPath) {
-      setApiPathInput(storedPath);
-      if (storedKey) {
-        convex
-          .query(getApi(storedPath).isApiKeyValid, {
-            apiKey: storedKey,
-          })
-          .then((isValid) => {
-            if (isValid) {
-              setApiKey(storedKey);
-            } else {
-              setError("Invalid API key for this playground path.");
-            }
-          });
-      }
+      return storedPath;
     }
-  }, []);
+    return "playground";
+  });
+  const [apiPathInput, setApiPathInput] = useState(apiPath);
+  const [copied, setCopied] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const convex = useConvex();
+  const [isConnected, setIsConnected] = useState<boolean | null>(null);
 
+  // Validate on every keystroke
   useEffect(() => {
+    if (!apiKeyInput) return;
     const nextApi = getApi(apiPathInput);
     convex
-      .query(nextApi.isApiKeyValid, {
-        apiKey: inputValue,
-      })
+      .query(nextApi.isApiKeyValid, { apiKey: apiKeyInput })
       .then((isValid) => {
         sessionStorage.setItem(API_PATH_STORAGE_KEY, apiPathInput);
         setApiPath(apiPathInput);
         if (isValid) {
-          sessionStorage.setItem(API_PATH_STORAGE_KEY, apiPathInput);
-          setApiKey(inputValue);
+          setApiKeyValid(true);
+          setError(null);
+          // Simulate form submission for password managers
         } else {
-          setApiKey(null);
+          setApiKeyValid(false);
           setError("Invalid API key for this playground path.");
         }
+        setIsConnected(true);
       })
       .catch(() => {
-        setApiPath("");
+        if (!convex.connectionState().isWebSocketConnected) {
+          setIsConnected(false);
+        }
         setError(
           "Invalid playground path (could not find isApiKeyValid). Please check the path and try again." +
             "e.g. if you exported the API in convex/foo/playground.ts, it would be foo/playground." +
@@ -91,7 +88,15 @@ function ApiKeyGate({
             PLAYGROUND_CODE
         );
       });
-  }, [apiPathInput, inputValue]);
+  }, [apiKeyInput, apiPathInput, convex]);
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (apiKeyValid) {
+      sessionStorage.setItem(API_KEY_STORAGE_KEY, apiKeyInput);
+      setApiKey(apiKeyInput);
+    }
+  };
 
   const handleCopy = () => {
     navigator.clipboard.writeText(CLI_COMMAND);
@@ -99,15 +104,18 @@ function ApiKeyGate({
     setTimeout(() => setCopied(false), 1200);
   };
 
-  if (!apiKey || !apiPath) {
+  if (!apiKey || !apiPath || !apiKeyValid) {
     return (
       <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-60 z-50">
-        <form className="bg-white rounded-xl shadow-2xl p-8 flex flex-col gap-6 min-w-[400px] max-w-[90vw] border border-muted">
+        <form
+          onSubmit={handleSubmit}
+          className="bg-white rounded-xl shadow-2xl p-8 flex flex-col gap-6 min-w-[400px] max-w-[90vw] border border-muted"
+        >
           <div className="flex flex-col gap-2">
             <h2 className="text-2xl font-bold mb-1 text-foreground">
               Configure the playground
             </h2>
-            {!convex.connectionState().isWebSocketConnected && (
+            {isConnected === false && (
               <div className="text-red-600 text-sm  font-medium mt-2">
                 Backend is not connected. Please check your internet connection,
                 or the Convex deployment URL in the environment variables /
@@ -123,17 +131,20 @@ function ApiKeyGate({
             <input
               className="border border-input rounded-lg px-4 py-2 text-base font-mono bg-muted focus:outline-none focus:ring-2 focus:ring-blue-500 transition w-full min-w-0"
               type="text"
+              autoComplete="username"
+              id="agent-playground-api-path"
               value={apiPathInput}
               onChange={(e) => setApiPathInput(e.target.value.trim())}
               placeholder="playground"
-              disabled={loading}
             />
             <span className="text-xs text-muted-foreground">
               Usually <code>playground</code>, or the path to your Convex
               playground module.
             </span>
           </div>
-          <h3 className="text-xl font-bold mb-1 text-foreground">API Key</h3>
+          <h3 className="text-xl font-bold mb-1 text-foreground">
+            API Key {apiKeyValid ? "✅ " : "❌ "}
+          </h3>
           <div className="text-muted-foreground text-sm mb-2">
             To use the Playground, you need an API key. After setting up the
             agent in your app, run this command in your project directory (CLI
@@ -189,12 +200,12 @@ function ApiKeyGate({
           <input
             className="border border-input rounded-lg px-4 py-3 text-base font-mono bg-muted focus:outline-none focus:ring-2 focus:ring-blue-500 transition w-full min-w-0"
             type="password"
-            autoComplete="new-password"
+            autoComplete="current-password"
             name="api-key"
-            id="api-key"
-            value={inputValue}
+            id="agent-playground-api-key"
+            value={apiKeyInput}
             onChange={(e) =>
-              setInputValue(
+              setApiKeyInput(
                 e.target.value
                   .trim()
                   .replace(/^['"]|['"]$/g, "")
@@ -203,7 +214,6 @@ function ApiKeyGate({
             }
             placeholder="API Key"
             autoFocus
-            disabled={loading}
           />
           {error && (
             // we want to show the error in a code block
@@ -213,6 +223,14 @@ function ApiKeyGate({
               </pre>
             </div>
           )}
+          <Button
+            type="submit"
+            variant="default"
+            className="bg-blue-500 text-white rounded-lg px-4 py-2 transition-colors hover:bg-blue-600"
+            disabled={!apiPath || !apiKeyValid}
+          >
+            Submit
+          </Button>
         </form>
       </div>
     );
