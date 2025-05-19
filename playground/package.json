@@ -1,14 +1,14 @@
 {
   "name": "@convex-dev/agent-playground",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
-    "alpha": "V=`npm version prerelease --preid alpha` && git add package-lock.json && git add package.json && git commit -m $V && git tag playground/$V && npm publish --tag alpha && git push --tags",
-    "release": "V=`npm version patch` && git add package-lock.json && git add package.json && git commit -m $V && git tag playground/$V && npm publish && git push --tags",
+    "alpha": "rm -rf dist && npm run build && V=`npm version prerelease --preid alpha` && git add package-lock.json && git add package.json && git commit -m $V && git tag playground/$V && npm publish --tag alpha && git push --tags",
+    "release": "rm -rf dist && npm run build && V=`npm version patch` && git add package-lock.json && git add package.json && git commit -m $V && git tag playground/$V && npm publish && git push --tags",
     "preview": "vite preview"
   },
   "bin": {
@@ -20,14 +20,8 @@
   },
   "files": [
     "dist",
-    "public",
     "src",
-    "bin",
-    "components.json",
-    "index.html",
-    "postcss.config.js",
-    "tailwind.config.ts",
-    "vite.config.ts"
+    "bin"
   ],
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",
