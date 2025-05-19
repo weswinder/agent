@@ -19,6 +19,7 @@
     "./ui/*.tsx": "./src/*.tsx"
   },
   "files": [
+    "dist",
     "public",
     "src",
     "bin",
