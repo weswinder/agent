@@ -21,6 +21,9 @@ const MessageList: React.FC<MessageListProps> = ({
     null
   );
   const uiMessages = useMemo(() => {
+    // TODO: segment the messages by "order" so the message item can show all of
+    // the messages that have been grouped together. Right now you can only see
+    // the latest message in the group / send messages to it.
     const uiMessages = toUIMessages([...messages].reverse());
     return uiMessages.map((uiMessage) => {
       const message =
