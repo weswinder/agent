@@ -7,6 +7,7 @@
 AI Agent framework built on Convex.
 
 - Automatic storage of chat history, per-user or per-thread, that can span multiple agents.
+- Playground UI for testing, debugging, and development. See [playground/README.md](playground/README.md) for more.
 - RAG for chat context, via hybrid text & vector search, with configuration options.
   Use the API to query the history yourself and do it your way.
 - Opt-in search for messages from other threads (for the same specified user).
@@ -384,6 +385,15 @@ await ctx.runMutation(components.agent.threads.updateThread, {
   { title, summary, status }
 });
 ```
+
+## Using the Playground UI
+
+The Playground UI is a simple way to test, debug, and develop with the agent.
+- First configure it with instructions [here](./playground/README.md).
+- Then you can use the [hosted version on GitHub pages](https://get-convex.github.io/agent/)
+or run it locally with `npx @convex-dev/agent-playground`.
+
+[Playground UI Screenshot](./playground/screenshot.png)
 
 ## Using the Workflow component for long-lived durable workflows
 
