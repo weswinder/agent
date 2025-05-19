@@ -31,10 +31,10 @@ function ConvexProviderGate({ children }: { children: ReactNode }) {
     return null;
   }, [encodedUrl]);
 
-  // 2. inputValue initially reflects the current url param / session storage
+  // 2. inputValue initially reflects the current url param / localStorage
   const [inputValue, setInputValue] = useState(() => {
     if (deploymentUrl) return deploymentUrl;
-    const stored = sessionStorage.getItem(DEPLOYMENT_URL_STORAGE_KEY);
+    const stored = localStorage.getItem(DEPLOYMENT_URL_STORAGE_KEY);
     return stored ?? "";
   });
   useEffect(() => {
@@ -77,7 +77,7 @@ function ConvexProviderGate({ children }: { children: ReactNode }) {
           setError(null);
           setLoading(false);
           setIsValid(true);
-          sessionStorage.setItem(DEPLOYMENT_URL_STORAGE_KEY, deploymentUrl);
+          localStorage.setItem(DEPLOYMENT_URL_STORAGE_KEY, deploymentUrl);
         })
         .catch(() => {
           setInstanceName(null);
