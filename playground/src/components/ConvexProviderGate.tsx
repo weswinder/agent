@@ -1,10 +1,8 @@
 import { useState, useEffect, ReactNode, useMemo } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import { ConvexProvider, ConvexReactClient } from "convex/react";
 
 const DEPLOYMENT_URL_STORAGE_KEY = "playground_deployment_url";
-const DEPLOYMENT_URL_ENV = import.meta.env.VITE_CONVEX_URL as
-  | string
-  | undefined;
 
 function isValidHttpUrl(url: string): boolean {
   try {
@@ -16,81 +14,106 @@ function isValidHttpUrl(url: string): boolean {
 }
 
 function ConvexProviderGate({ children }: { children: ReactNode }) {
-  const [deploymentUrl, setDeploymentUrl] = useState<string | null>(
-    DEPLOYMENT_URL_ENV
-  );
-  const [inputValue, setInputValue] = useState("");
+  const navigate = useNavigate();
+  const { url: encodedUrl } = useParams();
+
+  console.log("encodedUrl", encodedUrl);
+  // 1. deploymentUrl always reflects the decoded url param (or null)
+  const deploymentUrl = useMemo(() => {
+    if (encodedUrl) {
+      try {
+        return decodeURIComponent(encodedUrl).replace(/\/$/, "");
+      } catch (e) {
+        console.error("Error decoding url", encodedUrl, e);
+        return null;
+      }
+    }
+    return null;
+  }, [encodedUrl]);
+
+  // 2. inputValue initially reflects the current url param / session storage
+  const [inputValue, setInputValue] = useState(() => {
+    if (deploymentUrl) return deploymentUrl;
+    const stored = sessionStorage.getItem(DEPLOYMENT_URL_STORAGE_KEY);
+    return stored ?? "";
+  });
+  useEffect(() => {
+    if (deploymentUrl) setInputValue(deploymentUrl);
+  }, [deploymentUrl]);
+
   const [instanceName, setInstanceName] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-
-  const convex = useMemo(
-    () => deploymentUrl && new ConvexReactClient(deploymentUrl),
-    [deploymentUrl]
+  // Optimistically pass through the original deploymentUrl if set.
+  const [isValid, setIsValid] = useState(
+    !!deploymentUrl && isValidHttpUrl(deploymentUrl)
   );
 
-  // On mount, check sessionStorage and env
+  // 2. Debounced async validation of deploymentUrl
   useEffect(() => {
-    if (deploymentUrl) return;
-    const storedUrl = sessionStorage.getItem(DEPLOYMENT_URL_STORAGE_KEY);
-    if (storedUrl) {
-      setDeploymentUrl(storedUrl);
-      setInputValue(storedUrl);
-    } else if (DEPLOYMENT_URL_ENV) {
-      setInputValue(DEPLOYMENT_URL_ENV);
-    }
-  }, []);
-
-  // Debounced validation effect
-  useEffect(() => {
-    if (deploymentUrl) return;
-    if (!inputValue) {
+    if (!deploymentUrl) {
+      setIsValid(false);
       setInstanceName(null);
       setError(null);
       setLoading(false);
       return;
     }
-    if (!isValidHttpUrl(inputValue)) {
+    if (!isValidHttpUrl(deploymentUrl)) {
+      setIsValid(false);
       setInstanceName(null);
       setError(null);
       setLoading(false);
-      setDeploymentUrl(null);
-      sessionStorage.removeItem(DEPLOYMENT_URL_STORAGE_KEY);
       return;
     }
     setLoading(true);
-    let cancelled = false;
+    setInstanceName(null);
+    setError(null);
     const handler = setTimeout(() => {
-      const url = inputValue.trim().replace(/\/$/, "");
-      fetch(url + "/instance_name")
+      fetch(deploymentUrl + "/instance_name")
         .then(async (res) => {
-          if (cancelled) return;
           if (!res.ok) throw new Error("Invalid response");
           const name = await res.text();
           setInstanceName(name);
           setError(null);
           setLoading(false);
-          setDeploymentUrl(url);
-          sessionStorage.setItem(DEPLOYMENT_URL_STORAGE_KEY, url);
+          setIsValid(true);
+          sessionStorage.setItem(DEPLOYMENT_URL_STORAGE_KEY, deploymentUrl);
         })
         .catch(() => {
-          if (cancelled) return;
           setInstanceName(null);
           setError(
             "Could not validate deployment URL. Please check the URL and try again."
           );
           setLoading(false);
-          setDeploymentUrl(null);
-          sessionStorage.removeItem(DEPLOYMENT_URL_STORAGE_KEY);
+          setIsValid(false);
         });
     }, 400);
-    return () => {
-      cancelled = true;
-      clearTimeout(handler);
-    };
-  }, [inputValue, deploymentUrl]);
+    return () => clearTimeout(handler);
+  }, [deploymentUrl]);
 
-  if (!deploymentUrl) {
+  // 4. When user enters a new URL, update the path (which will trigger validation)
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setInputValue(e.target.value.trim());
+  };
+  const handleInputBlur = () => {
+    if (inputValue && isValidHttpUrl(inputValue)) {
+      navigate(`/play/${encodeURIComponent(inputValue.replace(/\/$/, ""))}`);
+    }
+  };
+  const handleInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter" && inputValue && isValidHttpUrl(inputValue)) {
+      navigate(`/play/${encodeURIComponent(inputValue.replace(/\/$/, ""))}`);
+    }
+  };
+
+  // 3. Only show children if isValid is true
+  const convex = useMemo(
+    () =>
+      isValid && deploymentUrl ? new ConvexReactClient(deploymentUrl) : null,
+    [isValid, deploymentUrl]
+  );
+
+  if (!deploymentUrl || !isValid || !convex) {
     return (
       <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-60 z-50">
         <div
@@ -107,7 +130,9 @@ function ConvexProviderGate({ children }: { children: ReactNode }) {
             className="border border-input rounded-lg px-4 py-2 text-base font-mono bg-muted focus:outline-none focus:ring-2 focus:ring-blue-500 transition w-full min-w-0"
             type="text"
             value={inputValue}
-            onChange={(e) => setInputValue(e.target.value.trim())}
+            onChange={handleInputChange}
+            onBlur={handleInputBlur}
+            onKeyDown={handleInputKeyDown}
             placeholder="https://<your-convex>.cloud"
             autoFocus
           />

@@ -12,22 +12,31 @@ const App = () => {
     <TooltipProvider>
       <Toaster />
       <Sonner />
-      <ConvexProviderGate>
-        <BrowserRouter>
-          <Routes>
-            <Route
-              path="/"
-              element={
+      <BrowserRouter>
+        <Routes>
+          <Route
+            path="/play/:url"
+            element={
+              <ConvexProviderGate>
                 <ApiKeyGate>
                   {(apiKey, api) => <Index apiKey={apiKey} api={api} />}
                 </ApiKeyGate>
-              }
-            />
-            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </BrowserRouter>
-      </ConvexProviderGate>
+              </ConvexProviderGate>
+            }
+          />
+          <Route
+            path="/"
+            element={
+              <ConvexProviderGate>
+                <ApiKeyGate>
+                  {(apiKey, api) => <Index apiKey={apiKey} api={api} />}
+                </ApiKeyGate>
+              </ConvexProviderGate>
+            }
+          />
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </BrowserRouter>
     </TooltipProvider>
   );
 };
