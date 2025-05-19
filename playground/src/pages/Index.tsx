@@ -4,9 +4,7 @@ import MiddlePanel from "@/components/MiddlePanel";
 import RightPanel from "@/components/RightPanel";
 import { useToast } from "@/components/ui/use-toast";
 import { usePaginatedQuery, useQuery, useAction } from "convex/react";
-import { assert } from "convex-helpers";
 import type { PlaygroundAPI } from "@convex-dev/agent/playground";
-import { anyApi } from "convex/server";
 import { ContextMessage, Thread } from "@/types";
 import { ContextOptions, StorageOptions } from "@convex-dev/agent";
 

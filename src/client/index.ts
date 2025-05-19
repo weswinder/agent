@@ -74,11 +74,14 @@ import schema from "../component/schema.js";
 export { extractText, isTool };
 export type { Usage, ProviderMetadata };
 export {
+  paginationResultValidator,
+  vContextOptions,
   vUsage,
   vProviderMetadata,
   vUserMessage,
   vAssistantMessage,
   vToolMessage,
+  vStorageOptions,
   vSystemMessage,
   vMessage,
 } from "../validators.js";
@@ -169,9 +172,11 @@ export type UsageHandler = (
   }
 ) => void | Promise<void>;
 
+export type AgentComponent = UseApi<Mounts>;
+
 export class Agent<AgentTools extends ToolSet> {
   constructor(
-    public component: UseApi<Mounts>,
+    public component: AgentComponent,
     public options: {
       /**
        * The name for the agent. This will be attributed on each message

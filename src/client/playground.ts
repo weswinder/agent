@@ -7,17 +7,18 @@ import {
   GenericQueryCtx,
   ApiFromModules,
 } from "convex/server";
-import { vMessageDoc, vThreadDoc, type Agent } from "./index";
-import type { RunQueryCtx, UseApi } from "./types";
+import {
+  vMessageDoc,
+  vThreadDoc,
+  paginationResultValidator,
+  vMessage,
+  vContextOptions,
+  vStorageOptions,
+  type AgentComponent,
+  type Agent,
+} from "./index";
 import type { ToolSet } from "ai";
 import { v } from "convex/values";
-import { Mounts } from "../component/_generated/api";
-import {
-  paginationResultValidator,
-  vContextOptions,
-  vMessage,
-  vStorageOptions,
-} from "../validators";
 
 export type PlaygroundAPI = ApiFromModules<{
   playground: ReturnType<typeof definePlaygroundAPI>;
@@ -25,7 +26,7 @@ export type PlaygroundAPI = ApiFromModules<{
 
 // Playground API definition
 export function definePlaygroundAPI(
-  component: UseApi<Mounts>,
+  component: AgentComponent,
   {
     agents,
     userNameLookup,
@@ -252,3 +253,5 @@ export function definePlaygroundAPI(
     fetchPromptContext,
   };
 }
+
+type RunQueryCtx = { runQuery: GenericQueryCtx<GenericDataModel>["runQuery"] };
