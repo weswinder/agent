@@ -70,6 +70,7 @@ It uses the `VITE_CONVEX_URL` env variable, usually pulling it from .env.local.
 
 ## Feature wishlist (contributions welcome!)
 
+- Show threads that aren't associated with a user as "no user" in the dropdown.
 - Constrict the message sending to be using the context of the selected message.
   It currently sends as if it were at the end of the thread.
 - Show the contextual messages with their rank in vector & text search, to get
