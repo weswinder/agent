@@ -12,6 +12,8 @@ This is a playground for @convex-dev/agent.
 - Send a message to the thread, with configurable saving options.
 - It uses api keys to communicate securely with the backend.
 
+There is also a [hosted version here](https://get-convex.github.io/agent/).
+
 # Setup
 
 ```sh
