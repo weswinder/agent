@@ -111,7 +111,7 @@ export default app;
 
 ## Usage
 
-### Configuring the agent
+### Creating the agent
 
 ```ts
 import { tool } from "ai";
@@ -124,8 +124,6 @@ import { components } from "./_generated/api";
 const supportAgent = new Agent(components.agent, {
   // The chat completions model to use for the agent.
   chat: openai.chat("gpt-4o-mini"),
-  // Embedding model to power vector search of message history (RAG).
-  textEmbedding: openai.embedding("text-embedding-3-small"),
   // The default system prompt if not overriden.
   instructions: "You are a helpful assistant.",
   tools: {
@@ -141,52 +139,20 @@ const supportAgent = new Agent(components.agent, {
       },
     }),
   },
-  // Used for fetching context messages. Values shown are the defaults.
-  contextOptions: {
-    // Whether to include tool messages in the context.
-    includeToolCalls: false,
-    // How many recent messages to include. These are added after the search
-    // messages, and do not count against the search limit.
-    recentMessages: 100,
-    // Options for searching messages via text and/or vector search.
-    searchOptions: {
-      limit: 10, // The maximum number of messages to fetch.
-      textSearch: false, // Whether to use text search to find messages.
-      vectorSearch: false, // Whether to use vector search to find messages.
-      // Note, this is after the limit is applied.
-      // E.g. this will quadruple the number of messages fetched.
-      // (two before, and one after each message found in the search)
-      messageRange: { before: 2, after: 1 },
-    },
-    // Whether to search across other threads for relevant messages.
-    // By default, only the current thread is searched.
-    searchOtherThreads: false,
-  },
-  // Used for storing messages.
-  storageOptions: {
-    // When false, allows you to pass in arbitrary context that will
-    // be in addition to automatically fetched content.
-    // Pass true to have all input messages saved to the thread history.
-    saveAllInputMessages: false,
-    // By default it saves the input message, or the last message if multiple are provided.
-    saveAnyInputMessages: true,
-    // Save the generated messages to the thread history.
-    saveOutputMessages: true,
-  },
+  // Embedding model to power vector search of message history (RAG).
+  textEmbedding: openai.embedding("text-embedding-3-small"),
+  // Used for fetching context messages. See [below](#configuring-the-context-of-messages)
+  contextOptions,
+  // Used for storing messages. See [below](#configuring-the-storage-of-messages)
+  storageOptions,
   // Used for limiting the number of steps when tool calls are involved.
+  // NOTE: if you want tool calls to happen automatically with a single call,
+  // you need to set this to something greater than 1 (the default).
   maxSteps: 1,
-  // Used for limiting the number of retries when a tool call fails.
+  // Used for limiting the number of retries when a tool call fails. Default: 3.
   maxRetries: 3,
-  // Used for tracking token usage.
-  usageHandler: async (ctx, args) => {
-    const {
-      // Who used the tokens
-      userId, threadId, agentName,
-      // What LLM was used
-      model, provider,
-      // How many tokens were used (extra info is available in providerMetadata)
-      usage, providerMetadata
-    } = args;
+  // Used for tracking token usage. See [below](#tracking-token-usage)
+  usageHandler: async (ctx, { model, usage }) => {
     // ... log, save usage to your database, etc.
   },
 });
@@ -231,28 +197,87 @@ export const continueThread = action({
 });
 ```
 
-### Sending a message with configurable message history context
+### Generating text
 
-You can customize what history is included per-message via `contextOptions`.
-See the [configuring the agent](#configuring-the-agent) section for details.
+The arguments to `generateText` are the same as the AI SDK, except you don't
+have to provide a model. By default it will use the agent's chat model.
 
 ```ts
-const result = await thread.generateText({ prompt }, { contextOptions });
+const { thread } = await supportAgent.createThread(ctx, { userId });
+const result = await thread.generateText({ prompt });
+```
+
+### Generating an object
+
+Similar to the AI SDK, you can generate or streaman object.
+The same arguments apply, except you don't have to provide a model.
+It will use the agent's default chat model.
+
+```ts
+import { z } from "zod";
+
+const result = await thread.generateObject({
+  prompt: "Generate a plan based on the conversation so far",
+  schema: z.object({...}),
+});
+```
+
+
+### Configuring the context of messages
+
+You can customize what history is included per-message via `contextOptions`.
+These options can be provided to the Agent constructor, or per-message.
+
+```ts
+const result = await thread.generateText({ prompt }, {
+  // Values shown are the defaults.
+  contextOptions: {
+    // Whether to include tool messages in the context.
+    includeToolCalls: false,
+    // How many recent messages to include. These are added after the search
+    // messages, and do not count against the search limit.
+    recentMessages: 100,
+    // Options for searching messages via text and/or vector search.
+    searchOptions: {
+      limit: 10, // The maximum number of messages to fetch.
+      textSearch: false, // Whether to use text search to find messages.
+      vectorSearch: false, // Whether to use vector search to find messages.
+      // Note, this is after the limit is applied.
+      // E.g. this will quadruple the number of messages fetched.
+      // (two before, and one after each message found in the search)
+      messageRange: { before: 2, after: 1 },
+    },
+    // Whether to search across other threads for relevant messages.
+    // By default, only the current thread is searched.
+    searchOtherThreads: false,
+  },
 ```
 
 ### Configuring the storage of messages
 
-See the [configuring the agent](#configuring-the-agent) section for details.
 Generally the defaults are fine, but if you want to pass in multiple messages
 and have them all saved (vs. just the last one), or avoid saving any input
-or output messages, you can pass in a `storageOptions` object.
+or output messages, you can pass in a `storageOptions` object, either to the
+Agent constructor or per-message.
 
 The usecase for passing multiple messages is if you want to include some extra
 messages for context to the LLM, but only the last message is the user's actual
 request. e.g. `messages = [...messagesFromRag, messageFromUser]`.
 
 ```ts
-const result = await thread.generateText({ messages }, { storageOptions });
+const result = await thread.generateText({ messages }, {
+  // The default values are shown below.
+  storageOptions: {
+    // When false, allows you to pass in arbitrary context that will
+    // be in addition to automatically fetched content.
+    // Pass true to have all input messages saved to the thread history.
+    saveAllInputMessages: false,
+    // By default it saves the input message, or the last message if multiple are provided.
+    saveAnyInputMessages: true,
+    // Save the generated messages to the thread history.
+    saveOutputMessages: true,
+  },
+});
 ```
 
 ### Creating a tool with Convex context
@@ -319,12 +344,14 @@ const messages: MessageDoc[] = await ctx.runQuery(
 
 This is what the agent does automatically, but it can be useful to do manually, e.g. to find custom context to include.
 
-Fetch CoreMessages (e.g. `{ role, content }`) for a user and/or thread.
+Fetch Messages for a user and/or thread.
 Accepts ContextOptions, e.g. includeToolCalls, searchOptions, etc.
 If you provide a `beforeMessageId`, it will only fetch messages from before that message.
 
 ```ts
-const coreMessages = await supportAgent.fetchContextMessages(ctx, {
+import type { MessageDoc } from "@convex-dev/agent";
+
+const messages: MessageDoc[] = await supportAgent.fetchContextMessages(ctx, {
   threadId, messages: [{ role, content }], contextOptions
 });
 ```
@@ -508,27 +535,21 @@ See an example in
 [this demo](https://github.com/ianmacartney/ai-agent-chat/blob/main/convex/chat.ts)
 that captures usage to a table, then scans it to generate per-user invoices.
 
+You can provide a `usageHandler` to the agent, per-thread, or per-message.
+
 ```ts
 const supportAgent = new Agent(components.agent, {
   ...
   usageHandler: async (ctx, args) => {
-    const { userId, threadId, agentName } = args;
-    const { model, provider, usage, providerMetadata } = args;
-    // ... save usage to your database, etc.
-  },
-});
-// or when creating/continuing a thread:
-const { thread } = await supportAgent.createThread(ctx, {
-  ...
-  usageHandler: async (ctx, args) => {
-    // ...
-  },
-});
-// or when generating text:
-const result = await thread.generateText({
-  ...
-  usageHandler: async (ctx, args) => {
-    // ...
+    const {
+      // Who used the tokens
+      userId, threadId, agentName,
+      // What LLM was used
+      model, provider,
+      // How many tokens were used (extra info is available in providerMetadata)
+      usage, providerMetadata
+    } = args;
+    // ... log, save usage to your database, etc.
   },
 });
 ```
