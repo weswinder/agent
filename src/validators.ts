@@ -138,6 +138,8 @@ const vToolResultPart = v.object({
   toolCallId: v.string(),
   toolName: v.string(),
   result: v.any(),
+  // This is only here b/c steps include it in toolResults
+  // Normal CoreMessage doesn't have this
   args: v.optional(v.any()),
   experimental_content: v.optional(vToolResultContent),
   isError: v.optional(v.boolean()),
