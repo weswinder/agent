@@ -1749,7 +1749,7 @@ export function toUIMessages(messages: MessageDoc[]): UIMessage[] {
   const uiMessages: UIMessage[] = [];
   let assistantMessage: UIMessage | undefined;
   for (const message of messages) {
-    const coreMessage = message.message;
+    const coreMessage = message.message && deserializeMessage(message.message);
     const text = message.text ?? "";
     const content = coreMessage?.content;
     const nonStringContent =
@@ -1786,11 +1786,7 @@ export function toUIMessages(messages: MessageDoc[]): UIMessage[] {
         );
         continue;
       }
-      if (
-        !assistantMessage ||
-        (coreMessage.role === "assistant" &&
-          !nonStringContent.find((part) => part.type === "tool-call"))
-      ) {
+      if (!assistantMessage) {
         assistantMessage = {
           id: message.id ?? message._id,
           createdAt: new Date(message._creationTime),
@@ -1800,6 +1796,8 @@ export function toUIMessages(messages: MessageDoc[]): UIMessage[] {
         };
         uiMessages.push(assistantMessage);
       }
+      // update it to the last message's id
+      assistantMessage.id = message.id ?? message._id;
       if (message.text) {
         assistantMessage.parts.push({
           type: "text",
@@ -1852,7 +1850,7 @@ export function toUIMessages(messages: MessageDoc[]): UIMessage[] {
               state: "result",
               toolCallId: contentPart.toolCallId,
               toolName: contentPart.toolName,
-              args: contentPart.args ?? call?.toolInvocation.args,
+              args: call?.toolInvocation.args,
               result: contentPart.result,
               step:
                 call?.toolInvocation.step ??
@@ -1875,6 +1873,10 @@ export function toUIMessages(messages: MessageDoc[]): UIMessage[] {
             break;
           }
         }
+      }
+      if (!message.tool) {
+        // Reset it so the next set of tool calls will create a new assistant message
+        assistantMessage = undefined;
       }
     }
   }
