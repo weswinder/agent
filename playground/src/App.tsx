@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { ConvexReactClient, ConvexProvider, useQuery } from "convex/react";
+import { ConvexReactClient, ConvexProvider, useConvex } from "convex/react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
@@ -26,6 +26,9 @@ function ApiKeyGate({
   const [apiPathInput, setApiPathInput] = useState("playground");
   const [copied, setCopied] = useState(false);
   const [touched, setTouched] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const convex = useConvex();
 
   useEffect(() => {
     const storedKey = sessionStorage.getItem(API_KEY_STORAGE_KEY);
@@ -43,19 +46,56 @@ function ApiKeyGate({
     .split("/")
     .reduce((acc, part) => acc[part], anyApi) as unknown as PlaygroundAPI;
 
-  // Validate API key if set
-  const isValid = useQuery(api.isApiKeyValid, apiKey ? { apiKey } : "skip");
-
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (inputValue.trim()) {
-      sessionStorage.setItem(API_KEY_STORAGE_KEY, inputValue.trim());
+    setError(null);
+    setTouched(true);
+    setLoading(true);
+    // Construct API object from input
+    const nextApi = apiPathInput
+      .trim()
+      .split("/")
+      .reduce((acc, part) => acc[part], anyApi) as unknown as PlaygroundAPI;
+    try {
+      const isValid = await convex.query(nextApi.isApiKeyValid, {
+        apiKey: inputValue,
+      });
+      if (!isValid) {
+        setError("Invalid API key for this playground path.");
+        setLoading(false);
+        return;
+      }
+      // Save and proceed
+      sessionStorage.setItem(API_KEY_STORAGE_KEY, inputValue);
+      sessionStorage.setItem(API_PATH_STORAGE_KEY, apiPathInput);
       setApiKey(inputValue);
-      setTouched(true);
-    }
-    if (apiPathInput.trim()) {
-      sessionStorage.setItem(API_PATH_STORAGE_KEY, apiPathInput.trim());
-      setApiPath(apiPathInput.trim());
+      setApiPath(apiPathInput);
+      setError(null);
+      setLoading(false);
+    } catch (err) {
+      setError(
+        "Invalid playground path (could not find isApiKeyValid). Please check the path and try again." +
+          "e.g. if you exported the API in convex/foo/playground.ts, it would be foo/playground." +
+          " The code there should be:\n" +
+          `
+import { definePlaygroundAPI } from "@convex-dev/agent/playground";
+import { components } from "./_generated/api";
+import { weatherAgent, fashionAgent } from "./example";
+
+export const {
+  isApiKeyValid,
+  listAgents,
+  listUsers,
+  listThreads,
+  listMessages,
+  createThread,
+  generateText,
+  fetchPromptContext,
+} = definePlaygroundAPI(components.agent, {
+  agents: [weatherAgent, fashionAgent],
+});`
+      );
+      setLoading(false);
     }
   };
 
@@ -65,7 +105,7 @@ function ApiKeyGate({
     setTimeout(() => setCopied(false), 1200);
   };
 
-  if (!apiKey || !isValid) {
+  if (!apiKey) {
     return (
       <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-60 z-50">
         <form
@@ -135,12 +175,13 @@ function ApiKeyGate({
               setInputValue(
                 e.target.value
                   .trim()
-                  .replace(/^["']|["']$/g, "")
+                  .replace(/^['"]|['"]$/g, "")
                   .trim()
               )
             }
             placeholder="API Key"
             autoFocus
+            disabled={loading}
           />
           <div className="flex flex-col gap-2">
             <label className="text-sm font-medium text-foreground">
@@ -152,23 +193,29 @@ function ApiKeyGate({
               value={apiPathInput}
               onChange={(e) => setApiPathInput(e.target.value.trim())}
               placeholder="playground"
+              disabled={loading}
             />
             <span className="text-xs text-muted-foreground">
               Usually <code>playground</code>, or the path to your Convex
               playground module.
             </span>
           </div>
-          {touched && apiKey && isValid === false && (
-            <div className="text-red-600 text-sm font-medium mt-2">
-              Invalid API key for this playground path. Please check and try
-              again.
+          {error && (
+            // we want to show the error in a code block
+            <div className="text-red-600 text-sm  font-medium mt-2">
+              <pre className="bg-gray-900 text-white rounded-md p-3 pr-14 text-xs overflow-x-auto border border-gray-800 font-mono select-all">
+                {error}
+              </pre>
             </div>
           )}
           <button
             type="submit"
-            className="bg-blue-600 text-white rounded-lg px-4 py-2 font-medium hover:bg-blue-700 transition mt-2 shadow"
+            className={`bg-blue-600 text-white rounded-lg px-4 py-2 font-medium hover:bg-blue-700 transition mt-2 shadow ${
+              loading || !inputValue.length ? "opacity-50" : ""
+            }`}
+            disabled={loading || !inputValue.length}
           >
-            Save
+            {loading ? "Validating..." : "Save"}
           </button>
         </form>
       </div>
