@@ -2,6 +2,8 @@
 
 This is a playground for @convex-dev/agent.
 
+![Playground Screenshot](./screenshot.png)
+
 - Pick a user to list their threads.
 - Browse the user's threads.
 - List the selected thread's messages, along with tool call details.
