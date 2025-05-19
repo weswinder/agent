@@ -6,7 +6,22 @@ import { anyApi } from "convex/server";
 const API_KEY_STORAGE_KEY = "playground_api_key";
 const API_PATH_STORAGE_KEY = "playground_api_path";
 const CLI_COMMAND = `npx convex run --component agent apiKeys:issue '{name: "..."}'`;
+const PLAYGROUND_CODE = `
+import { definePlaygroundAPI } from "@convex-dev/agent/playground";
+import { components } from "./_generated/api";
+import { weatherAgent, fashionAgent } from "./example";
 
+export const {
+  isApiKeyValid,
+  listAgents,
+  listUsers,
+  listThreads,
+  listMessages,
+  createThread,
+  generateText,
+  fetchPromptContext,
+} = definePlaygroundAPI(components.agent, { agents: [weatherAgent, fashionAgent] });
+`;
 function ApiKeyGate({
   children,
 }: {
@@ -69,7 +84,7 @@ function ApiKeyGate({
         "Invalid playground path (could not find isApiKeyValid). Please check the path and try again." +
           "e.g. if you exported the API in convex/foo/playground.ts, it would be foo/playground." +
           " The code there should be:\n" +
-          `\nimport { definePlaygroundAPI } from "@convex-dev/agent/playground";\nimport { components } from "./_generated/api";\nimport { weatherAgent, fashionAgent } from "./example";\n\nexport const {\n  isApiKeyValid,\n  listAgents,\n  listUsers,\n  listThreads,\n  listMessages,\n  createThread,\n  generateText,\n  fetchPromptContext,\n} = definePlaygroundAPI(components.agent, {\n  agents: [weatherAgent, fashionAgent],\n});`
+          PLAYGROUND_CODE
       );
       setLoading(false);
     }
