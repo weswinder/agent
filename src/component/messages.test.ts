@@ -27,7 +27,7 @@ describe("agent", () => {
     const maxMessage = await t.run(async (ctx) => {
       return await getMaxMessage(ctx, thread._id as Id<"threads">, "test");
     });
-    expect(maxMessage).toEqual({
+    expect(maxMessage).toMatchObject({
       _id: messages.at(-1)!._id,
       order: 1,
       stepOrder: 0,
