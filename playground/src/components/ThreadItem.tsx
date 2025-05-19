@@ -1,7 +1,6 @@
-
-import React from 'react';
-import { format, formatDistanceToNow } from 'date-fns';
-import { Thread } from '../types';
+import React from "react";
+import { format, formatDistanceToNow } from "date-fns";
+import { Thread } from "../types";
 
 interface ThreadItemProps {
   thread: Thread;
@@ -9,7 +8,11 @@ interface ThreadItemProps {
   onClick: () => void;
 }
 
-const ThreadItem: React.FC<ThreadItemProps> = ({ thread, isSelected, onClick }) => {
+const ThreadItem: React.FC<ThreadItemProps> = ({
+  thread,
+  isSelected,
+  onClick,
+}) => {
   const createdDate = new Date(thread._creationTime);
   const updatedDate = new Date(thread.lastMessageAt ?? thread._creationTime);
 

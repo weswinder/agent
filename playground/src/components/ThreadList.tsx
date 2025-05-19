@@ -1,9 +1,8 @@
-
-import React from 'react';
+import React from "react";
 import { Button } from "@/components/ui/button";
 import { ArrowDown } from "lucide-react";
-import ThreadItem from './ThreadItem';
-import { Thread } from '../types';
+import ThreadItem from "./ThreadItem";
+import { Thread } from "../types";
 
 interface ThreadListProps {
   threads: Thread[];

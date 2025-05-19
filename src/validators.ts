@@ -340,7 +340,7 @@ export const vContextOptionsSearchOptions = v.object({
 });
 
 export const vContextOptions = v.object({
-  includeToolCalls: v.optional(v.boolean()),
+  excludeToolMessages: v.optional(v.boolean()),
   recentMessages: v.optional(v.number()),
   searchOptions: v.optional(vContextOptionsSearchOptions),
   searchOtherThreads: v.optional(v.boolean()),

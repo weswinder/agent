@@ -26,6 +26,7 @@ const MessageList: React.FC<MessageListProps> = ({
       const message =
         messages.find((message) => message._id === uiMessage.id) ??
         messages.find((m) => m.id === uiMessage.id)!;
+      uiMessage.id = message._id;
       return {
         ...message,
         message: uiMessage,

@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import LeftPanel from "@/components/LeftPanel";
 import MiddlePanel from "@/components/MiddlePanel";
 import RightPanel from "@/components/RightPanel";
@@ -7,7 +7,6 @@ import { usePaginatedQuery, useQuery, useAction } from "convex/react";
 import { assert } from "convex-helpers";
 import type { PlaygroundAPI } from "@convex-dev/agent/playground";
 import { anyApi } from "convex/server";
-import { CoreMessage } from "ai";
 import { ContextMessage, Thread } from "@/types";
 import { ContextOptions, StorageOptions } from "@convex-dev/agent";
 
@@ -34,58 +33,60 @@ const Index = () => {
   >();
   const [contextMessages, setContextMessages] = useState<ContextMessage[]>([]);
 
-  // Users
+  // Convex hooks
   const users = usePaginatedQuery(
     api.listUsers,
     { apiKey },
     { initialNumItems: 20 }
   );
-  React.useEffect(() => {
+  useEffect(() => {
     if (users.results.length > 0 && !selectedUserId) {
       setSelectedUserId(users.results[0]._id);
     }
   }, [users.results, selectedUserId]);
 
-  // Threads
   const threads = usePaginatedQuery(
     api.listThreads,
     selectedUserId ? { apiKey, userId: selectedUserId } : "skip",
     { initialNumItems: 20 }
   );
-  React.useEffect(() => {
+  useEffect(() => {
     if (threads.results.length > 0 && !selectedThreadId) {
       setSelectedThreadId(threads.results[0]._id);
     }
   }, [threads.results, selectedThreadId]);
 
-  // Messages
   const messages = usePaginatedQuery(
     api.listMessages,
     selectedThreadId ? { apiKey, threadId: selectedThreadId } : "skip",
     { initialNumItems: 20 }
   );
-  React.useEffect(() => {
+  useEffect(() => {
     if (messages.results.length > 0 && !selectedMessageId) {
       setSelectedMessageId(messages.results[0].id);
     }
   }, [messages.results, selectedMessageId]);
 
-  // Agents
-  const agents = useQuery(api.listAgents, { apiKey }) || [];
+  const agents = useQuery(api.listAgents, { apiKey });
+  useEffect(() => {
+    if (agents && agents.length > 0 && !selectedAgentName) {
+      setSelectedAgentName(agents[0]);
+    }
+  }, [agents, selectedAgentName]);
+
+  // Convex actions
+  const generateText = useAction(api.generateText);
+  const fetchPromptContext = useAction(api.fetchPromptContext);
 
   // Selected thread and message
   const selectedThread = threads.results.find(
     (thread) => thread._id === selectedThreadId
   );
-
   const selectedMessage = messages.results.find(
     (message) => message._id === selectedMessageId
   );
 
-  // Context fetch (stub for now)
-  // const fetchContext = useAction(api.fetchPromptContext);
-  // const fetchContextMessages = useCallback(async () => { ... });
-
+  // Handlers
   const handleSelectUserId = (userId: string) => {
     setSelectedUserId(userId);
     setSelectedThreadId(undefined);
@@ -99,23 +100,73 @@ const Index = () => {
 
   const handleSelectMessage = (messageId: string) => {
     setSelectedMessageId(messageId);
+    const message = messages.results.find((m) => m._id === messageId);
+    if (message && selectedAgentName !== message?.agentName) {
+      setSelectedAgentName(message?.agentName);
+    }
   };
 
-  const handleSendMessage = (
+  // Fetch context messages
+  const fetchContextMessages = useCallback(
+    async (contextOptions: ContextOptions) => {
+      if (!selectedMessage || !selectedAgentName) {
+        toast({ title: "Select a message and agent first" });
+        return;
+      }
+      try {
+        const context = await fetchPromptContext({
+          apiKey,
+          agentName: selectedAgentName,
+          threadId: selectedThreadId,
+          userId: selectedUserId,
+          messages: [selectedMessage.message],
+          contextOptions,
+          beforeMessageId: selectedMessage._id,
+        });
+        setContextMessages(context);
+      } catch (err) {
+        toast({ title: "Failed to fetch context", description: String(err) });
+      }
+    },
+    [
+      fetchPromptContext,
+      selectedMessage,
+      selectedAgentName,
+      selectedThreadId,
+      selectedUserId,
+      toast,
+    ]
+  );
+
+  // Send message
+  const handleSendMessage = async (
     message: string,
     agentName: string,
     context: ContextOptions,
     storage: StorageOptions
   ) => {
-    console.log("Sending message:", message);
-    console.log("Agent:", agentName);
-    console.log("Context options:", context);
-    console.log("Storage options:", storage);
-
-    toast({
-      title: "(TODO) Message sent",
-      description: "Your message has been sent to the agent.",
-    });
+    if (!selectedThreadId || !selectedUserId) {
+      toast({ title: "Select a thread and user first" });
+      return;
+    }
+    try {
+      const result = await generateText({
+        apiKey,
+        agentName,
+        threadId: selectedThreadId,
+        userId: selectedUserId,
+        prompt: message,
+        contextOptions: context,
+        storageOptions: storage,
+      });
+      toast({
+        title: "Message sent",
+        description: result.text,
+      });
+      // Optionally, refresh messages or update UI here
+    } catch (err) {
+      toast({ title: "Failed to send message", description: String(err) });
+    }
   };
 
   return (
@@ -123,7 +174,6 @@ const Index = () => {
       <div className="bg-secondary p-3 border-b">
         <h1 className="font-bold text-lg">Playground</h1>
       </div>
-
       <div className="flex-grow flex overflow-hidden">
         <div className="w-1/4 h-full">
           <LeftPanel
@@ -137,7 +187,6 @@ const Index = () => {
             canLoadMoreThreads={threads.status === "CanLoadMore"}
           />
         </div>
-
         <div className="w-1/2 h-full border-x">
           <MiddlePanel
             users={users.results}
@@ -147,13 +196,15 @@ const Index = () => {
             selectedThreadTitle={selectedThread?.title}
           />
         </div>
-
         <div className="w-1/4 h-full">
           <RightPanel
             selectedMessage={selectedMessage}
             agents={agents}
             contextMessages={contextMessages}
             onSendMessage={handleSendMessage}
+            selectedAgentName={selectedAgentName}
+            setSelectedAgentName={setSelectedAgentName}
+            fetchContextMessages={fetchContextMessages}
           />
         </div>
       </div>
