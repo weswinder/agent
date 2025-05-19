@@ -46,6 +46,22 @@ export function definePlaygroundAPI(
     await ctx.runQuery(component.apiKeys.validate, { apiKey });
   }
 
+  const isApiKeyValid = queryGeneric({
+    args: {
+      apiKey: v.string(),
+    },
+    handler: async (ctx, args) => {
+      try {
+        await validateApiKey(ctx, args.apiKey);
+        return true;
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      } catch (e) {
+        return false;
+      }
+    },
+    returns: v.boolean(),
+  });
+
   // List all agents
   const listAgents = queryGeneric({
     args: {
@@ -226,6 +242,7 @@ export function definePlaygroundAPI(
   });
 
   return {
+    isApiKeyValid,
     listUsers,
     listThreads,
     listMessages,

@@ -11,6 +11,7 @@ import { weatherAgent, fashionAgent } from "./example";
  * ```
  */
 export const {
+  isApiKeyValid,
   listAgents,
   listUsers,
   listThreads,

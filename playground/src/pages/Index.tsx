@@ -10,16 +10,12 @@ import { anyApi } from "convex/server";
 import { ContextMessage, Thread } from "@/types";
 import { ContextOptions, StorageOptions } from "@convex-dev/agent";
 
-const api = (import.meta.env.VITE_PLAYGROUND_API_PATH as string)
-  .trim()
-  .split("/")
-  .reduce((acc, part) => acc[part], anyApi) as unknown as PlaygroundAPI;
-
 interface IndexProps {
   apiKey: string;
+  api: PlaygroundAPI;
 }
 
-const Index = ({ apiKey }: IndexProps) => {
+const Index = ({ apiKey, api }: IndexProps) => {
   const { toast } = useToast();
   const [selectedUserId, setSelectedUserId] = useState<string | undefined>();
   const [selectedThreadId, setSelectedThreadId] = useState<
@@ -129,6 +125,7 @@ const Index = ({ apiKey }: IndexProps) => {
       }
     },
     [
+      apiKey,
       fetchPromptContext,
       selectedMessage,
       selectedAgentName,
