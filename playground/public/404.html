@@ -2,14 +2,22 @@
 <html>
 
 <head>
-    <meta http-equiv="refresh" content="0; url=/agent/" />
+    <meta charset="utf-8" />
+    <title>Redirecting...</title>
     <script>
-        // For client-side routing fallback
-        var redirect = '/agent' + location.pathname + location.search + location.hash;
-        window.location.replace(redirect);
+                var base = "/agent";
+                var path = location.pathname;
+                // If already at /agent or deeper, redirect to /agent/
+                if (path === base || path.startsWith(base + "/")) {
+                    window.location.replace(base + "/");
+                } else {
+                    window.location.replace(base + path + location.search + location.hash);
+                }
     </script>
 </head>
 
-<body></body>
+<body>
+    Redirecting...
+</body>
 
 </html>

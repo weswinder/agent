@@ -7,12 +7,14 @@ import NotFound from "./pages/NotFound";
 import ApiKeyGate from "@/components/ApiKeyGate";
 import ConvexProviderGate from "@/components/ConvexProviderGate";
 
+const base = import.meta.env.BASE_URL;
+
 const App = () => {
   return (
     <TooltipProvider>
       <Toaster />
       <Sonner />
-      <BrowserRouter>
+      <BrowserRouter basename={base}>
         <Routes>
           <Route
             path="/play/:url"
