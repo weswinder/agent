@@ -83,169 +83,6 @@ export {
   vMessage,
 } from "../validators.js";
 
-export const vThreadDoc = v.object({
-  _id: v.string(),
-  _creationTime: v.number(),
-  userId: v.optional(v.string()), // Unset for anonymous
-  title: v.optional(v.string()),
-  summary: v.optional(v.string()),
-  status: vThreadStatus,
-});
-export type ThreadDoc = Infer<typeof vThreadDoc>;
-
-export const vMessageDoc = v.object({
-  _id: v.string(),
-  _creationTime: v.number(),
-  ...schema.tables.messages.validator.fields,
-  // Overwrite all the types that have a v.id validator
-  // Outside of the component, they are strings
-  threadId: v.string(),
-  parentMessageId: v.optional(v.string()),
-  stepId: v.optional(v.string()),
-  embeddingId: v.optional(v.string()),
-  files: v.optional(v.array(vFileWithStringId)),
-});
-export type MessageDoc = Infer<typeof vMessageDoc>;
-
-type MessageWithMetadata = OpaqueIds<InnerMessageWithMetadata>;
-
-export function toUIMessages(messages: MessageDoc[]): UIMessage[] {
-  const uiMessages: UIMessage[] = [];
-  let assistantMessage: UIMessage | undefined;
-  for (const message of messages) {
-    const coreMessage = message.message;
-    const text = message.text ?? "";
-    const content = coreMessage?.content;
-    const nonStringContent =
-      content && typeof content !== "string" ? content : [];
-    if (!coreMessage) continue;
-    if (coreMessage.role === "system") {
-      uiMessages.push({
-        id: message.id ?? message._id,
-        createdAt: new Date(message._creationTime),
-        role: "system",
-        content: text,
-        parts: [{ type: "text", text }],
-      });
-    } else if (coreMessage.role === "user") {
-      const parts: UIMessage["parts"] = [];
-      if (text) {
-        parts.push({ type: "text", text });
-      }
-      if (message.files) {
-        parts.push(...message.files.map(toUIFilePart));
-      }
-      uiMessages.push({
-        id: message.id ?? message._id,
-        createdAt: new Date(message._creationTime),
-        role: "user",
-        content: message.text ?? "",
-        parts,
-      });
-    } else {
-      if (coreMessage.role === "tool" && !assistantMessage) {
-        console.warn(
-          "Tool message without preceding assistant message.. skipping",
-          message
-        );
-        continue;
-      }
-      if (
-        !assistantMessage ||
-        (coreMessage.role === "assistant" &&
-          !nonStringContent.find((part) => part.type === "tool-call"))
-      ) {
-        assistantMessage = {
-          id: message.id ?? message._id,
-          createdAt: new Date(message._creationTime),
-          role: "assistant",
-          content: message.text ?? "",
-          parts: [],
-        };
-        uiMessages.push(assistantMessage);
-      }
-      if (message.text) {
-        assistantMessage.parts.push({
-          type: "text",
-          text: message.text,
-        });
-        assistantMessage.content += message.text;
-      }
-      if (message.reasoning) {
-        assistantMessage.parts.push({
-          type: "reasoning",
-          reasoning: message.reasoning,
-          details: message.reasoningDetails ?? [],
-        });
-      }
-      for (const source of message.sources ?? []) {
-        assistantMessage.parts.push({
-          type: "source",
-          source,
-        });
-      }
-      for (const file of message.files ?? []) {
-        assistantMessage.parts.push(toUIFilePart(file));
-      }
-      for (const contentPart of nonStringContent) {
-        switch (contentPart.type) {
-          case "tool-call":
-            assistantMessage.parts.push({
-              type: "step-start",
-            });
-            assistantMessage.parts.push({
-              type: "tool-invocation",
-              toolInvocation: {
-                state: "call",
-                step: assistantMessage.parts.filter(
-                  (part) => part.type === "tool-invocation"
-                ).length,
-                toolCallId: contentPart.toolCallId,
-                toolName: contentPart.toolName,
-                args: contentPart.args,
-              },
-            });
-            break;
-          case "tool-result": {
-            const call = assistantMessage.parts.find(
-              (part) =>
-                part.type === "tool-invocation" &&
-                part.toolInvocation.toolCallId === contentPart.toolCallId
-            ) as ToolInvocationUIPart | undefined;
-            const toolInvocation: ToolInvocationUIPart["toolInvocation"] = {
-              state: "result",
-              toolCallId: contentPart.toolCallId,
-              toolName: contentPart.toolName,
-              args: contentPart.args ?? call?.toolInvocation.args,
-              result: contentPart.result,
-              step:
-                call?.toolInvocation.step ??
-                assistantMessage.parts.filter(
-                  (part) => part.type === "tool-invocation"
-                ).length,
-            };
-            if (call) {
-              (call as ToolInvocationUIPart).toolInvocation = toolInvocation;
-            } else {
-              console.warn(
-                "Tool result without preceding tool call.. adding anyways",
-                contentPart
-              );
-              assistantMessage.parts.push({
-                type: "tool-invocation",
-                toolInvocation,
-              });
-            }
-            break;
-          }
-        }
-      }
-    }
-  }
-  return uiMessages;
-}
-
-
 /**
  * Options to configure what messages are fetched as context,
  * automatically with thread.generateText, or directly via search.
@@ -583,7 +420,7 @@ export class Agent<AgentTools extends ToolSet> {
       beforeMessageId?: string;
       contextOptions: ContextOptions | undefined;
     }
-  ): Promise<CoreMessage[]> {
+  ): Promise<MessageDoc[]> {
     assert(args.userId || args.threadId, "Specify userId or threadId");
     // Fetch the latest messages from the thread
     const contextMessages: MessageDoc[] = [];
@@ -626,11 +463,9 @@ export class Agent<AgentTools extends ToolSet> {
       );
       contextMessages.push(...page.filter((m) => !included?.has(m._id)));
     }
-    return contextMessages
-      .sort((a, b) =>
-        a.order === b.order ? a.stepOrder - b.stepOrder : a.order - b.order
-      )
-      .map((m) => deserializeMessage(m.message!));
+    return contextMessages.sort((a, b) =>
+      a.order === b.order ? a.stepOrder - b.stepOrder : a.order - b.order
+    );
   }
 
   /**
@@ -1092,7 +927,10 @@ export class Agent<AgentTools extends ToolSet> {
       args: {
         ...rest,
         system: args.system ?? this.options.instructions,
-        messages: [...contextMessages, ...messages],
+        messages: [
+          ...contextMessages.map((m) => deserializeMessage(m.message!)),
+          ...messages,
+        ],
       } as T,
       messageId,
     };
@@ -1846,4 +1684,166 @@ interface Thread<DefaultTools extends ToolSet> {
   ): Promise<
     StreamObjectResult<DeepPartial<T>, T, never> & ThreadOutputMetadata
   >;
+}
+
+export const vThreadDoc = v.object({
+  _id: v.string(),
+  _creationTime: v.number(),
+  userId: v.optional(v.string()), // Unset for anonymous
+  title: v.optional(v.string()),
+  summary: v.optional(v.string()),
+  status: vThreadStatus,
+});
+export type ThreadDoc = Infer<typeof vThreadDoc>;
+
+export const vMessageDoc = v.object({
+  _id: v.string(),
+  _creationTime: v.number(),
+  ...schema.tables.messages.validator.fields,
+  // Overwrite all the types that have a v.id validator
+  // Outside of the component, they are strings
+  threadId: v.string(),
+  parentMessageId: v.optional(v.string()),
+  stepId: v.optional(v.string()),
+  embeddingId: v.optional(v.string()),
+  files: v.optional(v.array(vFileWithStringId)),
+});
+export type MessageDoc = Infer<typeof vMessageDoc>;
+
+type MessageWithMetadata = OpaqueIds<InnerMessageWithMetadata>;
+
+export function toUIMessages(messages: MessageDoc[]): UIMessage[] {
+  const uiMessages: UIMessage[] = [];
+  let assistantMessage: UIMessage | undefined;
+  for (const message of messages) {
+    const coreMessage = message.message;
+    const text = message.text ?? "";
+    const content = coreMessage?.content;
+    const nonStringContent =
+      content && typeof content !== "string" ? content : [];
+    if (!coreMessage) continue;
+    if (coreMessage.role === "system") {
+      uiMessages.push({
+        id: message.id ?? message._id,
+        createdAt: new Date(message._creationTime),
+        role: "system",
+        content: text,
+        parts: [{ type: "text", text }],
+      });
+    } else if (coreMessage.role === "user") {
+      const parts: UIMessage["parts"] = [];
+      if (text) {
+        parts.push({ type: "text", text });
+      }
+      if (message.files) {
+        parts.push(...message.files.map(toUIFilePart));
+      }
+      uiMessages.push({
+        id: message.id ?? message._id,
+        createdAt: new Date(message._creationTime),
+        role: "user",
+        content: message.text ?? "",
+        parts,
+      });
+    } else {
+      if (coreMessage.role === "tool" && !assistantMessage) {
+        console.warn(
+          "Tool message without preceding assistant message.. skipping",
+          message
+        );
+        continue;
+      }
+      if (
+        !assistantMessage ||
+        (coreMessage.role === "assistant" &&
+          !nonStringContent.find((part) => part.type === "tool-call"))
+      ) {
+        assistantMessage = {
+          id: message.id ?? message._id,
+          createdAt: new Date(message._creationTime),
+          role: "assistant",
+          content: message.text ?? "",
+          parts: [],
+        };
+        uiMessages.push(assistantMessage);
+      }
+      if (message.text) {
+        assistantMessage.parts.push({
+          type: "text",
+          text: message.text,
+        });
+        assistantMessage.content += message.text;
+      }
+      if (message.reasoning) {
+        assistantMessage.parts.push({
+          type: "reasoning",
+          reasoning: message.reasoning,
+          details: message.reasoningDetails ?? [],
+        });
+      }
+      for (const source of message.sources ?? []) {
+        assistantMessage.parts.push({
+          type: "source",
+          source,
+        });
+      }
+      for (const file of message.files ?? []) {
+        assistantMessage.parts.push(toUIFilePart(file));
+      }
+      for (const contentPart of nonStringContent) {
+        switch (contentPart.type) {
+          case "tool-call":
+            assistantMessage.parts.push({
+              type: "step-start",
+            });
+            assistantMessage.parts.push({
+              type: "tool-invocation",
+              toolInvocation: {
+                state: "call",
+                step: assistantMessage.parts.filter(
+                  (part) => part.type === "tool-invocation"
+                ).length,
+                toolCallId: contentPart.toolCallId,
+                toolName: contentPart.toolName,
+                args: contentPart.args,
+              },
+            });
+            break;
+          case "tool-result": {
+            const call = assistantMessage.parts.find(
+              (part) =>
+                part.type === "tool-invocation" &&
+                part.toolInvocation.toolCallId === contentPart.toolCallId
+            ) as ToolInvocationUIPart | undefined;
+            const toolInvocation: ToolInvocationUIPart["toolInvocation"] = {
+              state: "result",
+              toolCallId: contentPart.toolCallId,
+              toolName: contentPart.toolName,
+              args: contentPart.args ?? call?.toolInvocation.args,
+              result: contentPart.result,
+              step:
+                call?.toolInvocation.step ??
+                assistantMessage.parts.filter(
+                  (part) => part.type === "tool-invocation"
+                ).length,
+            };
+            if (call) {
+              (call as ToolInvocationUIPart).toolInvocation = toolInvocation;
+            } else {
+              console.warn(
+                "Tool result without preceding tool call.. adding anyways",
+                contentPart
+              );
+              assistantMessage.parts.push({
+                type: "tool-invocation",
+                toolInvocation,
+              });
+            }
+            break;
+          }
+        }
+      }
+    }
+  }
+  return uiMessages;
 }

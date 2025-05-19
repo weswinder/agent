@@ -23,7 +23,7 @@ export interface ToolCall {
 
 export type Message = MessageDoc;
 
-export type ContextMessage = CoreMessage & {
+export type ContextMessage = MessageDoc & {
   vectorSearchRank?: number;
   textSearchRank?: number;
   hybridSearchRank?: number;

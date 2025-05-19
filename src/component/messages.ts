@@ -384,6 +384,12 @@ export const listMessagesByThreadId = query({
             return qq;
           })
           .order(order)
+          .filterWith(
+            async (m) =>
+              !before ||
+              m.order < before.order ||
+              (m.order === before.order && m.stepOrder < before.stepOrder)
+          )
       )
     );
     const messages = await mergedStream(streams, [
@@ -409,7 +415,6 @@ export const getThreadMessages = query({
   returns: paginationResultValidator(v.doc("messages")),
 });
 
-
 export const searchMessages = action({
   args: {
     userId: v.optional(v.string()),
@@ -428,6 +433,7 @@ export const searchMessages = action({
         threadId: args.threadId,
         text: args.text,
         limit,
+        beforeMessageId: args.beforeMessageId,
       });
     }
     if (args.vector) {
@@ -514,7 +520,10 @@ export const _fetchSearchMessages = internalQuery({
         m !== undefined &&
         m !== null &&
         !m.tool &&
-        (!beforeMessage || m.order <= beforeMessage.order)
+        (!beforeMessage ||
+          m.order < beforeMessage.order ||
+          (m.order === beforeMessage.order &&
+            m.stepOrder < beforeMessage.stepOrder))
     );
     messages.push(...(args.textSearchMessages ?? []));
     // TODO: prioritize more recent messages
@@ -605,9 +614,13 @@ export const textSearch = query({
     userId: v.optional(v.string()),
     text: v.string(),
     limit: v.number(),
+    beforeMessageId: v.optional(v.id("messages")),
   },
   handler: async (ctx, args) => {
     assert(args.userId || args.threadId, "Specify userId or threadId");
+    const beforeMessage =
+      args.beforeMessageId && (await ctx.db.get(args.beforeMessageId));
+    const order = beforeMessage?.order;
     const messages = await ctx.db
       .query("messages")
       .withSearchIndex("text_search", (q) =>
@@ -616,9 +629,21 @@ export const textSearch = query({
           : q.search("text", args.text).eq("threadId", args.threadId!)
       )
       // Just in case tool messages slip through
-      .filter((q) => q.eq(q.field("tool"), false))
+      .filter((q) => {
+        const qq = q.eq(q.field("tool"), false);
+        if (order) {
+          return q.and(qq, q.lte(q.field("order"), order));
+        }
+        return qq;
+      })
       .take(args.limit);
-    return messages;
+    return messages.filter(
+      (m) =>
+        !beforeMessage ||
+        m.order < beforeMessage.order ||
+        (m.order === beforeMessage.order &&
+          m.stepOrder < beforeMessage.stepOrder)
+    );
   },
   returns: v.array(v.doc("messages")),
 });

@@ -1621,7 +1621,13 @@ export type Mounts = {
     textSearch: FunctionReference<
       "query",
       "public",
-      { limit: number; text: string; threadId?: string; userId?: string },
+      {
+        beforeMessageId?: string;
+        limit: number;
+        text: string;
+        threadId?: string;
+        userId?: string;
+      },
       Array<{
         _creationTime: number;
         _id: string;

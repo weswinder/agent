@@ -1797,7 +1797,13 @@ export declare const components: {
       textSearch: FunctionReference<
         "query",
         "internal",
-        { limit: number; text: string; threadId?: string; userId?: string },
+        {
+          beforeMessageId?: string;
+          limit: number;
+          text: string;
+          threadId?: string;
+          userId?: string;
+        },
         Array<{
           _creationTime: number;
           _id: string;

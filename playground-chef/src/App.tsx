@@ -21,7 +21,6 @@ import { anyApi } from "convex/server";
 import { useAction, usePaginatedQuery, useQuery } from "convex/react";
 import { assert } from "convex-helpers";
 import { toast } from "sonner";
-import type { CoreMessage } from "ai";
 dayjs.extend(relativeTime);
 
 const DEFAULT_CONTEXT_OPTIONS: ContextOptions = {
@@ -76,7 +75,7 @@ export default function App() {
   const [storageOptions, setStorageOptions] = useState(
     JSON.stringify(DEFAULT_STORAGE_OPTIONS, null, 2)
   );
-  const [contextMessages, setContextMessages] = useState<CoreMessage[]>([]);
+  const [contextMessages, setContextMessages] = useState<MessageDoc[]>([]);
   const users = usePaginatedQuery(
     api.listUsers,
     { apiKey },
@@ -422,7 +421,7 @@ export default function App() {
                     </span>
                   )} */}
                 </div>
-                <div className="flex-1">{extractText(msg)}</div>
+                <div className="flex-1">{extractText(msg.message!)}</div>
                 <div className="w-20 flex-shrink-0 text-right">
                   {/* {msg.textSearchRank !== null && (
                     <span className="text-blue-600">
