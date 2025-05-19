@@ -19,7 +19,7 @@ interface MessageComposerProps {
     agentName: string,
     context: ContextOptions,
     storage: StorageOptions
-  ) => Promise<void>;
+  ) => Promise<string>;
   contextOptions: ContextOptions;
 }
 
@@ -41,11 +41,11 @@ const MessageComposer: React.FC<MessageComposerProps> = ({
       return;
     }
     setIsSendingMessage(true);
-    onSendMessage(message, agentName, contextOptions, storageOptions).finally(
-      () => {
+    onSendMessage(message, agentName, contextOptions, storageOptions)
+      .then((text) => setResponse(text))
+      .finally(() => {
         setIsSendingMessage(false);
-      }
-    );
+      });
     setResponse(
       "Thank you for your message. The agent is processing your request..."
     );

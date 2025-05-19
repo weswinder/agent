@@ -1,42 +1,75 @@
 # Agent Playground
 
-This is a prototype of the agent playground for @convex-dev/agent.
+This is a playground for @convex-dev/agent.
 
-# etc
+- Pick a user to list their threads.
+- Browse the user's threads.
+- List the selected thread's messages, along with tool call details.
+- Show message metadata details.
+- Experiment with contextual message lookup, adjusting context options.
+- Send a message to the thread, with configurable saving options.
+- It uses api keys to communicate securely with the backend.
 
-Generated on Loveable with this prompt:
+# Setup
 
+```sh
+npm i @convex-dev/agent-playground
 ```
-I want to build a chat admin interface for conversations with one or more LLM agents. It should be Vite with Tailwind and Shadcn, but only a single page app with no server functions or RSC.
 
-On the left panel:
+In your agent Convex project, make a file `convex/playground.ts` with:
 
-- a dropdown to pick users
-- A list of threads for that user with a title, subtitle, greyed out latest message, creation time and last message time (using dayjs)
-- When selected, the chat in the middle panel shows the messages for that channel
-- At the bottom of the list there should be a "load more" button
+```ts
+import { definePlaygroundAPI } from "@convex-dev/agent-playground";
+import { components } from "./_generated/api";
+import { weatherAgent, fashionAgent } from "./example";
 
-On the middle panel:
-
-- A list of messages with either text or image content. each message should be annotated with either a user or bot 🤖indicator - if it's a bot it should show the agent name
-- If the message has tool calls, show them as nested messages with a 🧰 icon, with a dropdown to see the details (the args to the tool call and the return value)
-- On the right of the message there should show how many seconds it took to generate.
-- When a message is selected, the right panel shows the message details
-
-On the right panel:
-
-- The full message object as JSON in a code block
-- A section to send a new message to the agent:
-  - A dropdown to pick the agent
-  - A collapsible section with "Context Options" showing the options as editable JSON with syntax highlighting
-  - A collapsible section with "Storage Options" showing the options as editable JSON with syntax highlighting
-  - A text area to enter the message
-  - A button to send the message
-  - A message section showing the response from the most recent prompt
-- A section to show what context messages were used to generate the response
-  - A list of messages
-  - A column on the left with a checkmark if the message was found with vector search
-    - in parentheses the rank of the message via vector search
-  - A column on the right with a checkmark if the message was found with text search
-    - in parentheses the rank of the message via text search
+/**
+ * Here we expose the API so the frontend can access it.
+ * Authorization is handled by passing up an apiKey that can be generated
+ * on the dashboard or via CLI via:
+ * ```
+ * npx convex run --component agent apiKeys:issue
+ * ```
+ */
+export const {
+  isApiKeyValid,
+  listAgents,
+  listUsers,
+  listThreads,
+  listMessages,
+  createThread,
+  generateText,
+  fetchPromptContext,
+} = definePlaygroundAPI(components.agent, {
+  agents: [weatherAgent, fashionAgent],
+});
 ```
+
+From in your project's repo, issue yourself an API key:
+
+```sh
+npx convex run --component agent apiKeys:issue '{name: "my key"}'
+```
+
+Then run the playground:
+
+```sh
+npx @convex-dev/agent-playground
+```
+
+It uses the `VITE_CONVEX_URL` env variable, usually pulling it from .env.local.
+
+- Enter the API key in the box.
+- If you used a different path for `convex/playground.ts` you can enter it.
+  E.g. if you had `convex/foo/bar.ts` where you exported the playground API,
+  you'd put in `foo/bar`.
+
+## Feature wishlist (contributions welcome!)
+
+- Constrict the message sending to be using the context of the selected message.
+  It currently sends as if it were at the end of the thread.
+- Have an input box for the backend URL, so you don't have to run it from a
+  directory where you have it as a defined env variable.
+- Show the contextual messages with their rank in vector & text search, to get
+  a sense of what is being found via text vs. vector vs. recency search.
+- Send down the agent's default context & storage options to use as the default.

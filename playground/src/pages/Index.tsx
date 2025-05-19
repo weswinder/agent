@@ -4,7 +4,7 @@ import MiddlePanel from "@/components/MiddlePanel";
 import RightPanel from "@/components/RightPanel";
 import { useToast } from "@/components/ui/use-toast";
 import { usePaginatedQuery, useQuery, useAction } from "convex/react";
-import type { PlaygroundAPI } from "@convex-dev/agent/playground";
+import type { PlaygroundAPI } from "../definePlaygroundAPI";
 import { ContextMessage, Thread } from "@/types";
 import { ContextOptions, StorageOptions } from "@convex-dev/agent";
 
@@ -145,7 +145,7 @@ const Index = ({ apiKey, api }: IndexProps) => {
       return;
     }
     try {
-      const result = await generateText({
+      const { text } = await generateText({
         apiKey,
         agentName,
         threadId: selectedThreadId,
@@ -154,10 +154,7 @@ const Index = ({ apiKey, api }: IndexProps) => {
         contextOptions: context,
         storageOptions: storage,
       });
-      toast({
-        title: "Message sent",
-        description: result.text,
-      });
+      return text;
       // Optionally, refresh messages or update UI here
     } catch (err) {
       toast({ title: "Failed to send message", description: String(err) });

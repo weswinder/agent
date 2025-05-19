@@ -23,7 +23,7 @@ interface RightPanelProps {
     agentName: string,
     context: ContextOptions,
     storage: StorageOptions
-  ) => Promise<void>;
+  ) => Promise<string>;
   selectedAgentName?: string;
   setSelectedAgentName: (name: string) => void;
   fetchContextMessages: (contextOptions: ContextOptions) => Promise<void>;

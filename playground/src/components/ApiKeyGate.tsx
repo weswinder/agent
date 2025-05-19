@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, ReactNode } from "react";
 import { useConvex } from "convex/react";
-import type { PlaygroundAPI } from "@convex-dev/agent/playground";
+import type { PlaygroundAPI } from "../definePlaygroundAPI";
 import { anyApi } from "convex/server";
 
 const API_KEY_STORAGE_KEY = "playground_api_key";
@@ -25,14 +25,13 @@ export const {
 function ApiKeyGate({
   children,
 }: {
-  children: (apiKey: string, api: PlaygroundAPI) => JSX.Element;
+  children: (apiKey: string, api: PlaygroundAPI) => ReactNode;
 }) {
   const [apiKey, setApiKey] = useState<string | null>(null);
   const [inputValue, setInputValue] = useState("");
   const [apiPath, setApiPath] = useState<string>("playground");
   const [apiPathInput, setApiPathInput] = useState("playground");
   const [copied, setCopied] = useState(false);
-  const [touched, setTouched] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const convex = useConvex();
@@ -56,7 +55,6 @@ function ApiKeyGate({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    setTouched(true);
     setLoading(true);
     // Construct API object from input
     const nextApi = apiPathInput
@@ -103,9 +101,31 @@ function ApiKeyGate({
           onSubmit={handleSubmit}
           className="bg-white rounded-xl shadow-2xl p-8 flex flex-col gap-6 min-w-[400px] max-w-[90vw] border border-muted"
         >
-          <h2 className="text-xl font-bold mb-1 text-foreground">
-            Enter Playground API Key
-          </h2>
+          <div className="flex flex-col gap-2">
+            <h2 className="text-2xl font-bold mb-1 text-foreground">
+              Configure the playground
+            </h2>
+            <div>
+              Your target backend deployment: {import.meta.env.VITE_CONVEX_URL}
+            </div>
+            <h3 className="text-xl font-bold mb-1 text-foreground">API Path</h3>
+            <label className="text-sm font-medium text-foreground">
+              Playground API Path
+            </label>
+            <input
+              className="border border-input rounded-lg px-4 py-2 text-base font-mono bg-muted focus:outline-none focus:ring-2 focus:ring-blue-500 transition w-full min-w-0"
+              type="text"
+              value={apiPathInput}
+              onChange={(e) => setApiPathInput(e.target.value.trim())}
+              placeholder="playground"
+              disabled={loading}
+            />
+            <span className="text-xs text-muted-foreground">
+              Usually <code>playground</code>, or the path to your Convex
+              playground module.
+            </span>
+          </div>
+          <h3 className="text-xl font-bold mb-1 text-foreground">API Key</h3>
           <div className="text-muted-foreground text-sm mb-2">
             To use the Playground, you need an API key. After setting up the
             agent in your app, run this command in your project directory (CLI
@@ -174,23 +194,6 @@ function ApiKeyGate({
             autoFocus
             disabled={loading}
           />
-          <div className="flex flex-col gap-2">
-            <label className="text-sm font-medium text-foreground">
-              Playground API Path
-            </label>
-            <input
-              className="border border-input rounded-lg px-4 py-2 text-base font-mono bg-muted focus:outline-none focus:ring-2 focus:ring-blue-500 transition w-full min-w-0"
-              type="text"
-              value={apiPathInput}
-              onChange={(e) => setApiPathInput(e.target.value.trim())}
-              placeholder="playground"
-              disabled={loading}
-            />
-            <span className="text-xs text-muted-foreground">
-              Usually <code>playground</code>, or the path to your Convex
-              playground module.
-            </span>
-          </div>
           {error && (
             // we want to show the error in a code block
             <div className="text-red-600 text-sm  font-medium mt-2">

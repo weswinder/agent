@@ -1,4 +1,4 @@
-import { definePlaygroundAPI } from "@convex-dev/agent/playground";
+import { definePlaygroundAPI } from "@convex-dev/agent-playground";
 import { components } from "./_generated/api";
 import { weatherAgent, fashionAgent } from "./example";
 

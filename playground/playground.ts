@@ -16,7 +16,7 @@ import {
   vStorageOptions,
   type AgentComponent,
   type Agent,
-} from "./index";
+} from "../src/client/index";
 import type { ToolSet } from "ai";
 import { v } from "convex/values";
 

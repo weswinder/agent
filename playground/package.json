@@ -13,8 +13,8 @@
     "agent-playground": "./bin/agent-playground.cjs"
   },
   "exports": {
-    "./src": "./src/App.tsx",
-    "./src/*": "./src/*"
+    ".": "./src/definePlaygroundAPI.ts",
+    "./*.tsx": "./src/*.tsx"
   },
   "files": [
     "public",
