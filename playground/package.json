@@ -10,7 +10,7 @@
     "preview": "vite preview"
   },
   "bin": {
-    "agent-playground": "npx vite --open"
+    "agent-playground": "./bin/agent-playground.cjs"
   },
   "exports": {
     "./src": "./src/App.tsx",
@@ -26,7 +26,7 @@
     "vite.config.ts"
   ],
   "dependencies": {
-    "@convex-dev/agent": "../",
+    "@convex-dev/agent": "^0.0.17 || 0.0.17-alpha.1",
     "@hookform/resolvers": "^3.9.0",
     "@radix-ui/react-accordion": "^1.2.0",
     "@radix-ui/react-alert-dialog": "^1.1.1",
@@ -58,6 +58,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.0.0",
+    "convex": "^1.24.1",
     "date-fns": "^3.2.0",
     "embla-carousel-react": "^8.3.0",
     "input-otp": "^1.2.4",
@@ -74,6 +75,7 @@
     "tailwind-merge": "^2.5.2",
     "tailwindcss-animate": "^1.0.7",
     "vaul": "^0.9.3",
+    "vite": "^6.3.5",
     "zod": "^3.23.8"
   },
   "devDependencies": {
@@ -84,7 +86,6 @@
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react-swc": "^3.9.0",
     "autoprefixer": "^10.4.20",
-    "convex": "^1.24.1",
     "eslint": "^9.9.0",
     "eslint-plugin-react-hooks": "^5.1.0-rc.0",
     "eslint-plugin-react-refresh": "^0.4.9",
@@ -92,7 +93,6 @@
     "postcss": "^8.4.47",
     "tailwindcss": "^3.4.11",
     "typescript": "^5.5.3",
-    "typescript-eslint": "^8.0.1",
-    "vite": "^6.3.5"
+    "typescript-eslint": "^8.0.1"
   }
 }
