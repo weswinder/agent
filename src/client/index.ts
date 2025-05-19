@@ -459,10 +459,17 @@ export class Agent<AgentTools extends ToolSet> {
           statuses: ["success"],
         }
       );
-      contextMessages.push(...page.filter((m) => !included?.has(m._id)));
+      contextMessages.push(
+        // Reverse since we fetched in descending order
+        ...page.filter((m) => !included?.has(m._id)).reverse()
+      );
     }
-    return contextMessages.sort((a, b) =>
-      a.order === b.order ? a.stepOrder - b.stepOrder : a.order - b.order
+    // Ensure we don't include tool messages without a corresponding tool call
+    return filterOutOrphanedToolMessages(
+      contextMessages.sort((a, b) =>
+        // Sort the raw MessageDocs by order and stepOrder
+        a.order === b.order ? a.stepOrder - b.stepOrder : a.order - b.order
+      )
     );
   }
 
@@ -1300,6 +1307,33 @@ export class Agent<AgentTools extends ToolSet> {
       },
     });
   }
+}
+
+export function filterOutOrphanedToolMessages(docs: MessageDoc[]) {
+  const toolCallIds = new Set<string>();
+  const result: MessageDoc[] = [];
+  for (const doc of docs) {
+    if (
+      doc.message?.role === "assistant" &&
+      Array.isArray(doc.message.content)
+    ) {
+      for (const content of doc.message.content) {
+        if (content.type === "tool-call") {
+          toolCallIds.add(content.toolCallId);
+        }
+      }
+      result.push(doc);
+    } else if (doc.message?.role === "tool") {
+      if (doc.message.content.every((c) => toolCallIds.has(c.toolCallId))) {
+        result.push(doc);
+      } else {
+        console.debug("Filtering out orphaned tool message", doc);
+      }
+    } else {
+      result.push(doc);
+    }
+  }
+  return result;
 }
 
 export type ToolCtx = RunActionCtx & {
