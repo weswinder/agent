@@ -433,9 +433,7 @@ export class Agent<AgentTools extends ToolSet> {
       const searchMessages = await ctx.runAction(
         this.component.messages.searchMessages,
         {
-          userId: args.contextOptions?.searchOtherThreads
-            ? args.userId
-            : undefined,
+          userId: opts?.searchOtherThreads ? args.userId : undefined,
           threadId: args.threadId,
           beforeMessageId: args.beforeMessageId,
           ...(await this.searchOptionsWithDefaults(opts, args.messages)),
