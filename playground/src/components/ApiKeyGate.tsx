@@ -1,4 +1,4 @@
-import { useState, useEffect, ReactNode } from "react";
+import { useState, useEffect, ReactNode, useMemo } from "react";
 import { useConvex } from "convex/react";
 import type { PlaygroundAPI } from "../definePlaygroundAPI";
 import { anyApi } from "convex/server";
@@ -22,6 +22,14 @@ export const {
   fetchPromptContext,
 } = definePlaygroundAPI(components.agent, { agents: [weatherAgent, fashionAgent] });
 `;
+
+function getApi(apiPath: string) {
+  return apiPath
+    .trim()
+    .split("/")
+    .reduce((acc, part) => acc[part], anyApi) as unknown as PlaygroundAPI;
+}
+
 function ApiKeyGate({
   children,
 }: {
@@ -38,55 +46,52 @@ function ApiKeyGate({
 
   useEffect(() => {
     const storedKey = sessionStorage.getItem(API_KEY_STORAGE_KEY);
-    if (storedKey) setApiKey(storedKey);
     const storedPath = sessionStorage.getItem(API_PATH_STORAGE_KEY);
     if (storedPath) {
-      setApiPath(storedPath);
       setApiPathInput(storedPath);
+      if (storedKey) {
+        convex
+          .query(getApi(storedPath).isApiKeyValid, {
+            apiKey: storedKey,
+          })
+          .then((isValid) => {
+            if (isValid) {
+              setApiKey(storedKey);
+            } else {
+              setError("Invalid API key for this playground path.");
+            }
+          });
+      }
     }
   }, []);
 
-  // Construct the API object using the playground path
-  const api: PlaygroundAPI = apiPath
-    .trim()
-    .split("/")
-    .reduce((acc, part) => acc[part], anyApi) as unknown as PlaygroundAPI;
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
-    setLoading(true);
-    // Construct API object from input
-    const nextApi = apiPathInput
-      .trim()
-      .split("/")
-      .reduce((acc, part) => acc[part], anyApi) as unknown as PlaygroundAPI;
-    try {
-      const isValid = await convex.query(nextApi.isApiKeyValid, {
+  useEffect(() => {
+    const nextApi = getApi(apiPathInput);
+    convex
+      .query(nextApi.isApiKeyValid, {
         apiKey: inputValue,
+      })
+      .then((isValid) => {
+        sessionStorage.setItem(API_PATH_STORAGE_KEY, apiPathInput);
+        setApiPath(apiPathInput);
+        if (isValid) {
+          sessionStorage.setItem(API_PATH_STORAGE_KEY, apiPathInput);
+          setApiKey(inputValue);
+        } else {
+          setApiKey(null);
+          setError("Invalid API key for this playground path.");
+        }
+      })
+      .catch(() => {
+        setApiPath("");
+        setError(
+          "Invalid playground path (could not find isApiKeyValid). Please check the path and try again." +
+            "e.g. if you exported the API in convex/foo/playground.ts, it would be foo/playground." +
+            " The code there should be:\n" +
+            PLAYGROUND_CODE
+        );
       });
-      if (!isValid) {
-        setError("Invalid API key for this playground path.");
-        setLoading(false);
-        return;
-      }
-      // Save and proceed
-      sessionStorage.setItem(API_KEY_STORAGE_KEY, inputValue);
-      sessionStorage.setItem(API_PATH_STORAGE_KEY, apiPathInput);
-      setApiKey(inputValue);
-      setApiPath(apiPathInput);
-      setError(null);
-      setLoading(false);
-    } catch (err) {
-      setError(
-        "Invalid playground path (could not find isApiKeyValid). Please check the path and try again." +
-          "e.g. if you exported the API in convex/foo/playground.ts, it would be foo/playground." +
-          " The code there should be:\n" +
-          PLAYGROUND_CODE
-      );
-      setLoading(false);
-    }
-  };
+  }, [apiPathInput, inputValue]);
 
   const handleCopy = () => {
     navigator.clipboard.writeText(CLI_COMMAND);
@@ -94,21 +99,24 @@ function ApiKeyGate({
     setTimeout(() => setCopied(false), 1200);
   };
 
-  if (!apiKey) {
+  if (!apiKey || !apiPath) {
     return (
       <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-60 z-50">
-        <form
-          onSubmit={handleSubmit}
-          className="bg-white rounded-xl shadow-2xl p-8 flex flex-col gap-6 min-w-[400px] max-w-[90vw] border border-muted"
-        >
+        <form className="bg-white rounded-xl shadow-2xl p-8 flex flex-col gap-6 min-w-[400px] max-w-[90vw] border border-muted">
           <div className="flex flex-col gap-2">
             <h2 className="text-2xl font-bold mb-1 text-foreground">
               Configure the playground
             </h2>
-            <div>
-              Your target backend deployment: {import.meta.env.VITE_CONVEX_URL}
-            </div>
-            <h3 className="text-xl font-bold mb-1 text-foreground">API Path</h3>
+            {!convex.connectionState().isWebSocketConnected && (
+              <div className="text-red-600 text-sm  font-medium mt-2">
+                Backend is not connected. Please check your internet connection,
+                or the Convex deployment URL in the environment variables /
+                sessionStorage.
+              </div>
+            )}
+            <h3 className="text-xl font-bold mb-1 text-foreground">
+              API Path {apiPath ? "✅ " : "❌ "}
+            </h3>
             <label className="text-sm font-medium text-foreground">
               Playground API Path
             </label>
@@ -180,7 +188,10 @@ function ApiKeyGate({
           </div>
           <input
             className="border border-input rounded-lg px-4 py-3 text-base font-mono bg-muted focus:outline-none focus:ring-2 focus:ring-blue-500 transition w-full min-w-0"
-            type="text"
+            type="password"
+            autoComplete="new-password"
+            name="api-key"
+            id="api-key"
             value={inputValue}
             onChange={(e) =>
               setInputValue(
@@ -202,20 +213,16 @@ function ApiKeyGate({
               </pre>
             </div>
           )}
-          <button
-            type="submit"
-            className={`bg-blue-600 text-white rounded-lg px-4 py-2 font-medium hover:bg-blue-700 transition mt-2 shadow ${
-              loading || !inputValue.length ? "opacity-50" : ""
-            }`}
-            disabled={loading || !inputValue.length}
-          >
-            {loading ? "Validating..." : "Save"}
-          </button>
         </form>
       </div>
     );
   }
 
+  // Construct the API object using the playground path
+  const api: PlaygroundAPI = apiPath
+    .trim()
+    .split("/")
+    .reduce((acc, part) => acc[part], anyApi) as unknown as PlaygroundAPI;
   // Valid
   return children(apiKey, api);
 }

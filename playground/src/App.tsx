@@ -1,20 +1,18 @@
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { ConvexReactClient, ConvexProvider } from "convex/react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import ApiKeyGate from "@/components/ApiKeyGate";
-
-const convex = new ConvexReactClient(import.meta.env.VITE_CONVEX_URL!);
+import ConvexProviderGate from "@/components/ConvexProviderGate";
 
 const App = () => {
   return (
-    <ConvexProvider client={convex}>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
+    <TooltipProvider>
+      <Toaster />
+      <Sonner />
+      <ConvexProviderGate>
         <BrowserRouter>
           <Routes>
             <Route
@@ -29,8 +27,8 @@ const App = () => {
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
-      </TooltipProvider>
-    </ConvexProvider>
+      </ConvexProviderGate>
+    </TooltipProvider>
   );
 };
 

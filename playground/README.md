@@ -68,8 +68,6 @@ It uses the `VITE_CONVEX_URL` env variable, usually pulling it from .env.local.
 
 - Constrict the message sending to be using the context of the selected message.
   It currently sends as if it were at the end of the thread.
-- Have an input box for the backend URL, so you don't have to run it from a
-  directory where you have it as a defined env variable.
 - Show the contextual messages with their rank in vector & text search, to get
   a sense of what is being found via text vs. vector vs. recency search.
 - Send down the agent's default context & storage options to use as the default.
