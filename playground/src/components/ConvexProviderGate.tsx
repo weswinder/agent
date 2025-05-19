@@ -49,16 +49,16 @@ function ConvexProviderGate({ children }: { children: ReactNode }) {
     !!deploymentUrl && isValidHttpUrl(deploymentUrl)
   );
 
-  // 2. Debounced async validation of deploymentUrl
-  useEffect(() => {
-    if (!deploymentUrl) {
+  // Extracted validation logic for reuse
+  const validateDeploymentUrl = async (url: string) => {
+    if (!url) {
       setIsValid(false);
       setInstanceName(null);
       setError(null);
       setLoading(false);
       return;
     }
-    if (!isValidHttpUrl(deploymentUrl)) {
+    if (!isValidHttpUrl(url)) {
       setIsValid(false);
       setInstanceName(null);
       setError(null);
@@ -68,28 +68,42 @@ function ConvexProviderGate({ children }: { children: ReactNode }) {
     setLoading(true);
     setInstanceName(null);
     setError(null);
+    try {
+      const res = await fetch(url + "/instance_name");
+      if (!res.ok) throw new Error("Invalid response");
+      const name = await res.text();
+      setInstanceName(name);
+      setError(null);
+      setLoading(false);
+      setIsValid(true);
+      localStorage.setItem(DEPLOYMENT_URL_STORAGE_KEY, url);
+    } catch {
+      setInstanceName(null);
+      setError(
+        "Could not validate deployment URL. Please check the URL and try again."
+      );
+      setLoading(false);
+      setIsValid(false);
+    }
+  };
+
+  // 2. Debounced async validation of deploymentUrl
+  useEffect(() => {
     const handler = setTimeout(() => {
-      fetch(deploymentUrl + "/instance_name")
-        .then(async (res) => {
-          if (!res.ok) throw new Error("Invalid response");
-          const name = await res.text();
-          setInstanceName(name);
-          setError(null);
-          setLoading(false);
-          setIsValid(true);
-          localStorage.setItem(DEPLOYMENT_URL_STORAGE_KEY, deploymentUrl);
-        })
-        .catch(() => {
-          setInstanceName(null);
-          setError(
-            "Could not validate deployment URL. Please check the URL and try again."
-          );
-          setLoading(false);
-          setIsValid(false);
-        });
+      validateDeploymentUrl(deploymentUrl);
     }, 400);
     return () => clearTimeout(handler);
   }, [deploymentUrl]);
+
+  // Polling effect: If deploymentUrl is set but not valid, poll every 3 seconds
+  useEffect(() => {
+    if (!deploymentUrl || isValid) return;
+    // Only poll if we have a URL and it's not valid
+    const interval = setInterval(() => {
+      validateDeploymentUrl(deploymentUrl);
+    }, 3000);
+    return () => clearInterval(interval);
+  }, [deploymentUrl, isValid]);
 
   // 4. When user enters a new URL, update the path (which will trigger validation)
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
