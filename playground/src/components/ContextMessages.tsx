@@ -20,11 +20,12 @@ const ContextMessages: React.FC<ContextMessagesProps> = ({ messages }) => {
           <div className="p-3 flex items-start gap-3 border-b bg-muted/50">
             <div className="flex-grow text-center self-end">Message Text</div>
 
+            {/* TODO: Fetch the text and vector search ranks and show them
             <div className="flex-shrink-0 w-24 text-right">
               <span className="text-xs font-medium">Text/Vector </span>
               <br />
               <span className="text-xs font-medium">Search Rank</span>
-            </div>
+            </div> */}
           </div>
 
           {/* Message rows */}
