@@ -15,11 +15,11 @@ const api = (import.meta.env.VITE_PLAYGROUND_API_PATH as string)
   .split("/")
   .reduce((acc, part) => acc[part], anyApi) as unknown as PlaygroundAPI;
 
-// TODO: have a UI to set the API key
-const apiKey = import.meta.env.VITE_PLAYGROUND_API_KEY!;
-assert(apiKey, "VITE_PLAYGROUND_API_KEY is not set");
+interface IndexProps {
+  apiKey: string;
+}
 
-const Index = () => {
+const Index = ({ apiKey }: IndexProps) => {
   const { toast } = useToast();
   const [selectedUserId, setSelectedUserId] = useState<string | undefined>();
   const [selectedThreadId, setSelectedThreadId] = useState<
