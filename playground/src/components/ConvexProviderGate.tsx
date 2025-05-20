@@ -2,7 +2,7 @@ import { useState, useEffect, ReactNode, useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ConvexProvider, ConvexReactClient } from "convex/react";
 
-const DEPLOYMENT_URL_STORAGE_KEY = "playground_deployment_url";
+export const DEPLOYMENT_URL_STORAGE_KEY = "playground_deployment_url";
 
 function isValidHttpUrl(url: string): boolean {
   try {

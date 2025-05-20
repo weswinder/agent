@@ -28,15 +28,16 @@ const App = () => {
             }
           />
           <Route
-            path="/"
+            path="/play"
             element={
               <ConvexProviderGate>
                 <ApiKeyGate>
-                  {(apiKey, api) => <Index apiKey={apiKey} api={api} />}
+                  {(apiKey, api) => <Play apiKey={apiKey} api={api} />}
                 </ApiKeyGate>
               </ConvexProviderGate>
             }
           />
+          <Route path="/" element={<Index />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
