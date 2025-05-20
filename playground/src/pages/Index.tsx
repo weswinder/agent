@@ -17,10 +17,6 @@ const Index = () => {
     });
   };
 
-  const urlFromLocalStorage = localStorage.getItem(DEPLOYMENT_URL_STORAGE_KEY);
-  const playgroundUrl = urlFromLocalStorage
-    ? `/play/${encodeURIComponent(urlFromLocalStorage)}`
-    : "/play";
 
   return (
     <div className="min-h-screen bg-background">
@@ -36,7 +32,7 @@ const Index = () => {
           <Button
             size="lg"
             className="mt-8 text-lg px-8"
-            onClick={() => navigate(playgroundUrl)}
+            onClick={() => navigate("/play")}
           >
             Launch Playground
           </Button>
@@ -190,7 +186,7 @@ export const {
             <Button
               size="lg"
               className="text-lg px-8"
-              onClick={() => navigate(playgroundUrl)}
+              onClick={() => navigate("/play")}
             >
               Try the Playground Now
             </Button>
