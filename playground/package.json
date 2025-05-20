@@ -80,8 +80,8 @@
     "vite": "^6.3.5"
   },
   "peerDependencies": {
-    "@convex-dev/agent": "^0.0.17 || ^0.0.17-alpha.0 || 0.0.17-alpha.1",
-    "convex": "^1.24.1",
+    "@convex-dev/agent": "^0.0.17 || ^0.0.17-alpha.0 || 0.0.17-alpha.1 || 0.0.17-alpha.2",
+    "convex": "^1.23.0",
     "zod": "^3.23.8"
   },
   "devDependencies": {
