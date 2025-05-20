@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8" />
+    <title>Redirecting...</title>
+    <script>
+                var base = "/agent";
+                var path = location.pathname;
+                // If already at /agent or deeper, redirect to /agent/
+                if (path === base || path.startsWith(base + "/")) {
+                    window.location.replace(base + "/");
+                } else {
+                    window.location.replace(base + path + location.search + location.hash);
+                }
+    </script>
+</head>
+
+<body>
+    Redirecting...
+</body>
+
+</html>

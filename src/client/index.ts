@@ -15,7 +15,9 @@ import type {
   ToolChoice,
   ToolExecutionOptions,
   ToolSet,
+  UIMessage,
 } from "ai";
+import type { ToolInvocationUIPart } from "@ai-sdk/ui-utils";
 import {
   generateObject,
   generateText,
@@ -40,6 +42,7 @@ import {
   serializeNewMessagesInStep,
   serializeObjectResult,
   serializeStep,
+  toUIFilePart,
 } from "../mapping.js";
 import {
   DEFAULT_MESSAGE_RANGE,
@@ -49,16 +52,18 @@ import {
 } from "../shared.js";
 import {
   type CallSettings,
-  MessageWithMetadata,
+  type MessageWithMetadata as InnerMessageWithMetadata,
   type ProviderMetadata,
   type ProviderOptions,
   type SearchOptions,
   type Usage,
+  vFileWithStringId,
   vSafeObjectArgs,
   vTextArgs,
   vThreadStatus,
 } from "../validators.js";
 import type {
+  OpaqueIds,
   RunActionCtx,
   RunMutationCtx,
   RunQueryCtx,
@@ -66,51 +71,33 @@ import type {
 } from "./types.js";
 import schema from "../component/schema.js";
 
+export { extractText, isTool };
 export type { Usage, ProviderMetadata };
 export {
+  paginationResultValidator,
+  vContextOptions,
   vUsage,
   vProviderMetadata,
   vUserMessage,
   vAssistantMessage,
   vToolMessage,
+  vStorageOptions,
   vSystemMessage,
   vMessage,
 } from "../validators.js";
-
-export const vThreadDoc = v.object({
-  _id: v.string(),
-  _creationTime: v.number(),
-  userId: v.optional(v.string()), // Unset for anonymous
-  title: v.optional(v.string()),
-  summary: v.optional(v.string()),
-  status: vThreadStatus,
-});
-export type ThreadDoc = Infer<typeof vThreadDoc>;
-
-export const vMessageDoc = v.object({
-  _id: v.string(),
-  _creationTime: v.number(),
-  ...schema.tables.messages.validator.fields,
-  // Overwrite all the types that have a v.id validator
-  // Outside of the component, they are strings
-  threadId: v.string(),
-  parentMessageId: v.optional(v.string()),
-  stepId: v.optional(v.string()),
-  embeddingId: v.optional(v.string()),
-  fileId: v.optional(v.string()),
-});
-export type MessageDoc = Infer<typeof vMessageDoc>;
 
 /**
  * Options to configure what messages are fetched as context,
  * automatically with thread.generateText, or directly via search.
  */
 export type ContextOptions = {
+  /** @deprecated Use excludeToolMessages instead. */
+  includeToolCalls?: boolean;
   /**
    * Whether to include tool messages in the context.
    * By default, tool calls and results are not included.
    */
-  includeToolCalls?: boolean;
+  excludeToolMessages?: boolean;
   /**
    * How many recent messages to include. These are added after the search
    * messages, and do not count against the search limit.
@@ -185,9 +172,11 @@ export type UsageHandler = (
   }
 ) => void | Promise<void>;
 
+export type AgentComponent = UseApi<Mounts>;
+
 export class Agent<AgentTools extends ToolSet> {
   constructor(
-    public component: UseApi<Mounts>,
+    public component: AgentComponent,
     public options: {
       /**
        * The name for the agent. This will be attributed on each message
@@ -436,7 +425,7 @@ export class Agent<AgentTools extends ToolSet> {
       beforeMessageId?: string;
       contextOptions: ContextOptions | undefined;
     }
-  ): Promise<CoreMessage[]> {
+  ): Promise<MessageDoc[]> {
     assert(args.userId || args.threadId, "Specify userId or threadId");
     // Fetch the latest messages from the thread
     const contextMessages: MessageDoc[] = [];
@@ -449,9 +438,7 @@ export class Agent<AgentTools extends ToolSet> {
       const searchMessages = await ctx.runAction(
         this.component.messages.searchMessages,
         {
-          userId: args.contextOptions?.searchOtherThreads
-            ? args.userId
-            : undefined,
+          userId: opts?.searchOtherThreads ? args.userId : undefined,
           threadId: args.threadId,
           beforeMessageId: args.beforeMessageId,
           ...(await this.searchOptionsWithDefaults(opts, args.messages)),
@@ -463,10 +450,11 @@ export class Agent<AgentTools extends ToolSet> {
     }
     if (args.threadId && opts.recentMessages !== 0) {
       const { page } = await ctx.runQuery(
-        this.component.messages.getThreadMessages,
+        this.component.messages.listMessagesByThreadId,
         {
           threadId: args.threadId,
-          isTool: opts.includeToolCalls ? undefined : false,
+          excludeToolMessages:
+            opts.includeToolCalls === true ? false : opts.excludeToolMessages,
           paginationOpts: {
             numItems: opts.recentMessages ?? DEFAULT_RECENT_MESSAGES,
             cursor: null,
@@ -476,13 +464,18 @@ export class Agent<AgentTools extends ToolSet> {
           statuses: ["success"],
         }
       );
-      contextMessages.push(...page.filter((m) => !included?.has(m._id)));
+      contextMessages.push(
+        // Reverse since we fetched in descending order
+        ...page.filter((m) => !included?.has(m._id)).reverse()
+      );
     }
-    return contextMessages
-      .sort((a, b) =>
+    // Ensure we don't include tool messages without a corresponding tool call
+    return filterOutOrphanedToolMessages(
+      contextMessages.sort((a, b) =>
+        // Sort the raw MessageDocs by order and stepOrder
         a.order === b.order ? a.stepOrder - b.stepOrder : a.order - b.order
       )
-      .map((m) => deserializeMessage(m.message!));
+    );
   }
 
   /**
@@ -944,7 +937,10 @@ export class Agent<AgentTools extends ToolSet> {
       args: {
         ...rest,
         system: args.system ?? this.options.instructions,
-        messages: [...contextMessages, ...messages],
+        messages: [
+          ...contextMessages.map((m) => deserializeMessage(m.message!)),
+          ...messages,
+        ],
       } as T,
       messageId,
     };
@@ -1317,6 +1313,34 @@ export class Agent<AgentTools extends ToolSet> {
     });
   }
 }
+
+export function filterOutOrphanedToolMessages(docs: MessageDoc[]) {
+  const toolCallIds = new Set<string>();
+  const result: MessageDoc[] = [];
+  for (const doc of docs) {
+    if (
+      doc.message?.role === "assistant" &&
+      Array.isArray(doc.message.content)
+    ) {
+      for (const content of doc.message.content) {
+        if (content.type === "tool-call") {
+          toolCallIds.add(content.toolCallId);
+        }
+      }
+      result.push(doc);
+    } else if (doc.message?.role === "tool") {
+      if (doc.message.content.every((c) => toolCallIds.has(c.toolCallId))) {
+        result.push(doc);
+      } else {
+        console.debug("Filtering out orphaned tool message", doc);
+      }
+    } else {
+      result.push(doc);
+    }
+  }
+  return result;
+}
+
 
 export type ToolCtx = RunActionCtx & {
   userId?: string;
@@ -1698,4 +1722,168 @@ interface Thread<DefaultTools extends ToolSet> {
   ): Promise<
     StreamObjectResult<DeepPartial<T>, T, never> & ThreadOutputMetadata
   >;
+}
+
+export const vThreadDoc = v.object({
+  _id: v.string(),
+  _creationTime: v.number(),
+  userId: v.optional(v.string()), // Unset for anonymous
+  title: v.optional(v.string()),
+  summary: v.optional(v.string()),
+  status: vThreadStatus,
+});
+export type ThreadDoc = Infer<typeof vThreadDoc>;
+
+export const vMessageDoc = v.object({
+  _id: v.string(),
+  _creationTime: v.number(),
+  ...schema.tables.messages.validator.fields,
+  // Overwrite all the types that have a v.id validator
+  // Outside of the component, they are strings
+  threadId: v.string(),
+  parentMessageId: v.optional(v.string()),
+  stepId: v.optional(v.string()),
+  embeddingId: v.optional(v.string()),
+  files: v.optional(v.array(vFileWithStringId)),
+});
+export type MessageDoc = Infer<typeof vMessageDoc>;
+
+type MessageWithMetadata = OpaqueIds<InnerMessageWithMetadata>;
+
+export function toUIMessages(messages: MessageDoc[]): UIMessage[] {
+  const uiMessages: UIMessage[] = [];
+  let assistantMessage: UIMessage | undefined;
+  for (const message of messages) {
+    const coreMessage = message.message && deserializeMessage(message.message);
+    const text = message.text ?? "";
+    const content = coreMessage?.content;
+    const nonStringContent =
+      content && typeof content !== "string" ? content : [];
+    if (!coreMessage) continue;
+    if (coreMessage.role === "system") {
+      uiMessages.push({
+        id: message.id ?? message._id,
+        createdAt: new Date(message._creationTime),
+        role: "system",
+        content: text,
+        parts: [{ type: "text", text }],
+      });
+    } else if (coreMessage.role === "user") {
+      const parts: UIMessage["parts"] = [];
+      if (text) {
+        parts.push({ type: "text", text });
+      }
+      if (message.files) {
+        parts.push(...message.files.map(toUIFilePart));
+      }
+      uiMessages.push({
+        id: message.id ?? message._id,
+        createdAt: new Date(message._creationTime),
+        role: "user",
+        content: message.text ?? "",
+        parts,
+      });
+    } else {
+      if (coreMessage.role === "tool" && !assistantMessage) {
+        console.warn(
+          "Tool message without preceding assistant message.. skipping",
+          message
+        );
+        continue;
+      }
+      if (!assistantMessage) {
+        assistantMessage = {
+          id: message.id ?? message._id,
+          createdAt: new Date(message._creationTime),
+          role: "assistant",
+          content: message.text ?? "",
+          parts: [],
+        };
+        uiMessages.push(assistantMessage);
+      }
+      // update it to the last message's id
+      assistantMessage.id = message.id ?? message._id;
+      if (message.text) {
+        assistantMessage.parts.push({
+          type: "text",
+          text: message.text,
+        });
+        assistantMessage.content += message.text;
+      }
+      if (message.reasoning) {
+        assistantMessage.parts.push({
+          type: "reasoning",
+          reasoning: message.reasoning,
+          details: message.reasoningDetails ?? [],
+        });
+      }
+      for (const source of message.sources ?? []) {
+        assistantMessage.parts.push({
+          type: "source",
+          source,
+        });
+      }
+      for (const file of message.files ?? []) {
+        assistantMessage.parts.push(toUIFilePart(file));
+      }
+      for (const contentPart of nonStringContent) {
+        switch (contentPart.type) {
+          case "tool-call":
+            assistantMessage.parts.push({
+              type: "step-start",
+            });
+            assistantMessage.parts.push({
+              type: "tool-invocation",
+              toolInvocation: {
+                state: "call",
+                step: assistantMessage.parts.filter(
+                  (part) => part.type === "tool-invocation"
+                ).length,
+                toolCallId: contentPart.toolCallId,
+                toolName: contentPart.toolName,
+                args: contentPart.args,
+              },
+            });
+            break;
+          case "tool-result": {
+            const call = assistantMessage.parts.find(
+              (part) =>
+                part.type === "tool-invocation" &&
+                part.toolInvocation.toolCallId === contentPart.toolCallId
+            ) as ToolInvocationUIPart | undefined;
+            const toolInvocation: ToolInvocationUIPart["toolInvocation"] = {
+              state: "result",
+              toolCallId: contentPart.toolCallId,
+              toolName: contentPart.toolName,
+              args: call?.toolInvocation.args,
+              result: contentPart.result,
+              step:
+                call?.toolInvocation.step ??
+                assistantMessage.parts.filter(
+                  (part) => part.type === "tool-invocation"
+                ).length,
+            };
+            if (call) {
+              (call as ToolInvocationUIPart).toolInvocation = toolInvocation;
+            } else {
+              console.warn(
+                "Tool result without preceding tool call.. adding anyways",
+                contentPart
+              );
+              assistantMessage.parts.push({
+                type: "tool-invocation",
+                toolInvocation,
+              });
+            }
+            break;
+          }
+        }
+      }
+      if (!message.tool) {
+        // Reset it so the next set of tool calls will create a new assistant message
+        assistantMessage = undefined;
+      }
+    }
+  }
+  return uiMessages;
 }

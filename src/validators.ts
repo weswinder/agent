@@ -3,14 +3,16 @@ import { vVectorDimension } from "./component/vector/tables";
 
 // const deprecated = v.optional(v.any()) as unknown as VNull<unknown, "optional">;
 
-const providerOptions = v.optional(v.record(v.string(), v.any()));
-export type ProviderOptions = Infer<typeof providerOptions>;
-const providerMetadata = v.optional(
-  v.record(v.string(), v.record(v.string(), v.any()))
+export const vProviderOptions = v.record(
+  v.string(),
+  v.record(v.string(), v.any())
 );
-export { providerMetadata as vProviderMetadata };
+const providerOptions = v.optional(vProviderOptions);
+export type ProviderOptions = Infer<typeof providerOptions>;
+
+export const vProviderMetadata = vProviderOptions;
+const providerMetadata = providerOptions;
 export type ProviderMetadata = Infer<typeof providerMetadata>;
-const experimental_providerMetadata = providerOptions;
 
 export const vThreadStatus = v.union(
   v.literal("active"),
@@ -34,7 +36,6 @@ export const vTextPart = v.object({
   type: v.literal("text"),
   text: v.string(),
   providerOptions,
-  experimental_providerMetadata,
 });
 
 export const vImagePart = v.object({
@@ -42,7 +43,6 @@ export const vImagePart = v.object({
   image: v.union(v.string(), v.bytes()),
   mimeType: v.optional(v.string()),
   providerOptions,
-  experimental_providerMetadata,
 });
 
 export const vFilePart = v.object({
@@ -50,7 +50,13 @@ export const vFilePart = v.object({
   data: v.union(v.string(), v.bytes()),
   mimeType: v.string(),
   providerOptions,
-  experimental_providerMetadata,
+});
+
+export const vFile = v.object({
+  data: v.optional(v.union(v.bytes(), v.string())),
+  url: v.optional(v.string()),
+  mimeType: v.string(),
+  fileId: v.optional(v.id("files")),
 });
 
 export const vUserContent = v.union(
@@ -61,16 +67,36 @@ export const vUserContent = v.union(
 export const vReasoningPart = v.object({
   type: v.literal("reasoning"),
   text: v.string(),
+  signature: v.optional(v.string()),
   providerOptions,
-  experimental_providerMetadata,
+});
+
+export const vFileWithStringId = v.object({
+  bytes: v.optional(v.bytes()),
+  url: v.optional(v.string()),
+  mimeType: v.string(),
+  fileId: v.optional(v.string()),
 });
 
 export const vRedactedReasoningPart = v.object({
   type: v.literal("redacted-reasoning"),
   data: v.string(),
   providerOptions,
-  experimental_providerMetadata,
 });
+
+export const vReasoningDetails = v.array(
+  v.union(
+    v.object({
+      type: v.literal("text"),
+      text: v.string(),
+      signature: v.optional(v.string()),
+    }),
+    v.object({
+      type: v.literal("redacted"),
+      data: v.string(),
+    })
+  )
+);
 
 export const vToolCallPart = v.object({
   type: v.literal("tool-call"),
@@ -78,7 +104,6 @@ export const vToolCallPart = v.object({
   toolName: v.string(),
   args: v.any(),
   providerOptions,
-  experimental_providerMetadata,
 });
 
 export const vAssistantContent = v.union(
@@ -113,11 +138,12 @@ const vToolResultPart = v.object({
   toolCallId: v.string(),
   toolName: v.string(),
   result: v.any(),
+  // This is only here b/c steps include it in toolResults
+  // Normal CoreMessage doesn't have this
   args: v.optional(v.any()),
   experimental_content: v.optional(vToolResultContent),
   isError: v.optional(v.boolean()),
   providerOptions,
-  experimental_providerMetadata,
 });
 export const vToolContent = v.array(vToolResultPart);
 
@@ -128,28 +154,24 @@ export const vUserMessage = v.object({
   role: v.literal("user"),
   content: vUserContent,
   providerOptions,
-  experimental_providerMetadata,
 });
 
 export const vAssistantMessage = v.object({
   role: v.literal("assistant"),
   content: vAssistantContent,
   providerOptions,
-  experimental_providerMetadata,
 });
 
 export const vToolMessage = v.object({
   role: v.literal("tool"),
   content: vToolContent,
   providerOptions,
-  experimental_providerMetadata,
 });
 
 export const vSystemMessage = v.object({
   role: v.literal("system"),
   content: v.string(),
   providerOptions,
-  experimental_providerMetadata,
 });
 
 export const vMessage = v.union(
@@ -165,7 +187,7 @@ export const vSource = v.object({
   id: v.string(),
   url: v.string(),
   title: v.optional(v.string()),
-  providerMetadata,
+  providerOptions,
 });
 
 export const vRequest = v.object({
@@ -237,7 +259,7 @@ export const vMessageWithMetadata = v.object({
   id: v.optional(v.string()), // external id, e.g. from Vercel AI SDK
   message: vMessage,
   text: v.optional(v.string()),
-  fileId: v.optional(v.id("files")),
+  files: v.optional(v.array(vFile)),
   // metadata
   finishReason: v.optional(vFinishReason),
   model: v.optional(v.string()),
@@ -245,6 +267,7 @@ export const vMessageWithMetadata = v.object({
   providerMetadata,
   sources: v.optional(v.array(vSource)),
   reasoning: v.optional(v.string()),
+  reasoningDetails: v.optional(vReasoningDetails),
   usage: v.optional(vUsage),
   warnings: v.optional(v.array(vLanguageModelV1CallWarning)),
   error: v.optional(v.string()),
@@ -260,15 +283,14 @@ export const vMessageWithMetadata = v.object({
 export type MessageWithMetadata = Infer<typeof vMessageWithMetadata>;
 
 export const vStep = v.object({
-  experimental_providerMetadata,
   files: v.optional(v.array(v.any())),
   finishReason: vFinishReason,
   isContinued: v.boolean(),
   logprobs: v.optional(v.any()),
   providerMetadata,
-  providerOptions,
+  experimental_providerMetadata: providerMetadata,
   reasoning: v.optional(v.string()),
-  reasoningDetails: v.optional(v.array(v.any())),
+  reasoningDetails: v.optional(vReasoningDetails),
   request: v.optional(vRequest),
   response: v.optional(vResponse),
   sources: v.optional(v.array(vSource)),
@@ -300,7 +322,6 @@ export const vObjectResult = v.object({
   error: v.optional(v.string()),
   warnings: v.optional(v.array(vLanguageModelV1CallWarning)),
   providerMetadata,
-  experimental_providerMetadata,
 });
 export type ObjectResult = Infer<typeof vObjectResult>;
 export const vSearchOptions = v.object({
@@ -321,7 +342,7 @@ export const vContextOptionsSearchOptions = v.object({
 });
 
 export const vContextOptions = v.object({
-  includeToolCalls: v.optional(v.boolean()),
+  excludeToolMessages: v.optional(v.boolean()),
   recentMessages: v.optional(v.number()),
   searchOptions: v.optional(vContextOptionsSearchOptions),
   searchOtherThreads: v.optional(v.boolean()),
@@ -329,7 +350,8 @@ export const vContextOptions = v.object({
 
 export const vStorageOptions = v.object({
   saveAllInputMessages: v.optional(v.boolean()),
-  saveAllOutputMessages: v.optional(v.boolean()),
+  saveAnyInputMessages: v.optional(v.boolean()),
+  saveOutputMessages: v.optional(v.boolean()),
 });
 
 const vPromptFields = {
@@ -357,7 +379,6 @@ const vCommonArgs = {
   contextOptions: v.optional(vContextOptions),
   storageOptions: v.optional(vStorageOptions),
   providerOptions,
-  experimental_providerMetadata,
   ...vCallSettingsFields,
   ...vPromptFields,
 };
@@ -378,7 +399,6 @@ export const vTextArgs = v.object({
   maxSteps: v.optional(v.number()),
   experimental_continueSteps: v.optional(v.boolean()),
   providerOptions,
-  experimental_providerMetadata,
 });
 export type TextArgs = Infer<typeof vTextArgs>;
 

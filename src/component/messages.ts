@@ -32,7 +32,22 @@ import {
   VectorTableId,
   vVectorId,
 } from "./vector/tables.js";
+import {
+  listThreadsByUserId as _listThreadsByUserId,
+  getThread as _getThread,
+  updateThread as _updateThread,
+} from "./threads.js";
 import { paginationOptsValidator } from "convex/server";
+
+
+/** @deprecated Use *.threads.listMessagesByThreadId instead. */
+export const listThreadsByUserId= _listThreadsByUserId
+
+/** @deprecated Use *.threads.getThread */
+export const getThread = _getThread;
+
+/** @deprecated Use *.threads.updateThread instead */
+export const updateThread= _updateThread;
 
 export async function deleteMessage(
   ctx: MutationCtx,
@@ -42,10 +57,11 @@ export async function deleteMessage(
   if (messageDoc.embeddingId) {
     await ctx.db.delete(messageDoc.embeddingId);
   }
-  if (messageDoc.fileId) {
-    const file = await ctx.db.get(messageDoc.fileId);
+  for (const { fileId } of messageDoc.files ?? []) {
+    if (!fileId) continue;
+    const file = await ctx.db.get(fileId);
     if (file) {
-      await ctx.db.patch(messageDoc.fileId, { refcount: file.refcount - 1 });
+      await ctx.db.patch(fileId, { refcount: file.refcount - 1 });
     }
   }
 }
@@ -102,9 +118,11 @@ async function addMessagesHandler(
   }
   const maxMessage = await getMaxMessage(ctx, threadId, userId);
   let order = maxMessage?.order ?? -1;
+  let stepOrder = maxMessage?.stepOrder ?? 0;
+  let lastMessageIsTool = maxMessage?.tool ?? false;
   const toReturn: Doc<"messages">[] = [];
   if (messages.length > 0) {
-    for (const { message, fileId, embedding, ...fields } of messages) {
+    for (const { message, files, embedding, ...fields } of messages) {
       let embeddingId: VectorTableId | undefined;
       if (embedding) {
         embeddingId = await insertVector(ctx, embedding.dimension, {
@@ -116,9 +134,13 @@ async function addMessagesHandler(
         });
       }
       const tool = isTool(message);
-      if (!tool) {
+      if (lastMessageIsTool) {
+        stepOrder++;
+      } else {
         order++;
+        stepOrder = 0;
       }
+      lastMessageIsTool = tool;
       const text = extractText(message);
       const messageId = await ctx.db.insert("messages", {
         ...rest,
@@ -130,11 +152,17 @@ async function addMessagesHandler(
         order,
         tool,
         text,
-        fileId,
+        files,
         status: pending ? "pending" : "success",
-        stepOrder: 0,
+        stepOrder,
       });
-      if (fileId) {
+      if (!fields.id) {
+        await ctx.db.patch(messageId, {
+          id: messageId,
+        });
+      }
+      for (const { fileId } of files ?? []) {
+        if (!fileId) continue;
         await ctx.db.patch(fileId, {
           refcount: (await ctx.db.get(fileId))!.refcount + 1,
         });
@@ -145,7 +173,8 @@ async function addMessagesHandler(
   return { messages: toReturn };
 }
 
-async function getMaxMessage(
+// exported for tests
+export async function getMaxMessage(
   ctx: QueryCtx,
   threadId: Id<"threads"> | undefined,
   userId: string | undefined
@@ -153,39 +182,32 @@ async function getMaxMessage(
   assert(threadId || userId, "One of threadId or userId is required");
   if (threadId) {
     return mergedStream(
-      ["success" as const, "pending" as const].map((status) =>
-        stream(ctx.db, schema)
-          .query("messages")
-          .withIndex("threadId_status_tool_order_stepOrder", (q) =>
-            q.eq("threadId", threadId).eq("status", status).eq("tool", false)
-          )
-          .order("desc")
+      [true, false].flatMap((tool) =>
+        ["success" as const, "pending" as const].map((status) =>
+          stream(ctx.db, schema)
+            .query("messages")
+            .withIndex("threadId_status_tool_order_stepOrder", (q) =>
+              q.eq("threadId", threadId).eq("status", status).eq("tool", tool)
+            )
+            .order("desc")
+        )
       ),
       ["order", "stepOrder"]
     ).first();
   } else {
-    // DO explicitly
-    const maxPending = await ctx.db
-      .query("messages")
-      .withIndex("userId_status_tool_order_stepOrder", (q) =>
-        q.eq("userId", userId).eq("status", "pending").eq("tool", false)
-      )
-      .order("desc")
-      .first();
-    const maxSuccess = await ctx.db
-      .query("messages")
-      .withIndex("userId_status_tool_order_stepOrder", (q) =>
-        q.eq("userId", userId).eq("status", "success").eq("tool", false)
-      )
-      .order("desc")
-      .first();
-    return maxPending
-      ? maxSuccess
-        ? maxPending.order > maxSuccess.order
-          ? maxPending
-          : maxSuccess
-        : maxPending
-      : maxSuccess ?? null;
+    return mergedStream(
+      [true, false].flatMap((tool) =>
+        ["success" as const, "pending" as const].map((status) =>
+          stream(ctx.db, schema)
+            .query("messages")
+            .withIndex("userId_status_tool_order_stepOrder", (q) =>
+              q.eq("userId", userId).eq("status", status).eq("tool", tool)
+            )
+            .order("desc")
+        )
+      ),
+      ["order", "stepOrder"]
+    ).first();
   }
 }
 
@@ -210,6 +232,7 @@ async function addStepHandler(
   assert(parentMessage, `Message ${args.parentMessageId} not found`);
   const order = parentMessage.order;
   assert(order !== undefined, `${args.parentMessageId} has no order`);
+  // TODO: only fetch the last one if we aren't failing pending steps
   let steps = await ctx.db
     .query("steps")
     .withIndex("parentMessageId_order_stepOrder", (q) =>
@@ -328,10 +351,12 @@ async function commitMessageHandler(
   }
 }
 
-export const getThreadMessages = query({
+export const listMessagesByThreadId = query({
   args: {
     threadId: v.id("threads"),
-    isTool: v.optional(v.boolean()),
+    excludeToolMessages: v.optional(v.boolean()),
+    /** @deprecated Use excludeToolMessages instead. */
+    isTool: v.optional(v.literal("use excludeToolMessages instead of this")),
     order: v.optional(v.union(v.literal("asc"), v.literal("desc"))),
     paginationOpts: v.optional(paginationOptsValidator),
     statuses: v.optional(v.array(vMessageStatus)),
@@ -342,8 +367,7 @@ export const getThreadMessages = query({
       args.statuses ?? vMessageStatus.members.map((m) => m.value);
     const before =
       args.beforeMessageId && (await ctx.db.get(args.beforeMessageId));
-    const toolOptions =
-      args.isTool === undefined ? [true, false] : [args.isTool];
+    const toolOptions = args.excludeToolMessages ? [false] : [true, false];
     const order = args.order ?? "desc";
     const streams = toolOptions.flatMap((tool) =>
       statuses.map((status) =>
@@ -360,6 +384,12 @@ export const getThreadMessages = query({
             return qq;
           })
           .order(order)
+          .filterWith(
+            async (m) =>
+              !before ||
+              m.order < before.order ||
+              (m.order === before.order && m.stepOrder < before.stepOrder)
+          )
       )
     );
     const messages = await mergedStream(streams, [
@@ -372,6 +402,15 @@ export const getThreadMessages = query({
       }
     );
     return messages;
+  },
+  returns: paginationResultValidator(v.doc("messages")),
+});
+
+/** @deprecated Use listMessagesByThreadId instead. */
+export const getThreadMessages = query({
+  args: { deprecated: v.literal("Use listMessagesByThreadId instead") },
+  handler: async () => {
+    throw new Error("Use listMessagesByThreadId instead of getThreadMessages");
   },
   returns: paginationResultValidator(v.doc("messages")),
 });
@@ -394,6 +433,7 @@ export const searchMessages = action({
         threadId: args.threadId,
         text: args.text,
         limit,
+        beforeMessageId: args.beforeMessageId,
       });
     }
     if (args.vector) {
@@ -480,7 +520,10 @@ export const _fetchSearchMessages = internalQuery({
         m !== undefined &&
         m !== null &&
         !m.tool &&
-        (!beforeMessage || m.order <= beforeMessage.order)
+        (!beforeMessage ||
+          m.order < beforeMessage.order ||
+          (m.order === beforeMessage.order &&
+            m.stepOrder < beforeMessage.stepOrder))
     );
     messages.push(...(args.textSearchMessages ?? []));
     // TODO: prioritize more recent messages
@@ -571,9 +614,13 @@ export const textSearch = query({
     userId: v.optional(v.string()),
     text: v.string(),
     limit: v.number(),
+    beforeMessageId: v.optional(v.id("messages")),
   },
   handler: async (ctx, args) => {
     assert(args.userId || args.threadId, "Specify userId or threadId");
+    const beforeMessage =
+      args.beforeMessageId && (await ctx.db.get(args.beforeMessageId));
+    const order = beforeMessage?.order;
     const messages = await ctx.db
       .query("messages")
       .withSearchIndex("text_search", (q) =>
@@ -582,9 +629,21 @@ export const textSearch = query({
           : q.search("text", args.text).eq("threadId", args.threadId!)
       )
       // Just in case tool messages slip through
-      .filter((q) => q.eq(q.field("tool"), false))
+      .filter((q) => {
+        const qq = q.eq(q.field("tool"), false);
+        if (order) {
+          return q.and(qq, q.lte(q.field("order"), order));
+        }
+        return qq;
+      })
       .take(args.limit);
-    return messages;
+    return messages.filter(
+      (m) =>
+        !beforeMessage ||
+        m.order < beforeMessage.order ||
+        (m.order === beforeMessage.order &&
+          m.stepOrder < beforeMessage.stepOrder)
+    );
   },
   returns: v.array(v.doc("messages")),
 });

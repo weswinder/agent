@@ -9,6 +9,10 @@ import {
   vSource,
   vLanguageModelV1CallWarning,
   vFinishReason,
+  vProviderOptions,
+  vProviderMetadata,
+  vReasoningDetails,
+  vFile,
 } from "../validators.js";
 import { typedV } from "convex-helpers/validators";
 import vectorTables, { vVectorId } from "./vector/tables.js";
@@ -29,35 +33,44 @@ export const schema = defineSchema({
     id: v.optional(v.string()), // external id, e.g. from Vercel AI SDK
     userId: v.optional(v.string()), // useful for future indexes (text search)
     threadId: v.id("threads"),
+    // TODO: is this redunant with message at last step @ order - 1?
     parentMessageId: v.optional(v.id("messages")),
     stepId: v.optional(v.id("steps")),
-    agentName: v.optional(v.string()),
-    message: v.optional(vMessage),
-    error: v.optional(v.string()),
-    model: v.optional(v.string()),
-    provider: v.optional(v.string()),
-    text: v.optional(v.string()),
-    embeddingId: v.optional(vVectorId),
-    // TODO: add sub-messages back in? or be able to skip them?
-    tool: v.boolean(),
     // Repeats until a non-tool message.
-    // Unset if it's not in a thread.
     order: v.number(),
     stepOrder: v.number(),
+    embeddingId: v.optional(vVectorId),
+    error: v.optional(v.string()),
+    status: vMessageStatus,
+
+    // Context on how it was generated
+    agentName: v.optional(v.string()),
+    model: v.optional(v.string()),
+    provider: v.optional(v.string()),
+    providerOptions: v.optional(vProviderOptions), // Sent to model
+
+    // The result
+    message: v.optional(vMessage),
+    // Convenience fields extracted from the message
+    tool: v.boolean(), // either tool call (assistant) or tool result (tool)
+    text: v.optional(v.string()),
+    files: v.optional(v.array(vFile)),
+
+    // Result metadata
     usage: v.optional(vUsage),
-    finishReason: v.optional(vFinishReason),
-    providerMetadata: v.optional(v.record(v.string(), v.any())),
+    providerMetadata: v.optional(vProviderMetadata), // Received from model
     sources: v.optional(v.array(vSource)),
     reasoning: v.optional(v.string()),
+    reasoningDetails: v.optional(vReasoningDetails),
     warnings: v.optional(v.array(vLanguageModelV1CallWarning)),
-    fileId: v.optional(v.id("files")),
-    status: vMessageStatus,
+    finishReason: v.optional(vFinishReason),
   })
     // Allows finding successful visible messages in order
     // Also surface pending messages separately to e.g. stream
     .index("threadId_status_tool_order_stepOrder", [
       "threadId",
       "status",
+      // TODO: we might not need this to be in the index..
       "tool",
       "order",
       "stepOrder",

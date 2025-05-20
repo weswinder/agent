@@ -15,7 +15,7 @@ const usageHandler: UsageHandler = async (_ctx, args) => {
 };
 
 // Define an agent similarly to the AI SDK
-const weatherAgent = new Agent(components.agent, {
+export const weatherAgent = new Agent(components.agent, {
   name: "Weather Agent",
   chat: openai.chat("gpt-4o-mini"),
   textEmbedding: openai.embedding("text-embedding-3-small"),
@@ -29,7 +29,7 @@ const weatherAgent = new Agent(components.agent, {
   usageHandler,
 });
 
-const fashionAgent = new Agent(components.agent, {
+export const fashionAgent = new Agent(components.agent, {
   name: "Fashion Agent",
   chat: openai.chat("gpt-4o-mini"),
   textEmbedding: openai.embedding("text-embedding-3-small"),
@@ -150,18 +150,18 @@ export const getThreads = query({
     { userId, paginationOpts },
   ): Promise<PaginationResult<ThreadDoc>> => {
     const results = await ctx.runQuery(
-      components.agent.threads.getThreadsByUserId,
+      components.agent.threads.listThreadsByUserId,
       { userId, paginationOpts },
     );
     return results;
   },
 });
 
-export const getThreadMessages = query({
+export const listMessagesByThreadId = query({
   args: { threadId: v.string(), paginationOpts: paginationOptsValidator },
   handler: async (ctx, { threadId, paginationOpts }) => {
     const messages = await ctx.runQuery(
-      components.agent.messages.getThreadMessages,
+      components.agent.messages.listMessagesByThreadId,
       { threadId, paginationOpts },
     );
     return messages;
@@ -172,7 +172,7 @@ export const getInProgressMessages = query({
   args: { threadId: v.string() },
   handler: async (ctx, { threadId }) => {
     const { page } = await ctx.runQuery(
-      components.agent.messages.getThreadMessages,
+      components.agent.messages.listMessagesByThreadId,
       { threadId, statuses: ["pending"] },
     );
     return page;
