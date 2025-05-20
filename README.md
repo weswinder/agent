@@ -424,11 +424,15 @@ export const getStructuredSupport = supportAgent.asObjectAction({
 });
 ```
 
-Create a thread from within a workflow, similar to agent.createThread.
+To save messages explicitly as a mutation, similar to `agent.saveMessages`:
 
 ```ts
-export const createThread = supportAgent.createThreadMutation();
+export const saveMessages = supportAgent.asSaveMessagesMutation();
 ```
+
+This is useful for idempotency, as you can first create the user's message,
+then generate a response in an unreliable action with retries, passing in the
+existing messageId instead of a prompt.
 
 ### Using the agent actions within a workflow
 

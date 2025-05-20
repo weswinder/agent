@@ -58,6 +58,7 @@ import {
   type SearchOptions,
   type Usage,
   vFileWithStringId,
+  vMessageWithMetadata,
   vSafeObjectArgs,
   vTextArgs,
   vThreadStatus,
@@ -582,6 +583,35 @@ export class Agent<AgentTools extends ToolSet> {
       lastMessageId: result.messages.at(-1)!._id,
       messageIds: result.messages.map((m) => m._id),
     };
+  }
+
+  /**
+   * Save messages to the thread.
+   * Useful as a step in Workflows, e.g.
+   * ```ts
+   * const saveMessages = agent.asSaveMessagesMutation();
+   *
+   * const myWorkflow = workflow.define()
+   * ```
+   * @returns A mutation that can be used to save messages to the thread.
+   */
+  asSaveMessagesMutation() {
+    return internalMutationGeneric({
+      args: {
+        threadId: v.string(),
+        userId: v.optional(v.string()),
+        messages: v.array(vMessageWithMetadata),
+        pending: v.optional(v.boolean()),
+        failPendingSteps: v.optional(v.boolean()),
+      },
+      handler: async (ctx, args) => {
+        return this.saveMessages(ctx, {
+          ...args,
+          messages: args.messages.map((m) => m.message),
+          metadata: args.messages.map(({ message: _, ...m }) => m),
+        });
+      },
+    });
   }
 
   /**
