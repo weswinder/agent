@@ -401,11 +401,25 @@ The [Workflow component](https://convex.dev/components/workflow) is a great way 
 It handles retries and guarantees of eventually completing, surviving server restarts, and more.
 Read more about durable workflows in [this Stack post](https://stack.convex.dev/durable-workflows-and-strong-guarantees).
 
+To use the agent alongside workflows, you can run indivdual idempotent steps
+that the workflow can run, each with configurable retries, with guarantees that
+the workflow will eventually complete. Even if the server crashes mid-workflow,
+the workflow will pick up from where it left off and run the next step. If a
+step fails and isn't caught by the workflow, the workflow's onComplete handler
+will get the error result.
 
 ### Exposing the agent as Convex actions
 
-You can expose the agent as a Convex internal action.
-This is generally used from a workflow, where each step is a new thread message.
+You can expose the agent's capabilities as Convex functions to be used as steps
+in a workflow.
+
+To create a thread as a standalone mutation, similar to `agent.createThread`:
+
+```ts
+export const createThread = supportAgent.createThreadMutation();
+```
+
+For an action that generates text in a thread, similar to `thread.generateText`:
 
 ```ts
 export const getSupport = supportAgent.asTextAction({
