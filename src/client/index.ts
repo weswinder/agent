@@ -74,7 +74,9 @@ import schema from "../component/schema.js";
 export { extractText, isTool };
 export type { Usage, ProviderMetadata };
 export {
+  /** @deprecated Use vPaginationResult instead. */
   paginationResultValidator,
+  paginationResultValidator as vPaginationResult,
   vContextOptions,
   vUsage,
   vProviderMetadata,
@@ -261,11 +263,11 @@ export class Agent<AgentTools extends ToolSet> {
        */
       userId?: string;
       /**
-       * The title of the thread. Not currently used.
+       * The title of the thread. Not currently used for anything.
        */
       title?: string;
       /**
-       * The summary of the thread. Not currently used.
+       * The summary of the thread. Not currently used for anything.
        */
       summary?: string;
       /**
@@ -301,11 +303,11 @@ export class Agent<AgentTools extends ToolSet> {
        */
       userId?: string;
       /**
-       * The title of the thread. Not currently used.
+       * The title of the thread. Not currently used for anything.
        */
       title?: string;
       /**
-       * The summary of the thread. Not currently used.
+       * The summary of the thread. Not currently used for anything.
        */
       summary?: string;
       /**
