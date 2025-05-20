@@ -1,9 +1,7 @@
-import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useToast } from "@/components/ui/use-toast";
-import { DEPLOYMENT_URL_STORAGE_KEY } from "@/components/ConvexProviderGate";
 
 const Index = () => {
   const navigate = useNavigate();
@@ -17,7 +15,6 @@ const Index = () => {
     });
   };
 
-
   return (
     <div className="min-h-screen bg-background">
       {/* Hero Section */}
@@ -25,9 +22,15 @@ const Index = () => {
         <div className="text-center mb-12">
           <h1 className="text-4xl font-bold mb-4">Agent Playground</h1>
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-            A powerful playground for experimenting with @convex-dev/agent. Test
-            your agents, browse threads, and explore message interactions in
-            real-time.
+            A powerful playground for experimenting with{" "}
+            <a
+              href="https://convex.dev/components/agent"
+              className="text-blue-500"
+            >
+              @convex-dev/agent
+            </a>
+            . Test your agents, browse threads, and explore message interactions
+            in real-time.
           </p>
           <Button
             size="lg"
