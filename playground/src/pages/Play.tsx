@@ -8,12 +8,12 @@ import type { PlaygroundAPI } from "../definePlaygroundAPI";
 import { ContextMessage, Thread } from "@/types";
 import { ContextOptions, StorageOptions } from "@convex-dev/agent";
 
-interface IndexProps {
+interface PlayProps {
   apiKey: string;
   api: PlaygroundAPI;
 }
 
-const Index = ({ apiKey, api }: IndexProps) => {
+const Play = ({ apiKey, api }: PlayProps) => {
   const { toast } = useToast();
   const [selectedUserId, setSelectedUserId] = useState<string | undefined>();
   const [selectedThreadId, setSelectedThreadId] = useState<
@@ -204,4 +204,4 @@ const Index = ({ apiKey, api }: IndexProps) => {
   );
 };
 
-export default Index;
+export default Play;

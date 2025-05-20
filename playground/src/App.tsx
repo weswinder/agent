@@ -6,6 +6,7 @@ import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import ApiKeyGate from "@/components/ApiKeyGate";
 import ConvexProviderGate from "@/components/ConvexProviderGate";
+import Play from "./pages/Play";
 
 const base = import.meta.env.BASE_URL;
 
@@ -21,7 +22,7 @@ const App = () => {
             element={
               <ConvexProviderGate>
                 <ApiKeyGate>
-                  {(apiKey, api) => <Index apiKey={apiKey} api={api} />}
+                  {(apiKey, api) => <Play apiKey={apiKey} api={api} />}
                 </ApiKeyGate>
               </ConvexProviderGate>
             }
