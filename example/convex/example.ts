@@ -118,7 +118,7 @@ export const weatherAgentWorkflow = workflow.define({
       threadId,
       prompt: `What is the weather in ${location}?`,
     });
-    const fashionSuggestion = await step.runAction(
+    const { object: fashionSuggestion } = await step.runAction(
       internal.example.getFashionAdvice,
       { threadId, prompt: `What should I wear based on the weather?` },
     );

@@ -449,11 +449,11 @@ export const supportAgentWorkflow = workflow.define({
     const suggestion = await step.runAction(internal.example.getSupport, {
       threadId, userId, prompt,
     });
-    const polished = await step.runAction(internal.example.adaptSuggestionForUser, {
-      userId, suggestion,
+    const { object } = await step.runAction(internal.example.getStructuredSupport, {
+      userId, message: suggestion,
     });
     await step.runMutation(internal.example.sendUserMessage, {
-      userId, message: polished.message,
+      userId, message: object.suggestion,
     });
   },
 });

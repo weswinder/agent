@@ -1308,7 +1308,7 @@ export class Agent<AgentTools extends ToolSet> {
               this.options.storageOptions,
           }
         );
-        return value.object as T;
+        return { object: value.object as T };
       },
     });
   }
