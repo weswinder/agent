@@ -3,6 +3,7 @@ import { useConvex } from "convex/react";
 import type { PlaygroundAPI } from "../definePlaygroundAPI";
 import { anyApi } from "convex/server";
 import { Button } from "./ui/button";
+import { useParams } from "react-router-dom";
 
 const API_KEY_STORAGE_KEY = "playground_api_key";
 const API_PATH_STORAGE_KEY = "playground_api_path";
@@ -36,8 +37,11 @@ function ApiKeyGate({
 }: {
   children: (apiKey: string, api: PlaygroundAPI) => ReactNode;
 }) {
+  const { url: encodedUrl } = useParams();
   const [apiKey, setApiKey] = useState<string>(() => {
-    const storedKey = sessionStorage.getItem(API_KEY_STORAGE_KEY);
+    const storedKey = sessionStorage.getItem(
+      `${API_KEY_STORAGE_KEY}-${encodedUrl}`
+    );
     if (storedKey) {
       return storedKey;
     }
@@ -46,7 +50,9 @@ function ApiKeyGate({
   const [apiKeyValid, setApiKeyValid] = useState<boolean>(!!apiKey);
   const [apiKeyInput, setApiKeyInput] = useState(apiKey || "");
   const [apiPath, setApiPath] = useState<string>(() => {
-    const storedPath = sessionStorage.getItem(API_PATH_STORAGE_KEY);
+    const storedPath = sessionStorage.getItem(
+      `${API_PATH_STORAGE_KEY}-${encodedUrl}`
+    );
     if (storedPath) {
       return storedPath;
     }
@@ -65,7 +71,10 @@ function ApiKeyGate({
     convex
       .query(nextApi.isApiKeyValid, { apiKey: apiKeyInput })
       .then((isValid) => {
-        sessionStorage.setItem(API_PATH_STORAGE_KEY, apiPathInput);
+        sessionStorage.setItem(
+          `${API_PATH_STORAGE_KEY}-${encodedUrl}`,
+          apiPathInput
+        );
         setApiPath(apiPathInput);
         if (isValid) {
           setApiKeyValid(true);
@@ -93,7 +102,10 @@ function ApiKeyGate({
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (apiKeyValid) {
-      sessionStorage.setItem(API_KEY_STORAGE_KEY, apiKeyInput);
+      sessionStorage.setItem(
+        `${API_KEY_STORAGE_KEY}-${encodedUrl}`,
+        apiKeyInput
+      );
       setApiKey(apiKeyInput);
     }
   };

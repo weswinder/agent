@@ -89,6 +89,7 @@ function ConvexProviderGate({ children }: { children: ReactNode }) {
 
   // 2. Debounced async validation of deploymentUrl
   useEffect(() => {
+    if (!deploymentUrl) return;
     const handler = setTimeout(() => {
       validateDeploymentUrl(deploymentUrl);
     }, 400);
