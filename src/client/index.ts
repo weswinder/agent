@@ -15,7 +15,9 @@ import type {
   ToolChoice,
   ToolExecutionOptions,
   ToolSet,
+  UIMessage,
 } from "ai";
+import type { ToolInvocationUIPart } from "@ai-sdk/ui-utils";
 import {
   generateObject,
   generateText,
@@ -40,6 +42,7 @@ import {
   serializeNewMessagesInStep,
   serializeObjectResult,
   serializeStep,
+  toUIFilePart,
 } from "../mapping.js";
 import {
   DEFAULT_MESSAGE_RANGE,
@@ -49,13 +52,15 @@ import {
 } from "../shared.js";
 import {
   type CallSettings,
-  MessageWithMetadata,
+  type MessageWithMetadata as InnerMessageWithMetadata,
   type ProviderMetadata,
   type ProviderOptions,
   type SearchOptions,
   type Usage,
+  vFileWithStringId,
   vSafeObjectArgs,
   vTextArgs,
+  vThreadStatus,
 } from "../validators.js";
 import type {
   OpaqueIds,
@@ -66,38 +71,33 @@ import type {
 } from "./types.js";
 import schema from "../component/schema.js";
 
+export { extractText, isTool };
 export type { Usage, ProviderMetadata };
 export {
+  paginationResultValidator,
+  vContextOptions,
   vUsage,
   vProviderMetadata,
   vUserMessage,
   vAssistantMessage,
   vToolMessage,
+  vStorageOptions,
   vSystemMessage,
   vMessage,
 } from "../validators.js";
-
-export type ThreadDoc = OpaqueIds<
-  { _id: string; _creationTime: number } & Infer<
-    typeof schema.tables.threads.validator
-  >
->;
-export type MessageDoc = OpaqueIds<
-  { _id: string; _creationTime: number } & Infer<
-    typeof schema.tables.messages.validator
-  >
->;
 
 /**
  * Options to configure what messages are fetched as context,
  * automatically with thread.generateText, or directly via search.
  */
 export type ContextOptions = {
+  /** @deprecated Use excludeToolMessages instead. */
+  includeToolCalls?: boolean;
   /**
    * Whether to include tool messages in the context.
    * By default, tool calls and results are not included.
    */
-  includeToolCalls?: boolean;
+  excludeToolMessages?: boolean;
   /**
    * How many recent messages to include. These are added after the search
    * messages, and do not count against the search limit.
@@ -172,9 +172,11 @@ export type UsageHandler = (
   }
 ) => void | Promise<void>;
 
+export type AgentComponent = UseApi<Mounts>;
+
 export class Agent<AgentTools extends ToolSet> {
   constructor(
-    public component: UseApi<Mounts>,
+    public component: AgentComponent,
     public options: {
       /**
        * The name for the agent. This will be attributed on each message
@@ -334,7 +336,7 @@ export class Agent<AgentTools extends ToolSet> {
     thread?: Thread<ThreadTools extends undefined ? AgentTools : ThreadTools>;
   }> {
     const threadDoc = await ctx.runMutation(
-      this.component.messages.createThread,
+      this.component.threads.createThread,
       {
         userId: args?.userId,
         title: args?.title,
@@ -415,10 +417,15 @@ export class Agent<AgentTools extends ToolSet> {
       userId: string | undefined;
       threadId: string | undefined;
       messages: CoreMessage[];
-      parentMessageId?: string;
+      /**
+       * If provided, it will search for messages before this message.
+       * Note: if this is far in the past, the search results may be more
+       * limited, as it's post-filtering the results.
+       */
+      beforeMessageId?: string;
       contextOptions: ContextOptions | undefined;
     }
-  ): Promise<CoreMessage[]> {
+  ): Promise<MessageDoc[]> {
     assert(args.userId || args.threadId, "Specify userId or threadId");
     // Fetch the latest messages from the thread
     const contextMessages: MessageDoc[] = [];
@@ -431,11 +438,9 @@ export class Agent<AgentTools extends ToolSet> {
       const searchMessages = await ctx.runAction(
         this.component.messages.searchMessages,
         {
-          userId: args.contextOptions?.searchOtherThreads
-            ? args.userId
-            : undefined,
+          userId: opts?.searchOtherThreads ? args.userId : undefined,
           threadId: args.threadId,
-          parentMessageId: args.parentMessageId,
+          beforeMessageId: args.beforeMessageId,
           ...(await this.searchOptionsWithDefaults(opts, args.messages)),
         }
       );
@@ -445,15 +450,16 @@ export class Agent<AgentTools extends ToolSet> {
     }
     if (args.threadId && opts.recentMessages !== 0) {
       const { page } = await ctx.runQuery(
-        this.component.messages.getThreadMessages,
+        this.component.messages.listMessagesByThreadId,
         {
           threadId: args.threadId,
-          isTool: opts.includeToolCalls ? undefined : false,
+          excludeToolMessages:
+            opts.includeToolCalls === true ? false : opts.excludeToolMessages,
           paginationOpts: {
             numItems: opts.recentMessages ?? DEFAULT_RECENT_MESSAGES,
             cursor: null,
           },
-          parentMessageId: args.parentMessageId,
+          beforeMessageId: args.beforeMessageId,
           order: "desc",
           statuses: ["success"],
         }
@@ -463,15 +469,12 @@ export class Agent<AgentTools extends ToolSet> {
         ...page.filter((m) => !included?.has(m._id)).reverse()
       );
     }
-
-    // Sort the raw MessageDocs by order and stepOrder
-    const sortedDocs = contextMessages.sort((a, b) =>
-      a.order === b.order ? a.stepOrder - b.stepOrder : a.order - b.order
-    );
-
     // Ensure we don't include tool messages without a corresponding tool call
-    return filterOutOrphanedToolMessages(sortedDocs).map((m) =>
-      deserializeMessage(m.message!)
+    return filterOutOrphanedToolMessages(
+      contextMessages.sort((a, b) =>
+        // Sort the raw MessageDocs by order and stepOrder
+        a.order === b.order ? a.stepOrder - b.stepOrder : a.order - b.order
+      )
     );
   }
 
@@ -544,13 +547,8 @@ export class Agent<AgentTools extends ToolSet> {
        */
       pending?: boolean;
       /**
-       * The message that this is responding to.
-       */
-      parentMessageId?: string;
-      /**
-       * Whether to mark all pending messages in the thread as failed.
-       * This is used to recover from a failure via a retry that wipes the slate clean.
-       * Defaults to true.
+       * If true, it will fail any pending steps.
+       * Defaults to false.
        */
       failPendingSteps?: boolean;
     }
@@ -575,9 +573,8 @@ export class Agent<AgentTools extends ToolSet> {
             message: serializeMessage(m),
           }) as MessageWithMetadata
       ),
-      failPendingSteps: args.failPendingSteps ?? true,
+      failPendingSteps: args.failPendingSteps ?? false,
       pending: args.pending ?? false,
-      parentMessageId: args.parentMessageId,
     });
     return {
       lastMessageId: result.messages.at(-1)!._id,
@@ -598,7 +595,7 @@ export class Agent<AgentTools extends ToolSet> {
       /**
        * The message this step is in response to.
        */
-      messageId: string;
+      parentMessageId: string;
       /**
        * The step to save, possibly including multiple tool calls.
        */
@@ -635,7 +632,7 @@ export class Agent<AgentTools extends ToolSet> {
     await ctx.runMutation(this.component.messages.addStep, {
       userId: args.userId,
       threadId: args.threadId,
-      messageId: args.messageId,
+      parentMessageId: args.parentMessageId,
       step: { step, messages },
       failPendingSteps: false,
     });
@@ -741,7 +738,7 @@ export class Agent<AgentTools extends ToolSet> {
             await this.saveStep(ctx, {
               userId,
               threadId,
-              messageId,
+              parentMessageId: messageId,
               step,
             });
           }
@@ -863,7 +860,7 @@ export class Agent<AgentTools extends ToolSet> {
           await this.saveStep(ctx, {
             userId,
             threadId,
-            messageId,
+            parentMessageId: messageId,
             step,
           });
         }
@@ -902,7 +899,6 @@ export class Agent<AgentTools extends ToolSet> {
     {
       userId,
       threadId,
-      parentMessageId,
       contextOptions,
       storageOptions,
     }: {
@@ -920,7 +916,6 @@ export class Agent<AgentTools extends ToolSet> {
       userId,
       threadId,
       messages,
-      parentMessageId,
       contextOptions,
     });
     let messageId: string | undefined;
@@ -933,9 +928,7 @@ export class Agent<AgentTools extends ToolSet> {
         messages: coreMessages,
         metadata: coreMessages.length === 1 ? [{ id: args.id }] : undefined,
         pending: true,
-        // We should just fail if you pass in an ID for the message, fail those children
-        // failPendingSteps: true,
-        parentMessageId,
+        failPendingSteps: true,
       });
       messageId = saved.lastMessageId;
     }
@@ -944,7 +937,10 @@ export class Agent<AgentTools extends ToolSet> {
       args: {
         ...rest,
         system: args.system ?? this.options.instructions,
-        messages: [...contextMessages, ...messages],
+        messages: [
+          ...contextMessages.map((m) => deserializeMessage(m.message!)),
+          ...messages,
+        ],
       } as T,
       messageId,
     };
@@ -993,7 +989,12 @@ export class Agent<AgentTools extends ToolSet> {
       } as any)) as GenerateObjectResult<T> & GenerationOutputMetadata;
 
       if (threadId && messageId && saveOutputMessages !== false) {
-        await this.saveObject(ctx, { threadId, messageId, result, userId });
+        await this.saveObject(ctx, {
+          threadId,
+          parentMessageId: messageId,
+          result,
+          userId,
+        });
       }
       result.messageId = messageId;
       if (trackUsage && result.usage) {
@@ -1070,7 +1071,7 @@ export class Agent<AgentTools extends ToolSet> {
           await this.saveObject(ctx, {
             userId,
             threadId,
-            messageId,
+            parentMessageId: messageId,
             result: {
               object: result.object,
               finishReason: "stop",
@@ -1118,7 +1119,7 @@ export class Agent<AgentTools extends ToolSet> {
     args: {
       userId: string | undefined;
       threadId: string;
-      messageId: string;
+      parentMessageId: string;
       result: GenerateObjectResult<unknown>;
       metadata?: Omit<MessageWithMetadata, "message">;
     }
@@ -1147,7 +1148,7 @@ export class Agent<AgentTools extends ToolSet> {
     await ctx.runMutation(this.component.messages.addStep, {
       userId: args.userId,
       threadId: args.threadId,
-      messageId: args.messageId,
+      parentMessageId: args.parentMessageId,
       failPendingSteps: false,
       step: { step, messages },
     });
@@ -1443,10 +1444,6 @@ function wrapTools(
 
 type Options = {
   /**
-   * The parent message id to use for the tool calls.
-   */
-  parentMessageId?: string;
-  /**
    * The context options to use for passing in message history to the LLM.
    */
   contextOptions?: ContextOptions;
@@ -1725,4 +1722,168 @@ interface Thread<DefaultTools extends ToolSet> {
   ): Promise<
     StreamObjectResult<DeepPartial<T>, T, never> & ThreadOutputMetadata
   >;
+}
+
+export const vThreadDoc = v.object({
+  _id: v.string(),
+  _creationTime: v.number(),
+  userId: v.optional(v.string()), // Unset for anonymous
+  title: v.optional(v.string()),
+  summary: v.optional(v.string()),
+  status: vThreadStatus,
+});
+export type ThreadDoc = Infer<typeof vThreadDoc>;
+
+export const vMessageDoc = v.object({
+  _id: v.string(),
+  _creationTime: v.number(),
+  ...schema.tables.messages.validator.fields,
+  // Overwrite all the types that have a v.id validator
+  // Outside of the component, they are strings
+  threadId: v.string(),
+  parentMessageId: v.optional(v.string()),
+  stepId: v.optional(v.string()),
+  embeddingId: v.optional(v.string()),
+  files: v.optional(v.array(vFileWithStringId)),
+});
+export type MessageDoc = Infer<typeof vMessageDoc>;
+
+type MessageWithMetadata = OpaqueIds<InnerMessageWithMetadata>;
+
+export function toUIMessages(messages: MessageDoc[]): UIMessage[] {
+  const uiMessages: UIMessage[] = [];
+  let assistantMessage: UIMessage | undefined;
+  for (const message of messages) {
+    const coreMessage = message.message && deserializeMessage(message.message);
+    const text = message.text ?? "";
+    const content = coreMessage?.content;
+    const nonStringContent =
+      content && typeof content !== "string" ? content : [];
+    if (!coreMessage) continue;
+    if (coreMessage.role === "system") {
+      uiMessages.push({
+        id: message.id ?? message._id,
+        createdAt: new Date(message._creationTime),
+        role: "system",
+        content: text,
+        parts: [{ type: "text", text }],
+      });
+    } else if (coreMessage.role === "user") {
+      const parts: UIMessage["parts"] = [];
+      if (text) {
+        parts.push({ type: "text", text });
+      }
+      if (message.files) {
+        parts.push(...message.files.map(toUIFilePart));
+      }
+      uiMessages.push({
+        id: message.id ?? message._id,
+        createdAt: new Date(message._creationTime),
+        role: "user",
+        content: message.text ?? "",
+        parts,
+      });
+    } else {
+      if (coreMessage.role === "tool" && !assistantMessage) {
+        console.warn(
+          "Tool message without preceding assistant message.. skipping",
+          message
+        );
+        continue;
+      }
+      if (!assistantMessage) {
+        assistantMessage = {
+          id: message.id ?? message._id,
+          createdAt: new Date(message._creationTime),
+          role: "assistant",
+          content: message.text ?? "",
+          parts: [],
+        };
+        uiMessages.push(assistantMessage);
+      }
+      // update it to the last message's id
+      assistantMessage.id = message.id ?? message._id;
+      if (message.text) {
+        assistantMessage.parts.push({
+          type: "text",
+          text: message.text,
+        });
+        assistantMessage.content += message.text;
+      }
+      if (message.reasoning) {
+        assistantMessage.parts.push({
+          type: "reasoning",
+          reasoning: message.reasoning,
+          details: message.reasoningDetails ?? [],
+        });
+      }
+      for (const source of message.sources ?? []) {
+        assistantMessage.parts.push({
+          type: "source",
+          source,
+        });
+      }
+      for (const file of message.files ?? []) {
+        assistantMessage.parts.push(toUIFilePart(file));
+      }
+      for (const contentPart of nonStringContent) {
+        switch (contentPart.type) {
+          case "tool-call":
+            assistantMessage.parts.push({
+              type: "step-start",
+            });
+            assistantMessage.parts.push({
+              type: "tool-invocation",
+              toolInvocation: {
+                state: "call",
+                step: assistantMessage.parts.filter(
+                  (part) => part.type === "tool-invocation"
+                ).length,
+                toolCallId: contentPart.toolCallId,
+                toolName: contentPart.toolName,
+                args: contentPart.args,
+              },
+            });
+            break;
+          case "tool-result": {
+            const call = assistantMessage.parts.find(
+              (part) =>
+                part.type === "tool-invocation" &&
+                part.toolInvocation.toolCallId === contentPart.toolCallId
+            ) as ToolInvocationUIPart | undefined;
+            const toolInvocation: ToolInvocationUIPart["toolInvocation"] = {
+              state: "result",
+              toolCallId: contentPart.toolCallId,
+              toolName: contentPart.toolName,
+              args: call?.toolInvocation.args,
+              result: contentPart.result,
+              step:
+                call?.toolInvocation.step ??
+                assistantMessage.parts.filter(
+                  (part) => part.type === "tool-invocation"
+                ).length,
+            };
+            if (call) {
+              (call as ToolInvocationUIPart).toolInvocation = toolInvocation;
+            } else {
+              console.warn(
+                "Tool result without preceding tool call.. adding anyways",
+                contentPart
+              );
+              assistantMessage.parts.push({
+                type: "tool-invocation",
+                toolInvocation,
+              });
+            }
+            break;
+          }
+        }
+      }
+      if (!message.tool) {
+        // Reset it so the next set of tool calls will create a new assistant message
+        assistantMessage = undefined;
+      }
+    }
+  }
+  return uiMessages;
 }

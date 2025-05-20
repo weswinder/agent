@@ -17,7 +17,7 @@ export function Home() {
     userId,
   });
   const messages = usePaginatedQuery(
-    api.example.getThreadMessages,
+    api.example.listMessagesByThreadId,
     threadId ? { threadId } : "skip",
     { initialNumItems: 10 },
   );
