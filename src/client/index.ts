@@ -456,7 +456,7 @@ export class Agent<AgentTools extends ToolSet> {
       included = new Set(page.map((m) => m._id));
       contextMessages.push(
         // Reverse since we fetched in descending order
-        ...page.filter((m) => !included?.has(m._id)).reverse()
+        ...page.reverse()
       );
     }
     if (opts.searchOptions?.textSearch || opts.searchOptions?.vectorSearch) {
