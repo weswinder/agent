@@ -125,8 +125,8 @@ async function addMessagesHandler(
     stepOrder = parentMessage.stepOrder;
   } else {
     const maxMessage = await getMaxMessage(ctx, threadId, userId);
-    order = maxMessage?.order ?? 0;
-    stepOrder = maxMessage?.stepOrder ?? -1;
+    order = maxMessage ? maxMessage.order + 1 : 0;
+    stepOrder = -1;
   }
   const toReturn: Doc<"messages">[] = [];
   if (messages.length > 0) {
