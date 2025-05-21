@@ -393,7 +393,7 @@ The Playground UI is a simple way to test, debug, and develop with the agent.
 - Then you can use the [hosted version on GitHub pages](https://get-convex.github.io/agent/)
 or run it locally with `npx @convex-dev/agent-playground`.
 
-[Playground UI Screenshot](./playground/public/screenshot.png)
+![Playground UI Screenshot](./playground/public/screenshot.png)
 
 ## Using the Workflow component for long-lived durable workflows
 
