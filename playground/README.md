@@ -2,7 +2,7 @@
 
 This is a playground for @convex-dev/agent.
 
-![Playground Screenshot](./screenshot.png)
+![Playground Screenshot](./public/screenshot.png)
 
 - Pick a user to list their threads.
 - Browse the user's threads.

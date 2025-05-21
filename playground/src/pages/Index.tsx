@@ -63,6 +63,15 @@ const Index = () => {
           </Card>
         </div>
 
+        {/* Big image link to /screenshot.png */}
+        <div className="max-w-6xl mx-auto">
+          <img
+            src="/screenshot.png"
+            alt="Agent Playground"
+            className="w-full h-auto"
+          />
+        </div>
+
         {/* Installation Instructions */}
         <div className="max-w-3xl mx-auto">
           <h2 className="text-2xl font-bold mb-6">Getting Started</h2>
