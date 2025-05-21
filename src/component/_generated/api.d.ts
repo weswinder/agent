@@ -1264,7 +1264,6 @@ export type Mounts = {
       "query",
       "public",
       {
-        beforeMessageId?: string;
         excludeToolMessages?: boolean;
         isTool?: "use excludeToolMessages instead of this";
         order?: "asc" | "desc";
@@ -1278,6 +1277,7 @@ export type Mounts = {
         };
         statuses?: Array<"pending" | "success" | "failed">;
         threadId: string;
+        upToAndIncludingMessageId?: string;
       },
       {
         continueCursor: string;

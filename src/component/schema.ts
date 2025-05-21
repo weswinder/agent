@@ -28,10 +28,9 @@ export const schema = defineSchema({
     parentThreadIds: v.optional(v.array(v.id("threads"))),
     order: /*DEPRECATED*/ v.optional(v.number()),
   }).index("userId", ["userId"]),
-  // TODO: text search on title/ summary
   messages: defineTable({
     id: v.optional(v.string()), // external id, e.g. from Vercel AI SDK
-    userId: v.optional(v.string()), // useful for future indexes (text search)
+    userId: v.optional(v.string()), // useful for searching across threads
     threadId: v.id("threads"),
     // TODO: is this redunant with message at last step @ order - 1?
     parentMessageId: v.optional(v.id("messages")),

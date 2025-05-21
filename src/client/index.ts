@@ -421,37 +421,23 @@ export class Agent<AgentTools extends ToolSet> {
       threadId: string | undefined;
       messages: CoreMessage[];
       /**
-       * If provided, it will search for messages before this message.
-       * Note: if this is far in the past, the search results may be more
+       * If provided, it will search for messages up to and including this message.
+       * Note: if this is far in the past, text and vector search results may be more
        * limited, as it's post-filtering the results.
        */
-      beforeMessageId?: string;
+      upToAndIncludingMessageId?: string;
       contextOptions: ContextOptions | undefined;
     }
   ): Promise<MessageDoc[]> {
     assert(args.userId || args.threadId, "Specify userId or threadId");
     // Fetch the latest messages from the thread
-    const contextMessages: MessageDoc[] = [];
     let included: Set<string> | undefined;
     const opts = this.mergedContextOptions(args.contextOptions);
-    if (opts.searchOptions?.textSearch || opts.searchOptions?.vectorSearch) {
-      if (!("runAction" in ctx)) {
-        throw new Error("searchUserMessages only works in an action");
-      }
-      const searchMessages = await ctx.runAction(
-        this.component.messages.searchMessages,
-        {
-          userId: opts?.searchOtherThreads ? args.userId : undefined,
-          threadId: args.threadId,
-          beforeMessageId: args.beforeMessageId,
-          ...(await this.searchOptionsWithDefaults(opts, args.messages)),
-        }
-      );
-      // TODO: track what messages we used for context
-      included = new Set(searchMessages.map((m) => m._id));
-      contextMessages.push(...searchMessages);
-    }
-    if (args.threadId && opts.recentMessages !== 0) {
+    const contextMessages: MessageDoc[] = [];
+    if (
+      args.threadId &&
+      (opts.recentMessages !== 0 || args.upToAndIncludingMessageId)
+    ) {
       const { page } = await ctx.runQuery(
         this.component.messages.listMessagesByThreadId,
         {
@@ -462,14 +448,39 @@ export class Agent<AgentTools extends ToolSet> {
             numItems: opts.recentMessages ?? DEFAULT_RECENT_MESSAGES,
             cursor: null,
           },
-          beforeMessageId: args.beforeMessageId,
+          upToAndIncludingMessageId: args.upToAndIncludingMessageId,
           order: "desc",
           statuses: ["success"],
         }
       );
+      included = new Set(page.map((m) => m._id));
       contextMessages.push(
         // Reverse since we fetched in descending order
         ...page.filter((m) => !included?.has(m._id)).reverse()
+      );
+    }
+    if (opts.searchOptions?.textSearch || opts.searchOptions?.vectorSearch) {
+      const targetMessage = contextMessages.find(
+        (m) => m._id === args.upToAndIncludingMessageId
+      )?.message;
+      const messagesToSearch = targetMessage
+        ? [targetMessage, ...args.messages]
+        : args.messages;
+      if (!("runAction" in ctx)) {
+        throw new Error("searchUserMessages only works in an action");
+      }
+      const searchMessages = await ctx.runAction(
+        this.component.messages.searchMessages,
+        {
+          userId: opts?.searchOtherThreads ? args.userId : undefined,
+          threadId: args.threadId,
+          beforeMessageId: args.upToAndIncludingMessageId,
+          ...(await this.searchOptionsWithDefaults(opts, messagesToSearch)),
+        }
+      );
+      // TODO: track what messages we used for context
+      contextMessages.unshift(
+        ...searchMessages.filter((m) => !included?.has(m._id))
       );
     }
     // Ensure we don't include tool messages without a corresponding tool call
@@ -537,6 +548,14 @@ export class Agent<AgentTools extends ToolSet> {
     args: {
       threadId: string;
       userId?: string;
+      /**
+       * The message that these messages are in response to. They will be
+       * the same "order" as this message, at increasing stepOrder(s).
+       */
+      parentMessageId?: string;
+      /**
+       * The messages to save.
+       */
       messages: CoreMessageMaybeWithId[];
       /**
        * Metadata to save with the messages. Each element corresponds to the
@@ -564,6 +583,7 @@ export class Agent<AgentTools extends ToolSet> {
       threadId: args.threadId,
       userId: args.userId,
       agentName: this.options.name,
+      parentMessageId: args.parentMessageId,
       messages: args.messages.map(
         (m, i) =>
           ({
@@ -600,6 +620,7 @@ export class Agent<AgentTools extends ToolSet> {
       args: {
         threadId: v.string(),
         userId: v.optional(v.string()),
+        parentMessageId: v.optional(v.string()),
         messages: v.array(vMessageWithMetadata),
         pending: v.optional(v.boolean()),
         failPendingSteps: v.optional(v.boolean()),
@@ -617,7 +638,7 @@ export class Agent<AgentTools extends ToolSet> {
   /**
    * Explicitly save a "step" created by the AI SDK.
    * @param ctx The ctx argument to a mutation or action.
-   * @param args What to save
+   * @param args The Step generated by the AI SDK.
    */
   async saveStep<TOOLS extends ToolSet>(
     ctx: RunMutationCtx,
@@ -721,9 +742,7 @@ export class Agent<AgentTools extends ToolSet> {
        * set in the agent constructor.
        */
       usageHandler?: UsageHandler;
-      /**
-       * The tools to use for this thread. Overrides any tools passed in the agent constructor.
-       */
+      /** @deprecated Pass `tools` in the next parameter instead. This is only intended to pass through thread-default tools.  */
       tools?: ToolSet;
     },
     args: TextArgs<AgentTools, TOOLS, OUTPUT, OUTPUT_PARTIAL>,
@@ -732,7 +751,7 @@ export class Agent<AgentTools extends ToolSet> {
     GenerateTextResult<TOOLS extends undefined ? AgentTools : TOOLS, OUTPUT> &
       GenerationOutputMetadata
   > {
-    const { args: aiArgs, messageId } = await this.saveMessagesAndFetchContext(
+    const { args: aiArgs, messageId } = await this._saveMessagesAndFetchContext(
       ctx,
       args,
       { userId, threadId, ...options }
@@ -745,15 +764,12 @@ export class Agent<AgentTools extends ToolSet> {
     const saveOutputMessages =
       options?.storageOptions?.saveOutputMessages ??
       this.options.storageOptions?.saveOutputMessages;
-    const model = aiArgs.model ?? this.options.chat;
     const trackUsage = usageHandler ?? this.options.usageHandler;
     try {
       const result = (await generateText({
         // Can be overridden
         maxSteps: this.options.maxSteps,
-        maxRetries: this.options.maxRetries,
         ...aiArgs,
-        model,
         tools,
         onStepFinish: async (step) => {
           if (threadId && messageId && saveOutputMessages !== false) {
@@ -769,8 +785,8 @@ export class Agent<AgentTools extends ToolSet> {
               userId,
               threadId,
               agentName: this.options.name,
-              model: model.modelId,
-              provider: model.provider,
+              model: aiArgs.model.modelId,
+              provider: aiArgs.model.provider,
               usage: step.usage,
               providerMetadata: step.providerMetadata,
             });
@@ -802,11 +818,6 @@ export class Agent<AgentTools extends ToolSet> {
    * resulting messages to the thread, if specified.
    * Use {@link continueThread} to get a version of this function already scoped
    * to a thread (and optionally userId).
-   * @param ctx The context passed from the action function calling this.
-   * @param { userId, threadId }: The user and thread to associate the message with
-   * @param args The arguments to the streamText function, along with extra controls
-   * for the {@link ContextOptions} and {@link StorageOptions}.
-   * @returns The result of the streamText function.
    */
   async streamText<
     TOOLS extends ToolSet | undefined = undefined,
@@ -829,7 +840,14 @@ export class Agent<AgentTools extends ToolSet> {
       usageHandler?: UsageHandler;
       tools?: ToolSet;
     },
+    /**
+     * The arguments to the streamText function, similar to the ai `streamText` function.
+     */
     args: StreamingTextArgs<AgentTools, TOOLS, OUTPUT, PARTIAL_OUTPUT>,
+    /**
+     * The {@link ContextOptions} and {@link StorageOptions}
+     * options to use for fetching contextual messages and saving input/output messages.
+     */
     options?: Options
   ): Promise<
     StreamTextResult<
@@ -838,7 +856,7 @@ export class Agent<AgentTools extends ToolSet> {
     > &
       GenerationOutputMetadata
   > {
-    const { args: aiArgs, messageId } = await this.saveMessagesAndFetchContext(
+    const { args: aiArgs, messageId } = await this._saveMessagesAndFetchContext(
       ctx,
       args,
       { userId, threadId, ...options }
@@ -851,14 +869,11 @@ export class Agent<AgentTools extends ToolSet> {
     const saveOutputMessages =
       options?.storageOptions?.saveOutputMessages ??
       this.options.storageOptions?.saveOutputMessages;
-    const model = aiArgs.model ?? this.options.chat;
     const trackUsage = usageHandler ?? this.options.usageHandler;
     const result = streamText({
       // Can be overridden
       maxSteps: this.options.maxSteps,
-      maxRetries: this.options.maxRetries,
       ...aiArgs,
-      model,
       tools,
       onChunk: async (chunk) => {
         // console.log("onChunk", chunk);
@@ -890,8 +905,8 @@ export class Agent<AgentTools extends ToolSet> {
             userId,
             threadId,
             agentName: this.options.name,
-            model: model.modelId,
-            provider: model.provider,
+            model: aiArgs.model.modelId,
+            provider: aiArgs.model.provider,
             usage: step.usage,
             providerMetadata: step.providerMetadata,
           });
@@ -907,12 +922,15 @@ export class Agent<AgentTools extends ToolSet> {
     return result;
   }
 
-  async saveMessagesAndFetchContext<
+  async _saveMessagesAndFetchContext<
     T extends {
       id?: string;
       prompt?: string;
       messages?: CoreMessage[] | AIMessageWithoutId[];
       system?: string;
+      promptMessageId?: string;
+      model?: LanguageModelV1;
+      maxRetries?: number;
     },
   >(
     ctx: RunActionCtx | RunMutationCtx,
@@ -927,20 +945,33 @@ export class Agent<AgentTools extends ToolSet> {
       threadId: string | undefined;
     } & Options
   ): Promise<{
-    args: T;
+    args: T & { model: LanguageModelV1 };
     messageId: string | undefined;
   }> {
     contextOptions ||= this.options.contextOptions;
     storageOptions ||= this.options.storageOptions;
-    const messages = promptOrMessagesToCoreMessages(args);
+    // If only a messageId is provided, this will be empty.
+    const messages = args.promptMessageId
+      ? []
+      : promptOrMessagesToCoreMessages(args);
+    assert(
+      !args.promptMessageId || !(args.prompt || args.messages),
+      "you can't specify a prompt or message if you specify a promptMessageId"
+    );
+    // If only a messageId is provided, this will add that message to the end.
     const contextMessages = await this.fetchContextMessages(ctx, {
       userId,
       threadId,
+      upToAndIncludingMessageId: args.promptMessageId,
       messages,
       contextOptions,
     });
-    let messageId: string | undefined;
-    if (threadId && storageOptions?.saveAnyInputMessages !== false) {
+    let messageId = args.promptMessageId;
+    if (
+      threadId &&
+      messages.length &&
+      storageOptions?.saveAnyInputMessages !== false
+    ) {
       const saveAll = storageOptions?.saveAllInputMessages;
       const coreMessages = saveAll ? messages : messages.slice(-1);
       const saved = await this.saveMessages(ctx, {
@@ -953,16 +984,18 @@ export class Agent<AgentTools extends ToolSet> {
       });
       messageId = saved.lastMessageId;
     }
-    const { prompt: _, ...rest } = args;
+    const { prompt: _, model, ...rest } = args;
     return {
       args: {
         ...rest,
+        maxRetries: args.maxRetries ?? this.options.maxRetries,
+        model: model ?? this.options.chat,
         system: args.system ?? this.options.instructions,
         messages: [
           ...contextMessages.map((m) => deserializeMessage(m.message!)),
           ...messages,
         ],
-      } as T,
+      } as T & { model: LanguageModelV1 },
       messageId,
     };
   }
@@ -973,12 +1006,6 @@ export class Agent<AgentTools extends ToolSet> {
    * resulting messages to the thread, if specified.
    * Use {@link continueThread} to get a version of this function already scoped
    * to a thread (and optionally userId).
-   * @param ctx The context passed from the action function calling this.
-   * @param { userId, threadId }: The user and thread to associate the message with
-   * @param args The arguments to the generateObject function, similar to the ai.generateObject function.
-   * @param options The {@link ContextOptions} and {@link StorageOptions}
-   * options to use for fetching contextual messages and saving input/output messages.
-   * @returns The result of the generateObject function.
    */
   async generateObject<T>(
     ctx: RunActionCtx,
@@ -987,27 +1014,30 @@ export class Agent<AgentTools extends ToolSet> {
       threadId,
       usageHandler,
     }: { userId?: string; threadId?: string; usageHandler?: UsageHandler },
+    /**
+     * The arguments to the generateObject function, similar to the ai.generateObject function.
+     */
     args: OurObjectArgs<T>,
+    /**
+     * The {@link ContextOptions} and {@link StorageOptions}
+     * options to use for fetching contextual messages and saving input/output messages.
+     */
     options?: Options
   ): Promise<GenerateObjectResult<T> & GenerationOutputMetadata> {
-    const { args: aiArgs, messageId } = await this.saveMessagesAndFetchContext(
+    const { args: aiArgs, messageId } = await this._saveMessagesAndFetchContext(
       ctx,
       args,
       { userId, threadId, ...options }
     );
-    const model = aiArgs.model ?? this.options.chat;
     const trackUsage = usageHandler ?? this.options.usageHandler;
     const saveOutputMessages =
       options?.storageOptions?.saveOutputMessages ??
       this.options.storageOptions?.saveOutputMessages;
     try {
-      const result = (await generateObject({
-        // Can be overridden
-        maxRetries: this.options.maxRetries,
-        ...aiArgs,
-        model,
+      const result = (await generateObject(
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      } as any)) as GenerateObjectResult<T> & GenerationOutputMetadata;
+        aiArgs as any
+      )) as GenerateObjectResult<T> & GenerationOutputMetadata;
 
       if (threadId && messageId && saveOutputMessages !== false) {
         await this.saveObject(ctx, {
@@ -1023,8 +1053,8 @@ export class Agent<AgentTools extends ToolSet> {
           userId,
           threadId,
           agentName: this.options.name,
-          model: model.modelId,
-          provider: model.provider,
+          model: aiArgs.model.modelId,
+          provider: aiArgs.model.provider,
           usage: result.usage,
           providerMetadata: result.providerMetadata,
         });
@@ -1042,17 +1072,11 @@ export class Agent<AgentTools extends ToolSet> {
   }
 
   /**
-   * This behaves like {@link streamObject} from the "ai" package except that
+   * This behaves like `streamObject` from the "ai" package except that
    * it add context based on the userId and threadId and saves the input and
    * resulting messages to the thread, if specified.
    * Use {@link continueThread} to get a version of this function already scoped
    * to a thread (and optionally userId).
-   * @param ctx The context passed from the action function calling this.
-   * @param { userId, threadId }: The user and thread to associate the message with
-   * @param args The arguments to the streamObject function, similar to the ai.streamObject function.
-   * @param options The {@link ContextOptions} and {@link StorageOptions}
-   * options to use for fetching contextual messages and saving input/output messages.
-   * @returns The result of the streamObject function.
    */
   async streamObject<T>(
     ctx: RunActionCtx,
@@ -1061,28 +1085,31 @@ export class Agent<AgentTools extends ToolSet> {
       threadId,
       usageHandler,
     }: { userId?: string; threadId?: string; usageHandler?: UsageHandler },
+    /**
+     * The arguments to the streamObject function, similar to the ai `streamObject` function.
+     */
     args: OurStreamObjectArgs<T>,
+    /**
+     * The {@link ContextOptions} and {@link StorageOptions}
+     * options to use for fetching contextual messages and saving input/output messages.
+     */
     options?: Options
   ): Promise<
     StreamObjectResult<DeepPartial<T>, T, never> & GenerationOutputMetadata
   > {
     // TODO: unify all this shared code between all the generate* and stream* functions
-    const { args: aiArgs, messageId } = await this.saveMessagesAndFetchContext(
+    const { args: aiArgs, messageId } = await this._saveMessagesAndFetchContext(
       ctx,
       args,
       { userId, threadId, ...options }
     );
-    const model = aiArgs.model ?? this.options.chat;
     const trackUsage = usageHandler ?? this.options.usageHandler;
     const saveOutputMessages =
       options?.storageOptions?.saveOutputMessages ??
       this.options.storageOptions?.saveOutputMessages;
     const stream = streamObject<T>({
-      // Can be overridden
-      maxRetries: this.options.maxRetries,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       ...(aiArgs as any),
-      model,
       onError: async (error) => {
         console.error("onError", error);
         return args.onError?.(error);
@@ -1113,8 +1140,8 @@ export class Agent<AgentTools extends ToolSet> {
             userId,
             threadId,
             agentName: this.options.name,
-            model: model.modelId,
-            provider: model.provider,
+            model: aiArgs.model.modelId,
+            provider: aiArgs.model.provider,
             usage: result.usage,
             providerMetadata: result.providerMetadata,
           });
@@ -1476,6 +1503,13 @@ type TextArgs<
   "toolChoice" | "tools" | "model"
 > & {
   /**
+   * If provided, this message will be used as the "prompt" for the LLM call,
+   * instead of the prompt or messages.
+   * This is useful if you want to first save a user message, then use it as
+   * the prompt for the LLM call in another call.
+   */
+  promptMessageId?: string;
+  /**
    * The model to use for the tool calls. This will override the model specified
    * in the Agent constructor.
    */
@@ -1546,6 +1580,13 @@ type BaseGenerateObjectOptions = CallSettings & {
    * associated with and your contextOptions.
    */
   messages?: CoreMessage[];
+  /**
+   * The message to use as the "prompt" for the object generation.
+   * If this is provided, it will be used instead of the prompt or messages.
+   * This is useful if you want to first save a user message, then use it as
+   * the prompt for the object generation in another call.
+   */
+  promptMessageId?: string;
   experimental_repairText?: RepairTextFunction;
   experimental_telemetry?: TelemetrySettings;
   providerOptions?: ProviderOptions;

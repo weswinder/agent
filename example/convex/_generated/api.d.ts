@@ -1412,7 +1412,6 @@ export declare const components: {
         "query",
         "internal",
         {
-          beforeMessageId?: string;
           excludeToolMessages?: boolean;
           isTool?: "use excludeToolMessages instead of this";
           order?: "asc" | "desc";
@@ -1426,6 +1425,7 @@ export declare const components: {
           };
           statuses?: Array<"pending" | "success" | "failed">;
           threadId: string;
+          upToAndIncludingMessageId?: string;
         },
         {
           continueCursor: string;

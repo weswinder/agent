@@ -122,7 +122,9 @@ async function addMessagesHandler(
     const parentMessage = await ctx.db.get(parentMessageId);
     assert(parentMessage, `Parent message ${parentMessageId} not found`);
     order = parentMessage.order;
-    stepOrder = parentMessage.stepOrder;
+    // Defend against there being existing messages with this parent.
+    const maxMessage = await getMaxMessage(ctx, threadId, userId, order);
+    stepOrder = maxMessage?.stepOrder ?? parentMessage.stepOrder;
   } else {
     const maxMessage = await getMaxMessage(ctx, threadId, userId);
     order = maxMessage ? maxMessage.order + 1 : 0;
@@ -182,7 +184,8 @@ async function addMessagesHandler(
 export async function getMaxMessage(
   ctx: QueryCtx,
   threadId: Id<"threads"> | undefined,
-  userId: string | undefined
+  userId: string | undefined,
+  order?: number
 ) {
   assert(threadId || userId, "One of threadId or userId is required");
   if (threadId) {
@@ -191,9 +194,16 @@ export async function getMaxMessage(
         ["success" as const, "pending" as const].map((status) =>
           stream(ctx.db, schema)
             .query("messages")
-            .withIndex("threadId_status_tool_order_stepOrder", (q) =>
-              q.eq("threadId", threadId).eq("status", status).eq("tool", tool)
-            )
+            .withIndex("threadId_status_tool_order_stepOrder", (q) => {
+              const qq = q
+                .eq("threadId", threadId)
+                .eq("status", status)
+                .eq("tool", tool);
+              if (order) {
+                return qq.eq("order", order);
+              }
+              return qq;
+            })
             .order("desc")
         )
       ),
@@ -205,9 +215,16 @@ export async function getMaxMessage(
         ["success" as const, "pending" as const].map((status) =>
           stream(ctx.db, schema)
             .query("messages")
-            .withIndex("userId_status_tool_order_stepOrder", (q) =>
-              q.eq("userId", userId).eq("status", status).eq("tool", tool)
-            )
+            .withIndex("userId_status_tool_order_stepOrder", (q) => {
+              const qq = q
+                .eq("userId", userId)
+                .eq("status", status)
+                .eq("tool", tool);
+              if (order) {
+                return qq.eq("order", order);
+              }
+              return qq;
+            })
             .order("desc")
         )
       ),
@@ -236,7 +253,6 @@ async function addStepHandler(
   const parentMessage = await ctx.db.get(args.parentMessageId);
   assert(parentMessage, `Message ${args.parentMessageId} not found`);
   const order = parentMessage.order;
-  assert(order !== undefined, `${args.parentMessageId} has no order`);
   // TODO: only fetch the last one if we aren't failing pending steps
   let steps = await ctx.db
     .query("steps")
@@ -365,13 +381,18 @@ export const listMessagesByThreadId = query({
     order: v.optional(v.union(v.literal("asc"), v.literal("desc"))),
     paginationOpts: v.optional(paginationOptsValidator),
     statuses: v.optional(v.array(vMessageStatus)),
-    beforeMessageId: v.optional(v.id("messages")),
+    upToAndIncludingMessageId: v.optional(v.id("messages")),
   },
   handler: async (ctx, args) => {
     const statuses =
       args.statuses ?? vMessageStatus.members.map((m) => m.value);
-    const before =
-      args.beforeMessageId && (await ctx.db.get(args.beforeMessageId));
+    const last =
+      args.upToAndIncludingMessageId &&
+      (await ctx.db.get(args.upToAndIncludingMessageId));
+    assert(
+      !last || last.threadId === args.threadId,
+      "upToAndIncludingMessageId must be a message in the thread"
+    );
     const toolOptions = args.excludeToolMessages ? [false] : [true, false];
     const order = args.order ?? "desc";
     const streams = toolOptions.flatMap((tool) =>
@@ -383,17 +404,17 @@ export const listMessagesByThreadId = query({
               .eq("threadId", args.threadId)
               .eq("status", status)
               .eq("tool", tool);
-            if (before) {
-              return qq.lte("order", before.order);
+            if (last) {
+              return qq.lte("order", last.order);
             }
             return qq;
           })
           .order(order)
           .filterWith(
             async (m) =>
-              !before ||
-              m.order < before.order ||
-              (m.order === before.order && m.stepOrder < before.stepOrder)
+              !last ||
+              m.order < last.order ||
+              (m.order === last.order && m.stepOrder <= last.stepOrder)
           )
       )
     );
