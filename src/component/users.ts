@@ -14,6 +14,7 @@ import { deleteMessage } from "./messages.js";
 import { paginationOptsValidator } from "convex/server";
 import { stream } from "convex-helpers/server/stream";
 import { paginationResultValidator } from "../validators.js";
+import { Id } from "./_generated/dataModel.js";
 
 // Note: it only searches for users with threads
 export const listUsersWithThreads = query({
@@ -38,22 +39,18 @@ export const listUsersWithThreads = query({
 export const deleteAllForUserId = action({
   args: { userId: v.string() },
   handler: async (ctx, args) => {
-    let messagesCursor = null;
     let threadsCursor = null;
+    let threadInProgress = null;
+    let messagesCursor = null;
     let isDone = false;
     while (!isDone) {
-      const result: {
-        messagesCursor: string;
-        threadsCursor: string | null;
-        isDone: boolean;
-      } = await ctx.runMutation(internal.users._deletePageForUserId, {
-        userId: args.userId,
-        messagesCursor,
-        threadsCursor,
-      });
-      messagesCursor = result.messagesCursor;
-      threadsCursor = result.threadsCursor;
-      isDone = result.isDone;
+      ({ messagesCursor, threadInProgress, threadsCursor, isDone } =
+        await ctx.runMutation(internal.users._deletePageForUserId, {
+          userId: args.userId,
+          messagesCursor,
+          threadInProgress,
+          threadsCursor,
+        }));
     }
   },
   returns: v.null(),
@@ -68,6 +65,7 @@ export const deleteAllForUserIdAsync = mutation({
       userId: args.userId,
       messagesCursor: null,
       threadsCursor: null,
+      threadInProgress: null,
     });
     return isDone;
   },
@@ -78,11 +76,13 @@ const deleteAllArgs = {
   userId: v.string(),
   messagesCursor: nullable(v.string()),
   threadsCursor: nullable(v.string()),
+  threadInProgress: nullable(v.id("threads")),
 };
 type DeleteAllArgs = ObjectType<typeof deleteAllArgs>;
 const deleteAllReturns = {
-  messagesCursor: v.string(),
-  threadsCursor: nullable(v.string()),
+  threadsCursor: v.string(),
+  threadInProgress: nullable(v.id("threads")),
+  messagesCursor: nullable(v.string()),
   isDone: v.boolean(),
 };
 type DeleteAllReturns = ObjectType<typeof deleteAllReturns>;
@@ -101,8 +101,7 @@ async function deleteAllForUserIdAsyncHandler(
   if (!result.isDone) {
     await ctx.scheduler.runAfter(0, internal.users._deleteAllForUserIdAsync, {
       userId: args.userId,
-      messagesCursor: result.messagesCursor,
-      threadsCursor: result.threadsCursor,
+      ...result,
     });
   }
   return result.isDone;
@@ -117,29 +116,55 @@ async function deletePageForUserId(
   ctx: MutationCtx,
   args: DeleteAllArgs
 ): Promise<DeleteAllReturns> {
-  const threads = await paginator(ctx.db, schema)
-    .query("threads")
-    .withIndex("userId", (q) => q.eq("userId", args.userId))
-    .order("desc")
-    .paginate({
-      numItems: 100,
-      cursor: args.threadsCursor ?? null,
-    });
-  await Promise.all(threads.page.map((c) => ctx.db.delete(c._id)));
+  let threadInProgress: Id<"threads"> | null = args.threadInProgress;
+  let threadsCursor: string | null = args.threadsCursor;
+  let messagesCursor: string | null = args.messagesCursor;
+  if (!threadsCursor || !threadInProgress) {
+    const threads = await paginator(ctx.db, schema)
+      .query("threads")
+      .withIndex("userId", (q) => q.eq("userId", args.userId))
+      .order("desc")
+      .paginate({
+        numItems: 1,
+        cursor: args.threadsCursor ?? null,
+      });
+    threadsCursor = threads.continueCursor;
+    if (threads.page.length > 0) {
+      threadInProgress = threads.page[0]._id;
+      messagesCursor = null;
+    } else {
+      return {
+        isDone: true,
+        threadsCursor,
+        threadInProgress,
+        messagesCursor,
+      };
+    }
+  }
+  // TODO: make a stream of thread queries and delete those in pages
+  // then get rid of the "userId" index.
   const messages = await paginator(ctx.db, schema)
     .query("messages")
-    .withIndex("userId_status_tool_order_stepOrder", (q) =>
-      q.eq("userId", args.userId)
+    .withIndex("threadId_status_tool_order_stepOrder", (q) =>
+      q.eq("threadId", threadInProgress!)
     )
     .order("desc")
     .paginate({
       numItems: 100,
-      cursor: args.messagesCursor ?? null,
+      cursor: args.messagesCursor,
     });
   await Promise.all(messages.page.map((m) => deleteMessage(ctx, m)));
+  if (messages.isDone) {
+    await ctx.db.delete(threadInProgress);
+    threadInProgress = null;
+    messagesCursor = null;
+  } else {
+    messagesCursor = messages.continueCursor;
+  }
   return {
-    messagesCursor: messages.continueCursor,
-    threadsCursor: threads.continueCursor,
-    isDone: messages.isDone,
+    messagesCursor,
+    threadsCursor,
+    threadInProgress,
+    isDone: false,
   };
 }

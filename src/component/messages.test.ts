@@ -22,7 +22,7 @@ describe("agent", () => {
       ],
     });
     const maxMessage = await t.run(async (ctx) => {
-      return await getMaxMessage(ctx, thread._id as Id<"threads">, "test");
+      return await getMaxMessage(ctx, thread._id as Id<"threads">);
     });
     expect(maxMessage).toMatchObject({
       _id: messages.at(-1)!._id,
@@ -69,7 +69,7 @@ describe("agent", () => {
       ],
     });
     const maxMessage = await t.run(async (ctx) => {
-      return await getMaxMessage(ctx, thread._id as Id<"threads">, "test");
+      return await getMaxMessage(ctx, thread._id as Id<"threads">);
     });
     expect(maxMessage).toMatchObject({
       _id: messages.at(-1)!._id,
@@ -88,7 +88,7 @@ describe("agent", () => {
       messages: [{ message: { role: "user", content: "hello" } }],
     });
     const maxMessage = await t.run(async (ctx) => {
-      return await getMaxMessage(ctx, thread._id as Id<"threads">, "test");
+      return await getMaxMessage(ctx, thread._id as Id<"threads">);
     });
     expect(maxMessage).toMatchObject({
       _id: messages.at(-1)!._id,
@@ -100,7 +100,7 @@ describe("agent", () => {
       messages: [{ message: { role: "user", content: "hello" } }],
     });
     const maxMessage2 = await t.run(async (ctx) => {
-      return await getMaxMessage(ctx, thread._id as Id<"threads">, "test");
+      return await getMaxMessage(ctx, thread._id as Id<"threads">);
     });
     expect(maxMessage2).toMatchObject({
       _id: messages2.at(-1)!._id,
@@ -119,7 +119,7 @@ describe("agent", () => {
       messages: [{ message: { role: "user", content: "hello" } }],
     });
     const maxMessage = await t.run(async (ctx) => {
-      return await getMaxMessage(ctx, thread._id as Id<"threads">, "test");
+      return await getMaxMessage(ctx, thread._id as Id<"threads">);
     });
     expect(maxMessage).toMatchObject({
       _id: messages.at(-1)!._id,
@@ -132,7 +132,7 @@ describe("agent", () => {
       promptMessageId: messages.at(-1)!._id,
     });
     const maxMessage2 = await t.run(async (ctx) => {
-      return await getMaxMessage(ctx, thread._id as Id<"threads">, "test");
+      return await getMaxMessage(ctx, thread._id as Id<"threads">);
     });
     expect(maxMessage2).toMatchObject({
       _id: messages2.at(-1)!._id,

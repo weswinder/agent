@@ -74,21 +74,6 @@ export const schema = defineSchema({
       "order",
       "stepOrder",
     ])
-    .index("userId_status_tool_order_stepOrder", [
-      "userId",
-      "status",
-      "tool",
-      "order",
-      "stepOrder",
-    ])
-    // Allows finding all threaded messages in order
-    // Allows finding all failed messages to evaluate
-    // .index("status_parentMessageId_order_stepOrder", [
-    //   "status",
-    //   "parentMessageId",
-    //   "order",
-    //   "stepOrder",
-    // ])
     // Allows text search on message content
     .searchIndex("text_search", {
       searchField: "text",

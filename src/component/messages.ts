@@ -129,10 +129,10 @@ async function addMessagesHandler(
     }
     order = parentMessage.order;
     // Defend against there being existing messages with this parent.
-    const maxMessage = await getMaxMessage(ctx, threadId, userId, order);
+    const maxMessage = await getMaxMessage(ctx, threadId, order);
     stepOrder = maxMessage?.stepOrder ?? parentMessage.stepOrder;
   } else {
-    const maxMessage = await getMaxMessage(ctx, threadId, userId);
+    const maxMessage = await getMaxMessage(ctx, threadId);
     order = maxMessage ? maxMessage.order + 1 : 0;
     stepOrder = -1;
   }
@@ -190,64 +190,38 @@ async function addMessagesHandler(
 // exported for tests
 export async function getMaxMessage(
   ctx: QueryCtx,
-  threadId: Id<"threads"> | undefined,
-  userId: string | undefined,
+  threadId: Id<"threads">,
   order?: number
 ) {
-  return orderedMessagesStream(ctx, threadId, userId, "desc", order).first();
+  return orderedMessagesStream(ctx, threadId, "desc", order).first();
 }
 
 function orderedMessagesStream(
   ctx: QueryCtx,
-  threadId: Id<"threads"> | undefined,
-  userId: string | undefined,
+  threadId: Id<"threads">,
   sortOrder: "asc" | "desc",
   order?: number
 ) {
-  assert(threadId || userId, "One of threadId or userId is required");
-  if (threadId) {
-    return mergedStream(
-      [true, false].flatMap((tool) =>
-        ["success" as const, "pending" as const].map((status) =>
-          stream(ctx.db, schema)
-            .query("messages")
-            .withIndex("threadId_status_tool_order_stepOrder", (q) => {
-              const qq = q
-                .eq("threadId", threadId)
-                .eq("status", status)
-                .eq("tool", tool);
-              if (order) {
-                return qq.eq("order", order);
-              }
-              return qq;
-            })
-            .order(sortOrder)
-        )
-      ),
-      ["order", "stepOrder"]
-    );
-  } else {
-    return mergedStream(
-      [true, false].flatMap((tool) =>
-        ["success" as const, "pending" as const].map((status) =>
-          stream(ctx.db, schema)
-            .query("messages")
-            .withIndex("userId_status_tool_order_stepOrder", (q) => {
-              const qq = q
-                .eq("userId", userId)
-                .eq("status", status)
-                .eq("tool", tool);
-              if (order) {
-                return qq.eq("order", order);
-              }
-              return qq;
-            })
-            .order(sortOrder)
-        )
-      ),
-      ["order", "stepOrder"]
-    );
-  }
+  return mergedStream(
+    [true, false].flatMap((tool) =>
+      ["success" as const, "pending" as const].map((status) =>
+        stream(ctx.db, schema)
+          .query("messages")
+          .withIndex("threadId_status_tool_order_stepOrder", (q) => {
+            const qq = q
+              .eq("threadId", threadId)
+              .eq("status", status)
+              .eq("tool", tool);
+            if (order) {
+              return qq.eq("order", order);
+            }
+            return qq;
+          })
+          .order(sortOrder)
+      )
+    ),
+    ["order", "stepOrder"]
+  );
 }
 
 const addStepArgs = {
@@ -325,7 +299,6 @@ export const rollbackMessage = mutation({
     const messages = await orderedMessagesStream(
       ctx,
       message.threadId,
-      message.userId,
       "asc",
       message.order
     ).collect();
@@ -396,7 +369,6 @@ async function commitMessageHandler(
   ).collect();
   for (const message of messages) {
     await ctx.db.patch(message._id, { status: "success" });
-    // TODO: recursively commit steps & messages that might depend on this one.
   }
 }
 
@@ -616,39 +588,21 @@ export const _fetchSearchMessages = internalQuery({
         included[searchId].add(i);
       }
       if (earliest !== latest) {
-        if (m.threadId) {
-          const surrounding = await ctx.db
-            .query("messages")
-            .withIndex("threadId_status_tool_order_stepOrder", (q) =>
-              q
-                .eq("threadId", m.threadId)
-                .eq("status", "success")
-                .eq("tool", false)
-                .gte("order", earliest)
-                .lte("order", latest)
-            )
-            .collect();
-          if (!ranges[searchId]) {
-            ranges[searchId] = [];
-          }
-          ranges[searchId].push(...surrounding);
-        } else {
-          const surrounding = await ctx.db
-            .query("messages")
-            .withIndex("userId_status_tool_order_stepOrder", (q) =>
-              q
-                .eq("userId", m.userId!)
-                .eq("status", "success")
-                .eq("tool", false)
-                .gte("order", earliest)
-                .lte("order", latest)
-            )
-            .collect();
-          if (!ranges[searchId]) {
-            ranges[searchId] = [];
-          }
-          ranges[searchId].push(...surrounding);
+        const surrounding = await ctx.db
+          .query("messages")
+          .withIndex("threadId_status_tool_order_stepOrder", (q) =>
+            q
+              .eq("threadId", m.threadId as Id<"threads">)
+              .eq("status", "success")
+              .eq("tool", false)
+              .gte("order", earliest)
+              .lte("order", latest)
+          )
+          .collect();
+        if (!ranges[searchId]) {
+          ranges[searchId] = [];
         }
+        ranges[searchId].push(...surrounding);
       }
     }
     for (const r of Object.values(ranges).flat()) {
