@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.1.0 alpha
+## 0.1.0
 
 - UI Playground, to host locally or embed into your app.
   - On the left panel it has a dropdown to select a users, then lists the user's treads
@@ -9,10 +9,11 @@
     - Fetch context messages with different ContextOptions
     - Send a message in the thread - optionally saving it to the thread.
   - Run it with `npx @convex-dev/agent-playground` - uses Vite internally for now.
-- Add a function to turn MessageDoc[] into UIMessage[].
-- API key management (to authenticate into the UI Playground)
-- The README is a better resource.
+  - API key management (to authenticate into the UI Playground)
 - The `order` and `stepOrder` is now well defined: each call to something like `generateText` will be on the next "order" and each message generated from it will have increasing "subOrder" indexes.
+- Adds a function to turn MessageDoc[] into UIMessage[].
+- Eliminates an index to reduce storage cost per-message.
+- The README is a better resource.
 
 ### Breaking
 
