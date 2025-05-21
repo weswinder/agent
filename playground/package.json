@@ -1,7 +1,21 @@
 {
   "name": "@convex-dev/agent-playground",
+  "description": "A dashboard for the Convex Agent component.",
+  "repository": "github:get-convex/agent",
+  "homepage": "https://get-convex.github.io/agent/",
+  "bugs": {
+    "email": "support@convex.dev",
+    "url": "https://github.com/get-convex/agent/issues"
+  },
   "version": "0.0.7",
+  "license": "Apache-2.0",
   "type": "module",
+  "keywords": [
+    "convex",
+    "ai",
+    "agent",
+    "playground"
+  ],
   "scripts": {
     "dev": "vite",
     "build": "vite build",
@@ -97,6 +111,5 @@
     "globals": "^15.9.0",
     "typescript": "^5.5.3",
     "typescript-eslint": "^8.0.1"
-  },
-  "homepage": "https://get-convex.github.io/agent/"
+  }
 }
