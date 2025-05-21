@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.0.17 alpha
+## 0.1.0 alpha
 
 - UI Playground, to host locally or embed into your app.
   - On the left panel it has a dropdown to select a users, then lists the user's treads
@@ -12,15 +12,20 @@
 - Add a function to turn MessageDoc[] into UIMessage[].
 - API key management (to authenticate into the UI Playground)
 - The README is a better resource.
-- Fixes a bug to increment stepOrder correctly.
+- The `order` and `stepOrder` is now well defined: each call to something like `generateText` will be on the next "order" and each message generated from it will have increasing "subOrder" indexes.
 
 ### Breaking
 
 - `agent.fetchContextMessages` now returns `MessageDoc` instead of a `CoreMessage` objects.
 - `isTool` configuration for context has been changed to `excludeToolMessages` - where `false`/`undefined` is the default and includes tool messages, and `true` will only return user/assistant messages.
 - Reorganization of API (split `agent.messages.*` into `agent.threads.*`, `agent.messages.*`, `agent.files.*`, and `agent.users.*`.
-- Parameters like `parentMessageId` have generally been renamed to `beforeMessageId` to better clarify their use for things like looking up context. The `generate*` / `stream*` functions do not take a parentMessageId.
+- Parameters like `parentMessageId` have generally been renamed to `promptMessageId` or `beforeMessageId` or `upToAndIncludingMessageId` to better clarify their use for things like using an existing message as a prompt or searching context from before a message, or fetching messages up to and including a given message. The `generate*` / `stream*` functions can take a `promptMessageId` instead of a `prompt` / `messages` arg now.
 - Calls to steps and objects now take a parentMessageId instead of messageId parameter, as this is the true meaning of parent message (the message being responded to).
+
+### Deprecated
+
+- The `steps` table is going away, to be replaced with a callback where you can dump your own comprehensive debug information if/when you want to. As such, the `stepId` field isn't returned on messages.
+- The `parentMessageId` field is no longer exposed. Its purpose is now filled by the order & stepOrder fields: each message with the same order is a child of the message at stepOrder 0.
 
 ## 0.0.16
 
