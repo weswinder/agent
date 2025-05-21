@@ -1,5 +1,4 @@
-
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useRef, useEffect } from "react";
 import MessageItem from "./MessageItem";
 import { Message, User } from "../types";
 import { toUIMessages } from "@convex-dev/agent";
@@ -20,6 +19,7 @@ const MessageList: React.FC<MessageListProps> = ({
   const [selectedToolCallId, setSelectedToolCallId] = useState<string | null>(
     null
   );
+  const messagesEndRef = useRef<HTMLDivElement>(null);
   const uiMessages = useMemo(() => {
     // TODO: segment the messages by "order" so the message item can show all of
     // the messages that have been grouped together. Right now you can only see
@@ -43,6 +43,15 @@ const MessageList: React.FC<MessageListProps> = ({
     );
   };
 
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  // Scroll to bottom when messages change
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]); // Add messages as a dependency
+
   return (
     <div className="flex flex-col min-h-0 h-full overflow-y-auto">
       {uiMessages.map((message) => (
@@ -59,6 +68,8 @@ const MessageList: React.FC<MessageListProps> = ({
           selectedToolCallId={selectedToolCallId}
         />
       ))}
+      {/* Add an invisible div at the bottom to scroll to */}
+      <div ref={messagesEndRef} />
     </div>
   );
 };
