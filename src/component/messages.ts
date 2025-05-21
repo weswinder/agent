@@ -117,10 +117,17 @@ async function addMessagesHandler(
       )
     );
   }
-  const maxMessage = await getMaxMessage(ctx, threadId, userId);
-  let order = maxMessage?.order ?? -1;
-  let stepOrder = maxMessage?.stepOrder ?? 0;
-  let lastMessageIsTool = maxMessage?.tool ?? false;
+  let order, stepOrder;
+  if (parentMessageId) {
+    const parentMessage = await ctx.db.get(parentMessageId);
+    assert(parentMessage, `Parent message ${parentMessageId} not found`);
+    order = parentMessage.order;
+    stepOrder = parentMessage.stepOrder;
+  } else {
+    const maxMessage = await getMaxMessage(ctx, threadId, userId);
+    order = maxMessage?.order ?? 0;
+    stepOrder = maxMessage?.stepOrder ?? -1;
+  }
   const toReturn: Doc<"messages">[] = [];
   if (messages.length > 0) {
     if (args.embeddings) {
@@ -141,15 +148,7 @@ async function addMessagesHandler(
           threadId,
         });
       }
-      const tool = isTool(message.message);
-      if (lastMessageIsTool) {
-        stepOrder++;
-      } else {
-        order++;
-        stepOrder = 0;
-      }
-      lastMessageIsTool = tool;
-      const text = extractText(message.message);
+      stepOrder++;
       const messageId = await ctx.db.insert("messages", {
         ...rest,
         ...message,
@@ -157,8 +156,8 @@ async function addMessagesHandler(
         parentMessageId,
         userId,
         order,
-        tool,
-        text,
+        tool: isTool(message.message),
+        text: extractText(message.message),
         status: pending ? "pending" : "success",
         stepOrder,
       });

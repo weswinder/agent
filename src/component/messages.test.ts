@@ -29,8 +29,55 @@ describe("agent", () => {
     });
     expect(maxMessage).toMatchObject({
       _id: messages.at(-1)!._id,
-      order: 1,
-      stepOrder: 0,
+      order: 0,
+      stepOrder: 1,
+    });
+  });
+  test("getMaxMessages works when there are tools involved", async () => {
+    const t = convexTest(schema, modules);
+    const thread = await t.mutation(api.threads.createThread, {
+      userId: "test",
+    });
+    const { messages } = await t.mutation(api.messages.addMessages, {
+      threadId: thread._id as Id<"threads">,
+      messages: [
+        { message: { role: "user", content: "hello" } },
+        {
+          message: {
+            role: "assistant",
+            content: [
+              {
+                type: "tool-call",
+                args: { a: 1 },
+                toolCallId: "1",
+                toolName: "tool",
+              },
+            ],
+          },
+        },
+        {
+          message: {
+            role: "tool",
+            content: [
+              {
+                type: "tool-result",
+                toolName: "tool",
+                result: "foo",
+                toolCallId: "1",
+              },
+            ],
+          },
+        },
+        { message: { role: "assistant", content: "world" } },
+      ],
+    });
+    const maxMessage = await t.run(async (ctx) => {
+      return await getMaxMessage(ctx, thread._id as Id<"threads">, "test");
+    });
+    expect(maxMessage).toMatchObject({
+      _id: messages.at(-1)!._id,
+      order: 0,
+      stepOrder: 3,
     });
   });
 });
