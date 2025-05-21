@@ -652,20 +652,11 @@ export class Agent<AgentTools extends ToolSet> {
     const embeddings = await this.generateEmbeddings(
       messages.map((m) => m.message)
     );
-    if (embeddings) {
-      const { model, dimension, vectors } = embeddings;
-      for (let i = 0; i < messages.length; i++) {
-        const vector = vectors[i];
-        if (vector) {
-          messages[i].embedding = { model, dimension, vector };
-        }
-      }
-    }
     await ctx.runMutation(this.component.messages.addStep, {
       userId: args.userId,
       threadId: args.threadId,
       parentMessageId: args.parentMessageId,
-      step: { step, messages },
+      step: { step, messages, embeddings },
       failPendingSteps: false,
     });
   }
@@ -1156,33 +1147,20 @@ export class Agent<AgentTools extends ToolSet> {
       metadata?: Omit<MessageWithMetadata, "message">;
     }
   ): Promise<void> {
-    const { step, messages: withoutEmbed } = serializeObjectResult(
-      args.result,
-      {
-        model: this.options.chat.modelId,
-        provider: this.options.chat.provider,
-      }
+    const { step, messages } = serializeObjectResult(args.result, {
+      model: this.options.chat.modelId,
+      provider: this.options.chat.provider,
+    });
+    const embeddings = await this.generateEmbeddings(
+      messages.map((m) => m.message)
     );
-    const embeddings = await this.generateEmbeddings([withoutEmbed[0].message]);
-    const messages = embeddings?.vectors[0]
-      ? [
-          {
-            ...withoutEmbed[0],
-            embedding: {
-              dimension: embeddings.dimension,
-              model: embeddings.model,
-              vector: embeddings.vectors[0],
-            },
-          },
-        ]
-      : withoutEmbed;
 
     await ctx.runMutation(this.component.messages.addStep, {
       userId: args.userId,
       threadId: args.threadId,
       parentMessageId: args.parentMessageId,
       failPendingSteps: false,
-      step: { step, messages },
+      step: { step, messages, embeddings },
     });
   }
 

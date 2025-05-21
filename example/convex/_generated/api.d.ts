@@ -109,22 +109,13 @@ export declare const components: {
         "internal",
         {
           agentName?: string;
+          embeddings?: {
+            dimension: 128 | 256 | 512 | 768 | 1024 | 1536 | 2048 | 3072 | 4096;
+            model: string;
+            vectors: Array<Array<number> | null>;
+          };
           failPendingSteps?: boolean;
           messages: Array<{
-            embedding?: {
-              dimension:
-                | 128
-                | 256
-                | 512
-                | 768
-                | 1024
-                | 1536
-                | 2048
-                | 3072
-                | 4096;
-              model: string;
-              vector: Array<number>;
-            };
             error?: string;
             files?: Array<{
               data?: ArrayBuffer | string;
@@ -655,21 +646,21 @@ export declare const components: {
           failPendingSteps?: boolean;
           parentMessageId: string;
           step: {
+            embeddings?: {
+              dimension:
+                | 128
+                | 256
+                | 512
+                | 768
+                | 1024
+                | 1536
+                | 2048
+                | 3072
+                | 4096;
+              model: string;
+              vectors: Array<Array<number> | null>;
+            };
             messages: Array<{
-              embedding?: {
-                dimension:
-                  | 128
-                  | 256
-                  | 512
-                  | 768
-                  | 1024
-                  | 1536
-                  | 2048
-                  | 3072
-                  | 4096;
-                model: string;
-                vector: Array<number>;
-              };
               error?: string;
               files?: Array<{
                 data?: ArrayBuffer | string;

@@ -9,6 +9,7 @@ import {
 } from "../shared.js";
 import {
   paginationResultValidator,
+  vMessageEmbeddings,
   vMessageStatus,
   vMessageWithMetadata,
   vSearchOptions,
@@ -39,15 +40,14 @@ import {
 } from "./threads.js";
 import { paginationOptsValidator } from "convex/server";
 
-
 /** @deprecated Use *.threads.listMessagesByThreadId instead. */
-export const listThreadsByUserId= _listThreadsByUserId
+export const listThreadsByUserId = _listThreadsByUserId;
 
 /** @deprecated Use *.threads.getThread */
 export const getThread = _getThread;
 
 /** @deprecated Use *.threads.updateThread instead */
-export const updateThread= _updateThread;
+export const updateThread = _updateThread;
 
 export async function deleteMessage(
   ctx: MutationCtx,
@@ -78,6 +78,7 @@ const addMessagesArgs = {
   parentMessageId: v.optional(v.id("messages")),
   agentName: v.optional(v.string()),
   messages: v.array(vMessageWithMetadata),
+  embeddings: v.optional(vMessageEmbeddings),
   pending: v.optional(v.boolean()),
   failPendingSteps: v.optional(v.boolean()),
 };
@@ -122,18 +123,25 @@ async function addMessagesHandler(
   let lastMessageIsTool = maxMessage?.tool ?? false;
   const toReturn: Doc<"messages">[] = [];
   if (messages.length > 0) {
-    for (const { message, files, embedding, ...fields } of messages) {
+    if (args.embeddings) {
+      assert(
+        args.embeddings.vectors.length === messages.length,
+        "embeddings.vectors.length must match messages.length"
+      );
+    }
+    for (let i = 0; i < messages.length; i++) {
+      const message = messages[i];
       let embeddingId: VectorTableId | undefined;
-      if (embedding) {
-        embeddingId = await insertVector(ctx, embedding.dimension, {
-          vector: embedding.vector,
-          model: embedding.model,
+      if (args.embeddings && args.embeddings.vectors[i]) {
+        embeddingId = await insertVector(ctx, args.embeddings.dimension, {
+          vector: args.embeddings.vectors[i]!,
+          model: args.embeddings.model,
           table: "messages",
           userId,
           threadId,
         });
       }
-      const tool = isTool(message);
+      const tool = isTool(message.message);
       if (lastMessageIsTool) {
         stepOrder++;
       } else {
@@ -141,27 +149,25 @@ async function addMessagesHandler(
         stepOrder = 0;
       }
       lastMessageIsTool = tool;
-      const text = extractText(message);
+      const text = extractText(message.message);
       const messageId = await ctx.db.insert("messages", {
         ...rest,
-        ...fields,
+        ...message,
         embeddingId,
         parentMessageId,
         userId,
-        message,
         order,
         tool,
         text,
-        files,
         status: pending ? "pending" : "success",
         stepOrder,
       });
-      if (!fields.id) {
+      if (!message.id) {
         await ctx.db.patch(messageId, {
           id: messageId,
         });
       }
-      for (const { fileId } of files ?? []) {
+      for (const { fileId } of message.files ?? []) {
         if (!fileId) continue;
         await ctx.db.patch(fileId, {
           refcount: (await ctx.db.get(fileId))!.refcount + 1,

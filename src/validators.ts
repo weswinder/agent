@@ -271,16 +271,14 @@ export const vMessageWithMetadata = v.object({
   usage: v.optional(vUsage),
   warnings: v.optional(v.array(vLanguageModelV1CallWarning)),
   error: v.optional(v.string()),
-  // TODO: move this back out to passed alongside message
-  embedding: v.optional(
-    v.object({
-      model: v.string(),
-      dimension: vVectorDimension,
-      vector: v.array(v.number()),
-    })
-  ),
 });
 export type MessageWithMetadata = Infer<typeof vMessageWithMetadata>;
+
+export const vMessageEmbeddings = v.object({
+  model: v.string(),
+  dimension: vVectorDimension,
+  vectors: v.array(v.union(v.array(v.number()), v.null())),
+});
 
 export const vStep = v.object({
   files: v.optional(v.array(v.any())),
@@ -310,6 +308,7 @@ export type Step = Infer<typeof vStep>;
 export const vStepWithMessages = v.object({
   step: vStep,
   messages: v.array(vMessageWithMetadata),
+  embeddings: v.optional(vMessageEmbeddings),
 });
 export type StepWithMessagesWithMetadata = Infer<typeof vStepWithMessages>;
 

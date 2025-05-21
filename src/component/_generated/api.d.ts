@@ -89,13 +89,13 @@ export type Mounts = {
       "public",
       {
         agentName?: string;
+        embeddings?: {
+          dimension: 128 | 256 | 512 | 768 | 1024 | 1536 | 2048 | 3072 | 4096;
+          model: string;
+          vectors: Array<Array<number> | null>;
+        };
         failPendingSteps?: boolean;
         messages: Array<{
-          embedding?: {
-            dimension: 128 | 256 | 512 | 768 | 1024 | 1536 | 2048 | 3072 | 4096;
-            model: string;
-            vector: Array<number>;
-          };
           error?: string;
           files?: Array<{
             data?: ArrayBuffer | string;
@@ -542,21 +542,12 @@ export type Mounts = {
         failPendingSteps?: boolean;
         parentMessageId: string;
         step: {
+          embeddings?: {
+            dimension: 128 | 256 | 512 | 768 | 1024 | 1536 | 2048 | 3072 | 4096;
+            model: string;
+            vectors: Array<Array<number> | null>;
+          };
           messages: Array<{
-            embedding?: {
-              dimension:
-                | 128
-                | 256
-                | 512
-                | 768
-                | 1024
-                | 1536
-                | 2048
-                | 3072
-                | 4096;
-              model: string;
-              vector: Array<number>;
-            };
             error?: string;
             files?: Array<{
               data?: ArrayBuffer | string;
