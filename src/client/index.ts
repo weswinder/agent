@@ -584,14 +584,10 @@ export class Agent<AgentTools extends ToolSet> {
       userId: args.userId,
       agentName: this.options.name,
       promptMessageId: args.promptMessageId,
+      embeddings,
       messages: args.messages.map(
         (m, i) =>
           ({
-            embedding: embeddings?.vectors[i] && {
-              model: embeddings.model,
-              dimension: embeddings.dimension,
-              vector: embeddings.vectors[i],
-            },
             ...args.metadata?.[i],
             message: serializeMessage(m),
           }) as MessageWithMetadata
