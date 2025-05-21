@@ -71,8 +71,9 @@ It uses the `VITE_CONVEX_URL` env variable, usually pulling it from .env.local.
 ## Feature wishlist (contributions welcome!)
 
 - Show threads that aren't associated with a user as "no user" in the dropdown.
-- Constrict the message sending to be using the context of the selected message.
-  It currently sends as if it were at the end of the thread.
+- Add a "fork thread" button in the right message detail sidebar.
+- Add a "retry" button to regenerate a response while tuning the prompt/context.
+- Show and allow editing the agent's instructions (system) prompt.
 - Show the contextual messages with their rank in vector & text search, to get
   a sense of what is being found via text vs. vector vs. recency search.
-- Send down the agent's default context & storage options to use as the default.
+- Show the agent's default context & storage options.
