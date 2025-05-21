@@ -59,6 +59,11 @@ export const vFile = v.object({
   fileId: v.optional(v.id("files")),
 });
 
+export const vFileWithStringId = v.object({
+  ...vFile.fields,
+  fileId: v.optional(v.string()),
+});
+
 export const vUserContent = v.union(
   v.string(),
   v.array(v.union(vTextPart, vImagePart, vFilePart))
@@ -69,13 +74,6 @@ export const vReasoningPart = v.object({
   text: v.string(),
   signature: v.optional(v.string()),
   providerOptions,
-});
-
-export const vFileWithStringId = v.object({
-  bytes: v.optional(v.bytes()),
-  url: v.optional(v.string()),
-  mimeType: v.string(),
-  fileId: v.optional(v.string()),
 });
 
 export const vRedactedReasoningPart = v.object({
