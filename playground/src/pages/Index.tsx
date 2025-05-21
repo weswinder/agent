@@ -65,8 +65,9 @@ const Index = () => {
 
         {/* Big image link to /screenshot.png */}
         <div className="max-w-6xl mx-auto">
+          {/* use link that vite can put a baseurl under: */}
           <img
-            src="/screenshot.png"
+            src={import.meta.env.BASE_URL + "screenshot.png"}
             alt="Agent Playground"
             className="w-full h-auto"
           />
