@@ -10,7 +10,7 @@ import {
 import {
   vMessageDoc,
   vThreadDoc,
-  paginationResultValidator,
+  vPaginationResult,
   vMessage,
   vContextOptions,
   vStorageOptions,
@@ -110,7 +110,7 @@ export function definePlaygroundAPI(
         ),
       };
     },
-    returns: paginationResultValidator(
+    returns: vPaginationResult(
       v.object({
         _id: v.string(),
         name: v.string(),
@@ -158,7 +158,7 @@ export function definePlaygroundAPI(
         ),
       };
     },
-    returns: paginationResultValidator(
+    returns: vPaginationResult(
       v.object({
         ...vThreadDoc.fields,
         latestMessage: v.optional(v.string()),
@@ -183,7 +183,7 @@ export function definePlaygroundAPI(
         statuses: ["success", "failed", "pending"],
       });
     },
-    returns: paginationResultValidator(vMessageDoc),
+    returns: vPaginationResult(vMessageDoc),
   });
 
   // Create a thread (mutation)
@@ -259,13 +259,16 @@ export function definePlaygroundAPI(
       await validateApiKey(ctx, args.apiKey);
       const agent = agentMap[args.agentName];
       if (!agent) throw new Error(`Unknown agent: ${args.agentName}`);
-      return agent.fetchContextMessages(ctx, {
+      const messages = await agent.fetchContextMessages(ctx, {
         userId: args.userId,
         threadId: args.threadId,
         messages: args.messages,
         contextOptions: args.contextOptions,
-        beforeMessageId: args.beforeMessageId,
+        upToAndIncludingMessageId: args.beforeMessageId,
       });
+      return messages.filter(
+        (m) => !args.beforeMessageId || m._id !== args.beforeMessageId
+      );
     },
   });
 
