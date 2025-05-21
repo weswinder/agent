@@ -194,6 +194,16 @@ export async function getMaxMessage(
   userId: string | undefined,
   order?: number
 ) {
+  return orderedMessagesStream(ctx, threadId, userId, "desc", order).first();
+}
+
+function orderedMessagesStream(
+  ctx: QueryCtx,
+  threadId: Id<"threads"> | undefined,
+  userId: string | undefined,
+  sortOrder: "asc" | "desc",
+  order?: number
+) {
   assert(threadId || userId, "One of threadId or userId is required");
   if (threadId) {
     return mergedStream(
@@ -211,11 +221,11 @@ export async function getMaxMessage(
               }
               return qq;
             })
-            .order("desc")
+            .order(sortOrder)
         )
       ),
       ["order", "stepOrder"]
-    ).first();
+    );
   } else {
     return mergedStream(
       [true, false].flatMap((tool) =>
@@ -232,11 +242,11 @@ export async function getMaxMessage(
               }
               return qq;
             })
-            .order("desc")
+            .order(sortOrder)
         )
       ),
       ["order", "stepOrder"]
-    ).first();
+    );
   }
 }
 
@@ -312,8 +322,19 @@ export const rollbackMessage = mutation({
   handler: async (ctx, { messageId, error }) => {
     const message = await ctx.db.get(messageId);
     assert(message, `Message ${messageId} not found`);
-    // TODO: do BFS to fail all associated messages, then steps
-    // with parentMessageId of those messages, etc.
+    const messages = await orderedMessagesStream(
+      ctx,
+      message.threadId,
+      message.userId,
+      "asc",
+      message.order
+    ).collect();
+    for (const m of messages) {
+      if (m.status === "pending") {
+        await ctx.db.patch(m._id, { status: "failed", error });
+      }
+    }
+
     const steps = await ctx.db
       .query("steps")
       .withIndex("parentMessageId_order_stepOrder", (q) =>
