@@ -224,8 +224,8 @@ export type Mounts = {
             | { message: string; type: "other" }
           >;
         }>;
-        parentMessageId?: string;
         pending?: boolean;
+        promptMessageId?: string;
         stepId?: string;
         threadId: string;
         userId?: string;
@@ -540,7 +540,7 @@ export type Mounts = {
       "public",
       {
         failPendingSteps?: boolean;
-        parentMessageId: string;
+        promptMessageId: string;
         step: {
           embeddings?: {
             dimension: 128 | 256 | 512 | 768 | 1024 | 1536 | 2048 | 3072 | 4096;

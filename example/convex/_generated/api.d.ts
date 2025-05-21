@@ -272,8 +272,8 @@ export declare const components: {
               | { message: string; type: "other" }
             >;
           }>;
-          parentMessageId?: string;
           pending?: boolean;
+          promptMessageId?: string;
           stepId?: string;
           threadId: string;
           userId?: string;
@@ -644,7 +644,7 @@ export declare const components: {
         "internal",
         {
           failPendingSteps?: boolean;
-          parentMessageId: string;
+          promptMessageId: string;
           step: {
             embeddings?: {
               dimension:

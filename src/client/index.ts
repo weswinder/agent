@@ -552,7 +552,7 @@ export class Agent<AgentTools extends ToolSet> {
        * The message that these messages are in response to. They will be
        * the same "order" as this message, at increasing stepOrder(s).
        */
-      parentMessageId?: string;
+      promptMessageId?: string;
       /**
        * The messages to save.
        */
@@ -583,7 +583,7 @@ export class Agent<AgentTools extends ToolSet> {
       threadId: args.threadId,
       userId: args.userId,
       agentName: this.options.name,
-      parentMessageId: args.parentMessageId,
+      promptMessageId: args.promptMessageId,
       messages: args.messages.map(
         (m, i) =>
           ({
@@ -620,7 +620,7 @@ export class Agent<AgentTools extends ToolSet> {
       args: {
         threadId: v.string(),
         userId: v.optional(v.string()),
-        parentMessageId: v.optional(v.string()),
+        promptMessageId: v.optional(v.string()),
         messages: v.array(vMessageWithMetadata),
         pending: v.optional(v.boolean()),
         failPendingSteps: v.optional(v.boolean()),
@@ -648,7 +648,7 @@ export class Agent<AgentTools extends ToolSet> {
       /**
        * The message this step is in response to.
        */
-      parentMessageId: string;
+      promptMessageId: string;
       /**
        * The step to save, possibly including multiple tool calls.
        */
@@ -676,7 +676,7 @@ export class Agent<AgentTools extends ToolSet> {
     await ctx.runMutation(this.component.messages.addStep, {
       userId: args.userId,
       threadId: args.threadId,
-      parentMessageId: args.parentMessageId,
+      promptMessageId: args.promptMessageId,
       step: { step, messages, embeddings },
       failPendingSteps: false,
     });
@@ -776,7 +776,7 @@ export class Agent<AgentTools extends ToolSet> {
             await this.saveStep(ctx, {
               userId,
               threadId,
-              parentMessageId: messageId,
+              promptMessageId: messageId,
               step,
             });
           }
@@ -896,7 +896,7 @@ export class Agent<AgentTools extends ToolSet> {
           await this.saveStep(ctx, {
             userId,
             threadId,
-            parentMessageId: messageId,
+            promptMessageId: messageId,
             step,
           });
         }
@@ -1042,7 +1042,7 @@ export class Agent<AgentTools extends ToolSet> {
       if (threadId && messageId && saveOutputMessages !== false) {
         await this.saveObject(ctx, {
           threadId,
-          parentMessageId: messageId,
+          promptMessageId: messageId,
           result,
           userId,
         });
@@ -1119,7 +1119,7 @@ export class Agent<AgentTools extends ToolSet> {
           await this.saveObject(ctx, {
             userId,
             threadId,
-            parentMessageId: messageId,
+            promptMessageId: messageId,
             result: {
               object: result.object,
               finishReason: "stop",
@@ -1167,7 +1167,7 @@ export class Agent<AgentTools extends ToolSet> {
     args: {
       userId: string | undefined;
       threadId: string;
-      parentMessageId: string;
+      promptMessageId: string;
       result: GenerateObjectResult<unknown>;
       metadata?: Omit<MessageWithMetadata, "message">;
     }
@@ -1183,7 +1183,7 @@ export class Agent<AgentTools extends ToolSet> {
     await ctx.runMutation(this.component.messages.addStep, {
       userId: args.userId,
       threadId: args.threadId,
-      parentMessageId: args.parentMessageId,
+      promptMessageId: args.promptMessageId,
       failPendingSteps: false,
       step: { step, messages, embeddings },
     });

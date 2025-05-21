@@ -75,7 +75,7 @@ const addMessagesArgs = {
   userId: v.optional(v.string()),
   threadId: v.id("threads"),
   stepId: v.optional(v.id("steps")),
-  parentMessageId: v.optional(v.id("messages")),
+  promptMessageId: v.optional(v.id("messages")),
   agentName: v.optional(v.string()),
   messages: v.array(vMessageWithMetadata),
   embeddings: v.optional(vMessageEmbeddings),
@@ -101,8 +101,9 @@ async function addMessagesHandler(
     assert(thread, `Thread ${args.threadId} not found`);
     userId = thread.userId;
   }
-  const { failPendingSteps, pending, messages, parentMessageId, ...rest } =
+  const { failPendingSteps, pending, messages, promptMessageId, ...rest } =
     args;
+  const parentMessage = promptMessageId && (await ctx.db.get(promptMessageId));
   if (failPendingSteps) {
     assert(args.threadId, "threadId is required to fail pending steps");
     const pendingMessages = await ctx.db
@@ -112,16 +113,17 @@ async function addMessagesHandler(
       )
       .collect();
     await Promise.all(
-      pendingMessages.map((m) =>
-        ctx.db.patch(m._id, { status: "failed", error: "Restarting" })
-      )
+      pendingMessages
+        .filter((m) => !parentMessage || m.order === parentMessage.order)
+        .map((m) =>
+          ctx.db.patch(m._id, { status: "failed", error: "Restarting" })
+        )
     );
   }
   let order, stepOrder;
   let fail = false;
-  if (parentMessageId) {
-    const parentMessage = await ctx.db.get(parentMessageId);
-    assert(parentMessage, `Parent message ${parentMessageId} not found`);
+  if (promptMessageId) {
+    assert(parentMessage, `Parent message ${promptMessageId} not found`);
     if (parentMessage.status === "failed") {
       fail = true;
     }
@@ -159,7 +161,7 @@ async function addMessagesHandler(
         ...rest,
         ...message,
         embeddingId,
-        parentMessageId,
+        parentMessageId: promptMessageId,
         userId,
         order,
         tool: isTool(message.message),
@@ -241,7 +243,7 @@ export async function getMaxMessage(
 const addStepArgs = {
   userId: v.optional(v.string()),
   threadId: v.id("threads"),
-  parentMessageId: v.id("messages"),
+  promptMessageId: v.id("messages"),
   step: vStepWithMessages,
   failPendingSteps: v.optional(v.boolean()),
 };
@@ -255,15 +257,15 @@ async function addStepHandler(
   ctx: MutationCtx,
   args: ObjectType<typeof addStepArgs>
 ) {
-  const parentMessage = await ctx.db.get(args.parentMessageId);
-  assert(parentMessage, `Message ${args.parentMessageId} not found`);
+  const parentMessage = await ctx.db.get(args.promptMessageId);
+  assert(parentMessage, `Message ${args.promptMessageId} not found`);
   const order = parentMessage.order;
   // TODO: only fetch the last one if we aren't failing pending steps
   let steps = await ctx.db
     .query("steps")
     .withIndex("parentMessageId_order_stepOrder", (q) =>
       // TODO: fetch pending, and commit later
-      q.eq("parentMessageId", args.parentMessageId)
+      q.eq("parentMessageId", args.promptMessageId)
     )
     .collect();
   if (args.failPendingSteps) {
@@ -277,7 +279,7 @@ async function addStepHandler(
   const { step, messages } = args.step;
   const stepId = await ctx.db.insert("steps", {
     threadId: args.threadId,
-    parentMessageId: args.parentMessageId,
+    parentMessageId: args.promptMessageId,
     order,
     stepOrder: (steps.at(-1)?.stepOrder ?? -1) + 1,
     status: step.finishReason === "stop" ? "success" : "pending",
@@ -287,7 +289,7 @@ async function addStepHandler(
     userId: args.userId,
     threadId: args.threadId,
     stepId,
-    parentMessageId: args.parentMessageId,
+    promptMessageId: args.promptMessageId,
     agentName: parentMessage.agentName,
     messages,
     pending: step.finishReason === "stop" ? false : true,
@@ -295,7 +297,7 @@ async function addStepHandler(
   });
   // We don't commit if the parent is still pending.
   if (step.finishReason === "stop") {
-    await commitMessageHandler(ctx, { messageId: args.parentMessageId });
+    await commitMessageHandler(ctx, { messageId: args.promptMessageId });
   }
   steps.push((await ctx.db.get(stepId))!);
   return steps;
