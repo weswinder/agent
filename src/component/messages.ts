@@ -118,9 +118,13 @@ async function addMessagesHandler(
     );
   }
   let order, stepOrder;
+  let fail = false;
   if (parentMessageId) {
     const parentMessage = await ctx.db.get(parentMessageId);
     assert(parentMessage, `Parent message ${parentMessageId} not found`);
+    if (parentMessage.status === "failed") {
+      fail = true;
+    }
     order = parentMessage.order;
     // Defend against there being existing messages with this parent.
     const maxMessage = await getMaxMessage(ctx, threadId, userId, order);
@@ -160,7 +164,8 @@ async function addMessagesHandler(
         order,
         tool: isTool(message.message),
         text: extractText(message.message),
-        status: pending ? "pending" : "success",
+        status: fail ? "failed" : pending ? "pending" : "success",
+        error: fail ? "Parent message failed" : undefined,
         stepOrder,
       });
       if (!message.id) {
