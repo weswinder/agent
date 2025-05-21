@@ -8,7 +8,7 @@ import JsonEditor from "./JsonEditor";
 
 interface RightPanelProps {
   selectedMessage: Message | null;
-  contextMessages: ContextMessage[];
+  contextMessages: ContextMessage[] | null;
   contextOptions: ContextOptions;
   setContextOptions: (contextOptions: ContextOptions) => void;
   fetchContextMessages: (contextOptions: ContextOptions) => Promise<void>;
@@ -65,7 +65,12 @@ const RightPanel: React.FC<RightPanelProps> = ({
                   : "Fetch Context Messages"}
               </Button>
             </div>
-            {contextMessages.length > 0 && (
+            {contextMessages?.length === 0 && (
+              <div className="text-muted-foreground">
+                No context messages found
+              </div>
+            )}
+            {contextMessages && contextMessages.length > 0 && (
               <div className="mb-4">
                 <ContextMessages messages={contextMessages} />
               </div>

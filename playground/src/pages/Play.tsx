@@ -27,7 +27,9 @@ const Play = ({ apiKey, api }: PlayProps) => {
     string | undefined
   >();
   const [selectedAgent, setSelectedAgent] = useState<Agent | undefined>();
-  const [contextMessages, setContextMessages] = useState<ContextMessage[]>([]);
+  const [contextMessages, setContextMessages] = useState<
+    ContextMessage[] | null
+  >(null);
   const [storageOptions, setStorageOptions] = useState<StorageOptions>(
     DEFAULT_STORAGE_OPTIONS
   );

@@ -17,7 +17,6 @@ function ConvexProviderGate({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
   const { url: encodedUrl } = useParams();
 
-  console.log("encodedUrl", encodedUrl);
   // 1. deploymentUrl always reflects the decoded url param (or null)
   const deploymentUrl = useMemo(() => {
     if (encodedUrl) {

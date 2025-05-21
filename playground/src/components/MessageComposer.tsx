@@ -55,9 +55,7 @@ const MessageComposer: React.FC<MessageComposerProps> = ({
       return Promise.reject();
     }
     setIsSendingMessage(true);
-    setResponse(
-      "Thank you for your message. The agent is processing your request..."
-    );
+    setResponse("Sending...");
     try {
       const text = await onSendMessage(
         message,
@@ -75,6 +73,12 @@ const MessageComposer: React.FC<MessageComposerProps> = ({
 
   return (
     <>
+      {response && (
+        <div className="border rounded-md p-3 bg-muted/50">
+          <h3 className="font-medium mb-2 text-sm">Response:</h3>
+          <p className="text-sm">{response}</p>
+        </div>
+      )}
       <div className="flex flex-row gap-4 p-4 bg-muted/30 rounded-lg items-start">
         <div className="mb-0 w-full flex flex-col justify-center">
           <Textarea
@@ -132,12 +136,6 @@ const MessageComposer: React.FC<MessageComposerProps> = ({
             {isSendingMessage ? "Sending..." : "Send Message"}
           </Button>
         </div>
-        {response && (
-          <div className="border rounded-md p-3 bg-muted/50">
-            <h3 className="font-medium mb-2 text-sm">Response:</h3>
-            <p className="text-sm">{response}</p>
-          </div>
-        )}
       </div>
       <div className="px-4 bg-muted/30 rounded-lg">
         <CollapsibleSection title="Context & Storage Options">
