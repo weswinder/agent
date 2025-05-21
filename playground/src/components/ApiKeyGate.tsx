@@ -97,7 +97,7 @@ function ApiKeyGate({
             PLAYGROUND_CODE
         );
       });
-  }, [apiKeyInput, apiPathInput, convex]);
+  }, [apiKeyInput, apiPathInput, convex, encodedUrl]);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();

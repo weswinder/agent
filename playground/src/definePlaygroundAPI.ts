@@ -55,8 +55,7 @@ export function definePlaygroundAPI(
       try {
         await validateApiKey(ctx, args.apiKey);
         return true;
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      } catch (e) {
+      } catch {
         return false;
       }
     },
