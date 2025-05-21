@@ -13,7 +13,7 @@ import {
 import { UIMessage } from "ai";
 
 interface MessageItemProps {
-  user: User;
+  user: User | undefined;
   message: Omit<Message, "message"> & { message: UIMessage };
   isSelected: boolean;
   onClick: () => void;
@@ -53,7 +53,7 @@ const MessageItem: React.FC<MessageItemProps> = ({
               <div className="w-6 h-6 flex items-center justify-center rounded-full bg-primary text-primary-foreground">
                 <UserIcon size={14} />
               </div>
-              <span className="font-medium">{user.name}</span>
+              <span className="font-medium">{user?.name ?? "User"}</span>
             </>
           ) : (
             <>

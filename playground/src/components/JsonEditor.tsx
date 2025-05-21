@@ -30,7 +30,7 @@ const JsonEditor = <T,>({ initialValue, onChange }: JsonEditorProps<T>) => {
       <Textarea
         value={value ?? JSON.stringify(initialValue, null, 2)}
         onChange={handleChange}
-        className="font-mono text-sm"
+        className="font-mono text-sm h-72"
         rows={5}
       />
       {error && <p className="text-destructive text-sm mt-1">{error}</p>}

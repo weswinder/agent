@@ -70,9 +70,25 @@ export function definePlaygroundAPI(
     },
     handler: async (ctx, args) => {
       await validateApiKey(ctx, args.apiKey);
-      return Object.keys(agentMap);
+      const agents = Object.values(agentMap)
+        .map((agent) =>
+          agent.options.name
+            ? {
+                name: agent.options.name,
+                instructions: agent.options.instructions,
+                contextOptions: agent.options.contextOptions,
+                storageOptions: agent.options.storageOptions,
+                maxSteps: agent.options.maxSteps,
+                maxRetries: agent.options.maxRetries,
+                tools: agent.options.tools
+                  ? Object.keys(agent.options.tools)
+                  : [],
+              }
+            : undefined
+        )
+        .filter((agent) => agent !== undefined);
+      return agents;
     },
-    returns: v.array(v.string()),
   });
 
   const listUsers = queryGeneric({

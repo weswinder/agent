@@ -1,5 +1,19 @@
-import { MessageDoc, ThreadDoc } from "@convex-dev/agent";
-import { CoreMessage } from "ai";
+import {
+  ContextOptions,
+  MessageDoc,
+  StorageOptions,
+  ThreadDoc,
+} from "@convex-dev/agent";
+
+export interface Agent {
+  name: string;
+  instructions: string | undefined;
+  contextOptions: ContextOptions | undefined;
+  storageOptions: StorageOptions | undefined;
+  maxSteps: number | undefined;
+  maxRetries: number | undefined;
+  tools: string[];
+}
 
 export interface User {
   _id: string;

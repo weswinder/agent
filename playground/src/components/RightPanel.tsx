@@ -1,59 +1,26 @@
 import React, { useState } from "react";
 import { Message, ContextMessage } from "../types";
-import MessageComposer from "./MessageComposer";
 import ContextMessages from "./ContextMessages";
-import { ContextOptions, StorageOptions } from "@convex-dev/agent";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { ContextOptions } from "@convex-dev/agent";
 import { Button } from "@/components/ui/button";
 import CollapsibleSection from "./CollapsibleSection";
 import JsonEditor from "./JsonEditor";
 
 interface RightPanelProps {
   selectedMessage: Message | null;
-  agents: string[] | undefined;
   contextMessages: ContextMessage[];
-  onSendMessage: (
-    message: string,
-    agentName: string,
-    context: ContextOptions,
-    storage: StorageOptions
-  ) => Promise<string>;
-  selectedAgentName?: string;
-  setSelectedAgentName: (name: string) => void;
+  contextOptions: ContextOptions;
+  setContextOptions: (contextOptions: ContextOptions) => void;
   fetchContextMessages: (contextOptions: ContextOptions) => Promise<void>;
 }
 
-// TODO: store preferences in local storage
-const DEFAULT_CONTEXT_OPTIONS: ContextOptions = {
-  recentMessages: 10,
-  excludeToolMessages: true,
-  searchOtherThreads: false,
-  searchOptions: {
-    limit: 0,
-    textSearch: true,
-    vectorSearch: true,
-    messageRange: { before: 2, after: 1 },
-  },
-};
-
 const RightPanel: React.FC<RightPanelProps> = ({
   selectedMessage,
-  agents,
   contextMessages,
-  onSendMessage,
-  selectedAgentName,
-  setSelectedAgentName,
+  contextOptions,
+  setContextOptions,
   fetchContextMessages,
 }) => {
-  const [contextOptions, setContextOptions] = useState<ContextOptions>(
-    DEFAULT_CONTEXT_OPTIONS
-  );
   const [isFetchingContext, setIsFetchingContext] = useState(false);
 
   return (
@@ -69,26 +36,6 @@ const RightPanel: React.FC<RightPanelProps> = ({
               <pre className="bg-muted p-3 rounded-lg overflow-x-auto text-xs">
                 {JSON.stringify(selectedMessage, null, 2)}
               </pre>
-            </div>
-            <div className="mb-4">
-              <label className="block text-sm font-medium mb-1">
-                Select Agent
-              </label>
-              <Select
-                value={selectedAgentName || ""}
-                onValueChange={setSelectedAgentName}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select an agent" />
-                </SelectTrigger>
-                <SelectContent>
-                  {agents?.map((agent) => (
-                    <SelectItem key={agent} value={agent}>
-                      {agent}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
             </div>
             <div className="mb-4">
               <label className="block text-sm font-medium mb-1">
@@ -110,7 +57,7 @@ const RightPanel: React.FC<RightPanelProps> = ({
                     setIsFetchingContext(false);
                   });
                 }}
-                disabled={isFetchingContext || !selectedAgentName}
+                disabled={isFetchingContext || !selectedMessage}
               >
                 {isFetchingContext
                   ? "Fetching Context..."
@@ -122,13 +69,6 @@ const RightPanel: React.FC<RightPanelProps> = ({
                 <ContextMessages messages={contextMessages} />
               </div>
             )}
-            <div>
-              <MessageComposer
-                agentName={selectedAgentName}
-                onSendMessage={onSendMessage}
-                contextOptions={contextOptions}
-              />
-            </div>
           </>
         ) : (
           <div className="text-muted-foreground">

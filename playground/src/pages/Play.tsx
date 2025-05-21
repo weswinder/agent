@@ -5,8 +5,12 @@ import RightPanel from "@/components/RightPanel";
 import { useToast } from "@/components/ui/use-toast";
 import { usePaginatedQuery, useQuery, useAction } from "convex/react";
 import type { PlaygroundAPI } from "../definePlaygroundAPI";
-import { ContextMessage, Thread } from "@/types";
+import { ContextMessage, Thread, Agent } from "@/types";
 import { ContextOptions, StorageOptions } from "@convex-dev/agent";
+import {
+  DEFAULT_CONTEXT_OPTIONS,
+  DEFAULT_STORAGE_OPTIONS,
+} from "@/types/defaults";
 
 interface PlayProps {
   apiKey: string;
@@ -22,10 +26,14 @@ const Play = ({ apiKey, api }: PlayProps) => {
   const [selectedMessageId, setSelectedMessageId] = useState<
     string | undefined
   >();
-  const [selectedAgentName, setSelectedAgentName] = useState<
-    string | undefined
-  >();
+  const [selectedAgent, setSelectedAgent] = useState<Agent | undefined>();
   const [contextMessages, setContextMessages] = useState<ContextMessage[]>([]);
+  const [storageOptions, setStorageOptions] = useState<StorageOptions>(
+    DEFAULT_STORAGE_OPTIONS
+  );
+  const [contextOptions, setContextOptions] = useState<ContextOptions>(
+    DEFAULT_CONTEXT_OPTIONS
+  );
 
   // Convex hooks
   const users = usePaginatedQuery(
@@ -63,10 +71,16 @@ const Play = ({ apiKey, api }: PlayProps) => {
 
   const agents = useQuery(api.listAgents, { apiKey });
   useEffect(() => {
-    if (agents && agents.length > 0 && !selectedAgentName) {
-      setSelectedAgentName(agents[0]);
+    if (agents && agents.length > 0 && !selectedAgent) {
+      setSelectedAgent(agents[0]);
+      if (agents[0].contextOptions) {
+        setContextOptions(agents[0].contextOptions);
+      }
+      if (agents[0].storageOptions) {
+        setStorageOptions(agents[0].storageOptions);
+      }
     }
-  }, [agents, selectedAgentName]);
+  }, [agents, selectedAgent]);
 
   // Convex actions
   const generateText = useAction(api.generateText);
@@ -95,22 +109,25 @@ const Play = ({ apiKey, api }: PlayProps) => {
   const handleSelectMessage = (messageId: string) => {
     setSelectedMessageId(messageId);
     const message = messages.results.find((m) => m._id === messageId);
-    if (message && selectedAgentName !== message?.agentName) {
-      setSelectedAgentName(message?.agentName);
+    if (message && message.agentName && selectedAgent !== message.agentName) {
+      const agent = agents?.find((a) => a.name === message.agentName);
+      if (agent) {
+        setSelectedAgent(agent);
+      }
     }
   };
 
   // Fetch context messages
   const fetchContextMessages = useCallback(
     async (contextOptions: ContextOptions) => {
-      if (!selectedMessage || !selectedAgentName) {
+      if (!selectedMessage || !selectedAgent) {
         toast({ title: "Select a message and agent first" });
         return;
       }
       try {
         const context = await fetchPromptContext({
           apiKey,
-          agentName: selectedAgentName,
+          agentName: selectedAgent.name,
           threadId: selectedThreadId,
           userId: selectedUserId,
           messages: [selectedMessage.message],
@@ -126,7 +143,7 @@ const Play = ({ apiKey, api }: PlayProps) => {
       apiKey,
       fetchPromptContext,
       selectedMessage,
-      selectedAgentName,
+      selectedAgent,
       selectedThreadId,
       selectedUserId,
       toast,
@@ -137,8 +154,8 @@ const Play = ({ apiKey, api }: PlayProps) => {
   const handleSendMessage = async (
     message: string,
     agentName: string,
-    context: ContextOptions,
-    storage: StorageOptions
+    context: ContextOptions | undefined,
+    storage: StorageOptions | undefined
   ) => {
     if (!selectedThreadId || !selectedUserId) {
       toast({ title: "Select a thread and user first" });
@@ -181,21 +198,27 @@ const Play = ({ apiKey, api }: PlayProps) => {
         </div>
         <div className="w-1/2 h-full border-x">
           <MiddlePanel
+            agents={agents}
+            selectedAgent={selectedAgent}
+            setSelectedAgent={setSelectedAgent}
             users={users.results}
             messages={messages.results}
             selectedMessageId={selectedMessageId}
             onSelectMessage={handleSelectMessage}
+            contextOptions={contextOptions}
+            setContextOptions={setContextOptions}
+            storageOptions={storageOptions}
+            setStorageOptions={setStorageOptions}
             selectedThreadTitle={selectedThread?.title}
+            onSendMessage={handleSendMessage}
           />
         </div>
         <div className="w-1/4 h-full">
           <RightPanel
             selectedMessage={selectedMessage}
-            agents={agents}
             contextMessages={contextMessages}
-            onSendMessage={handleSendMessage}
-            selectedAgentName={selectedAgentName}
-            setSelectedAgentName={setSelectedAgentName}
+            contextOptions={contextOptions}
+            setContextOptions={setContextOptions}
             fetchContextMessages={fetchContextMessages}
           />
         </div>

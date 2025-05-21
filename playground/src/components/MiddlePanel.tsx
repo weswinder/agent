@@ -1,21 +1,44 @@
 
 import React from 'react';
 import MessageList from './MessageList';
-import { Message, User } from "../types";
+import { Agent, Message, User } from "../types";
+import MessageComposer from "./MessageComposer";
+import { ContextOptions, StorageOptions } from "../../../dist/esm/client";
 
 interface MiddlePanelProps {
+  agents: Agent[] | undefined;
   users: User[];
   messages: Message[];
   selectedMessageId: string | undefined;
+  selectedAgent: Agent | undefined;
+  setSelectedAgent: (agent: Agent) => void;
   onSelectMessage: (messageId: string) => void;
+  contextOptions: ContextOptions;
+  setContextOptions: (contextOptions: ContextOptions) => void;
+  storageOptions: StorageOptions;
+  setStorageOptions: (storageOptions: StorageOptions) => void;
+  onSendMessage: (
+    message: string,
+    agentName: string,
+    context: ContextOptions | undefined,
+    storage: StorageOptions | undefined
+  ) => Promise<string | undefined>;
   selectedThreadTitle?: string;
 }
 
 const MiddlePanel: React.FC<MiddlePanelProps> = ({
+  agents,
   users,
   messages,
   selectedMessageId,
+  selectedAgent,
+  setSelectedAgent,
   onSelectMessage,
+  contextOptions,
+  setContextOptions,
+  storageOptions,
+  setStorageOptions,
+  onSendMessage,
   selectedThreadTitle,
 }) => {
   return (
@@ -39,6 +62,18 @@ const MiddlePanel: React.FC<MiddlePanelProps> = ({
             Select a thread to view messages
           </div>
         )}
+      </div>
+      <div>
+        <MessageComposer
+          agents={agents}
+          selectedAgent={selectedAgent}
+          setSelectedAgent={setSelectedAgent}
+          contextOptions={contextOptions}
+          setContextOptions={setContextOptions}
+          storageOptions={storageOptions}
+          setStorageOptions={setStorageOptions}
+          onSendMessage={onSendMessage}
+        />
       </div>
     </div>
   );
