@@ -1,5 +1,5 @@
 import { defineSchema, defineTable } from "convex/server";
-import { v } from "convex/values";
+import { Infer, v } from "convex/values";
 import {
   vThreadStatus,
   vMessage,
@@ -13,9 +13,11 @@ import {
   vProviderMetadata,
   vReasoningDetails,
   vFile,
+  vFileWithStringId,
 } from "../validators.js";
 import { typedV } from "convex-helpers/validators";
 import vectorTables, { vVectorId } from "./vector/tables.js";
+import { omit } from "convex-helpers";
 
 export const schema = defineSchema({
   threads: defineTable({
@@ -32,9 +34,6 @@ export const schema = defineSchema({
     id: v.optional(v.string()), // external id, e.g. from Vercel AI SDK
     userId: v.optional(v.string()), // useful for searching across threads
     threadId: v.id("threads"),
-    // TODO: is this redunant with message at last step @ order - 1?
-    parentMessageId: v.optional(v.id("messages")),
-    stepId: v.optional(v.id("steps")),
     // Repeats until a non-tool message.
     order: v.number(),
     stepOrder: v.number(),
@@ -63,6 +62,9 @@ export const schema = defineSchema({
     reasoningDetails: v.optional(vReasoningDetails),
     warnings: v.optional(v.array(vLanguageModelV1CallWarning)),
     finishReason: v.optional(vFinishReason),
+    // DEPRECATED
+    parentMessageId: v.optional(v.id("messages")),
+    stepId: v.optional(v.id("steps")),
   })
     // Allows finding successful visible messages in order
     // Also surface pending messages separately to e.g. stream
@@ -131,5 +133,32 @@ export const schema = defineSchema({
 
 export const vv = typedV(schema);
 export { vv as v };
+
+// Public
+export const vThreadDoc = v.object({
+  _id: v.string(),
+  _creationTime: v.number(),
+  userId: v.optional(v.string()), // Unset for anonymous
+  title: v.optional(v.string()),
+  summary: v.optional(v.string()),
+  status: vThreadStatus,
+});
+export type ThreadDoc = Infer<typeof vThreadDoc>;
+
+export const vMessageDoc = v.object({
+  _id: v.string(),
+  _creationTime: v.number(),
+  ...omit(schema.tables.messages.validator.fields, [
+    "parentMessageId",
+    "stepId",
+  ]),
+  // Overwrite all the types that have a v.id validator
+  // Outside of the component, they are strings
+  threadId: v.string(),
+  embeddingId: v.optional(v.string()),
+  files: v.optional(v.array(vFileWithStringId)),
+});
+export type MessageDoc = Infer<typeof vMessageDoc>;
+
 
 export default schema;

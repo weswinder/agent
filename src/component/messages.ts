@@ -1,4 +1,4 @@
-import { assert } from "convex-helpers";
+import { assert, omit } from "convex-helpers";
 import { mergedStream, stream } from "convex-helpers/server/stream";
 import { ObjectType } from "convex/values";
 import {
@@ -39,6 +39,7 @@ import {
   updateThread as _updateThread,
 } from "./threads.js";
 import { paginationOptsValidator } from "convex/server";
+import { MessageDoc, vMessageDoc } from "./schema.js";
 
 /** @deprecated Use *.threads.listMessagesByThreadId instead. */
 export const listThreadsByUserId = _listThreadsByUserId;
@@ -48,6 +49,10 @@ export const getThread = _getThread;
 
 /** @deprecated Use *.threads.updateThread instead */
 export const updateThread = _updateThread;
+
+function publicMessage(message: Doc<"messages">): MessageDoc {
+  return omit(message, ["parentMessageId", "stepId"]);
+}
 
 export async function deleteMessage(
   ctx: MutationCtx,
@@ -66,7 +71,6 @@ export async function deleteMessage(
   }
 }
 
-export const vMessageDoc = schema.tables.messages.validator;
 export const messageStatuses = vMessageDoc.fields.status.members.map(
   (m) => m.value
 );
@@ -86,8 +90,8 @@ export const addMessages = mutation({
   args: addMessagesArgs,
   handler: addMessagesHandler,
   returns: v.object({
-    messages: v.array(v.doc("messages")),
-    pending: v.optional(v.doc("messages")),
+    messages: v.array(vMessageDoc),
+    pending: v.optional(vMessageDoc),
   }),
 });
 async function addMessagesHandler(
@@ -427,9 +431,9 @@ export const listMessagesByThreadId = query({
         cursor: null,
       }
     );
-    return messages;
+    return { ...messages, page: messages.page.map(publicMessage) };
   },
-  returns: paginationResultValidator(v.doc("messages")),
+  returns: paginationResultValidator(vMessageDoc),
 });
 
 /** @deprecated Use listMessagesByThreadId instead. */
@@ -438,7 +442,7 @@ export const getThreadMessages = query({
   handler: async () => {
     throw new Error("Use listMessagesByThreadId instead of getThreadMessages");
   },
-  returns: paginationResultValidator(v.doc("messages")),
+  returns: paginationResultValidator(vMessageDoc),
 });
 
 export const searchMessages = action({
@@ -448,11 +452,11 @@ export const searchMessages = action({
     beforeMessageId: v.optional(v.id("messages")),
     ...vSearchOptions.fields,
   },
-  returns: v.array(v.doc("messages")),
-  handler: async (ctx, args): Promise<Doc<"messages">[]> => {
+  returns: v.array(vMessageDoc),
+  handler: async (ctx, args): Promise<MessageDoc[]> => {
     assert(args.userId || args.threadId, "Specify userId or threadId");
     const limit = args.limit;
-    let textSearchMessages: Doc<"messages">[] | undefined;
+    let textSearchMessages: MessageDoc[] | undefined;
     if (args.text) {
       textSearchMessages = await ctx.runQuery(api.messages.textSearch, {
         userId: args.userId,
@@ -489,14 +493,14 @@ export const searchMessages = action({
         }))
         .sort((a, b) => b.score - a.score);
       const vectorIds = vectorScores.slice(0, limit).map((v) => v.id);
-      const messages: Doc<"messages">[] = await ctx.runQuery(
+      const messages: MessageDoc[] = await ctx.runQuery(
         internal.messages._fetchSearchMessages,
         {
           userId: args.userId,
           threadId: args.threadId,
           vectorIds,
           textSearchMessages: textSearchMessages?.filter(
-            (m) => !vectorIds.includes(m.embeddingId!)
+            (m) => !vectorIds.includes(m.embeddingId! as VectorTableId)
           ),
           messageRange: args.messageRange ?? DEFAULT_MESSAGE_RANGE,
           beforeMessageId: args.beforeMessageId,
@@ -514,18 +518,18 @@ export const _fetchSearchMessages = internalQuery({
     userId: v.optional(v.string()),
     threadId: v.optional(v.id("threads")),
     vectorIds: v.array(vVectorId),
-    textSearchMessages: v.optional(v.array(v.doc("messages"))),
+    textSearchMessages: v.optional(v.array(vMessageDoc)),
     messageRange: v.object({ before: v.number(), after: v.number() }),
     beforeMessageId: v.optional(v.id("messages")),
     limit: v.number(),
   },
-  returns: v.array(v.doc("messages")),
-  handler: async (ctx, args): Promise<Doc<"messages">[]> => {
+  returns: v.array(vMessageDoc),
+  handler: async (ctx, args): Promise<MessageDoc[]> => {
     const beforeMessage =
       args.beforeMessageId && (await ctx.db.get(args.beforeMessageId));
     const { userId, threadId } = args;
     assert(userId || threadId, "Specify userId or threadId to search");
-    let messages = (
+    let messages: MessageDoc[] = (
       await Promise.all(
         args.vectorIds.map((embeddingId) =>
           ctx.db
@@ -541,16 +545,18 @@ export const _fetchSearchMessages = internalQuery({
             .first()
         )
       )
-    ).filter(
-      (m): m is Doc<"messages"> =>
-        m !== undefined &&
-        m !== null &&
-        !m.tool &&
-        (!beforeMessage ||
-          m.order < beforeMessage.order ||
-          (m.order === beforeMessage.order &&
-            m.stepOrder < beforeMessage.stepOrder))
-    );
+    )
+      .filter(
+        (m): m is Doc<"messages"> =>
+          m !== undefined &&
+          m !== null &&
+          !m.tool &&
+          (!beforeMessage ||
+            m.order < beforeMessage.order ||
+            (m.order === beforeMessage.order &&
+              m.stepOrder < beforeMessage.stepOrder))
+      )
+      .map(publicMessage);
     messages.push(...(args.textSearchMessages ?? []));
     // TODO: prioritize more recent messages
     messages.sort((a, b) => a.order! - b.order!);
@@ -607,7 +613,7 @@ export const _fetchSearchMessages = internalQuery({
     }
     for (const r of Object.values(ranges).flat()) {
       if (!messages.some((m) => m._id === r._id)) {
-        messages.push(r);
+        messages.push(publicMessage(r));
       }
     }
     return messages.sort((a, b) => a.order - b.order);
@@ -645,13 +651,15 @@ export const textSearch = query({
         return qq;
       })
       .take(args.limit);
-    return messages.filter(
-      (m) =>
-        !beforeMessage ||
-        m.order < beforeMessage.order ||
-        (m.order === beforeMessage.order &&
-          m.stepOrder < beforeMessage.stepOrder)
-    );
+    return messages
+      .filter(
+        (m) =>
+          !beforeMessage ||
+          m.order < beforeMessage.order ||
+          (m.order === beforeMessage.order &&
+            m.stepOrder < beforeMessage.stepOrder)
+      )
+      .map(publicMessage);
   },
-  returns: v.array(v.doc("messages")),
+  returns: v.array(vMessageDoc),
 });

@@ -27,7 +27,7 @@ import {
 } from "ai";
 import { assert } from "convex-helpers";
 import { internalActionGeneric, internalMutationGeneric } from "convex/server";
-import { Infer, v } from "convex/values";
+import { v } from "convex/values";
 import { z } from "zod";
 import { Mounts } from "../component/_generated/api.js";
 import {
@@ -57,11 +57,9 @@ import {
   type ProviderOptions,
   type SearchOptions,
   type Usage,
-  vFileWithStringId,
   vMessageWithMetadata,
   vSafeObjectArgs,
   vTextArgs,
-  vThreadStatus,
 } from "../validators.js";
 import type {
   OpaqueIds,
@@ -70,10 +68,12 @@ import type {
   RunQueryCtx,
   UseApi,
 } from "./types.js";
-import schema from "../component/schema.js";
 
+import type { MessageDoc, ThreadDoc } from "../component/schema.js";
+
+export { vMessageDoc, vThreadDoc } from "../component/schema.js";
 export { extractText, isTool };
-export type { Usage, ProviderMetadata };
+export type { Usage, ProviderMetadata, MessageDoc, ThreadDoc };
 export {
   /** @deprecated Use vPaginationResult instead. */
   paginationResultValidator,
@@ -1767,30 +1767,6 @@ interface Thread<DefaultTools extends ToolSet> {
     StreamObjectResult<DeepPartial<T>, T, never> & ThreadOutputMetadata
   >;
 }
-
-export const vThreadDoc = v.object({
-  _id: v.string(),
-  _creationTime: v.number(),
-  userId: v.optional(v.string()), // Unset for anonymous
-  title: v.optional(v.string()),
-  summary: v.optional(v.string()),
-  status: vThreadStatus,
-});
-export type ThreadDoc = Infer<typeof vThreadDoc>;
-
-export const vMessageDoc = v.object({
-  _id: v.string(),
-  _creationTime: v.number(),
-  ...schema.tables.messages.validator.fields,
-  // Overwrite all the types that have a v.id validator
-  // Outside of the component, they are strings
-  threadId: v.string(),
-  parentMessageId: v.optional(v.string()),
-  stepId: v.optional(v.string()),
-  embeddingId: v.optional(v.string()),
-  files: v.optional(v.array(vFileWithStringId)),
-});
-export type MessageDoc = Infer<typeof vMessageDoc>;
 
 type MessageWithMetadata = OpaqueIds<InnerMessageWithMetadata>;
 

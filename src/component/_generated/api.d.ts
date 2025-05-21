@@ -235,16 +235,7 @@ export type Mounts = {
           _creationTime: number;
           _id: string;
           agentName?: string;
-          embeddingId?:
-            | string
-            | string
-            | string
-            | string
-            | string
-            | string
-            | string
-            | string
-            | string;
+          embeddingId?: string;
           error?: string;
           files?: Array<{
             data?: ArrayBuffer | string;
@@ -348,7 +339,6 @@ export type Mounts = {
               };
           model?: string;
           order: number;
-          parentMessageId?: string;
           provider?: string;
           providerMetadata?: Record<string, Record<string, any>>;
           providerOptions?: Record<string, Record<string, any>>;
@@ -365,7 +355,6 @@ export type Mounts = {
             url: string;
           }>;
           status: "pending" | "success" | "failed";
-          stepId?: string;
           stepOrder: number;
           text?: string;
           threadId: string;
@@ -386,16 +375,7 @@ export type Mounts = {
           _creationTime: number;
           _id: string;
           agentName?: string;
-          embeddingId?:
-            | string
-            | string
-            | string
-            | string
-            | string
-            | string
-            | string
-            | string
-            | string;
+          embeddingId?: string;
           error?: string;
           files?: Array<{
             data?: ArrayBuffer | string;
@@ -499,7 +479,6 @@ export type Mounts = {
               };
           model?: string;
           order: number;
-          parentMessageId?: string;
           provider?: string;
           providerMetadata?: Record<string, Record<string, any>>;
           providerOptions?: Record<string, Record<string, any>>;
@@ -516,7 +495,6 @@ export type Mounts = {
             url: string;
           }>;
           status: "pending" | "success" | "failed";
-          stepId?: string;
           stepOrder: number;
           text?: string;
           threadId: string;
@@ -1109,16 +1087,7 @@ export type Mounts = {
           _creationTime: number;
           _id: string;
           agentName?: string;
-          embeddingId?:
-            | string
-            | string
-            | string
-            | string
-            | string
-            | string
-            | string
-            | string
-            | string;
+          embeddingId?: string;
           error?: string;
           files?: Array<{
             data?: ArrayBuffer | string;
@@ -1222,7 +1191,6 @@ export type Mounts = {
               };
           model?: string;
           order: number;
-          parentMessageId?: string;
           provider?: string;
           providerMetadata?: Record<string, Record<string, any>>;
           providerOptions?: Record<string, Record<string, any>>;
@@ -1239,7 +1207,6 @@ export type Mounts = {
             url: string;
           }>;
           status: "pending" | "success" | "failed";
-          stepId?: string;
           stepOrder: number;
           text?: string;
           threadId: string;
@@ -1286,16 +1253,7 @@ export type Mounts = {
           _creationTime: number;
           _id: string;
           agentName?: string;
-          embeddingId?:
-            | string
-            | string
-            | string
-            | string
-            | string
-            | string
-            | string
-            | string
-            | string;
+          embeddingId?: string;
           error?: string;
           files?: Array<{
             data?: ArrayBuffer | string;
@@ -1399,7 +1357,6 @@ export type Mounts = {
               };
           model?: string;
           order: number;
-          parentMessageId?: string;
           provider?: string;
           providerMetadata?: Record<string, Record<string, any>>;
           providerOptions?: Record<string, Record<string, any>>;
@@ -1416,7 +1373,6 @@ export type Mounts = {
             url: string;
           }>;
           status: "pending" | "success" | "failed";
-          stepId?: string;
           stepOrder: number;
           text?: string;
           threadId: string;
@@ -1461,16 +1417,7 @@ export type Mounts = {
         _creationTime: number;
         _id: string;
         agentName?: string;
-        embeddingId?:
-          | string
-          | string
-          | string
-          | string
-          | string
-          | string
-          | string
-          | string
-          | string;
+        embeddingId?: string;
         error?: string;
         files?: Array<{
           data?: ArrayBuffer | string;
@@ -1574,7 +1521,6 @@ export type Mounts = {
             };
         model?: string;
         order: number;
-        parentMessageId?: string;
         provider?: string;
         providerMetadata?: Record<string, Record<string, any>>;
         providerOptions?: Record<string, Record<string, any>>;
@@ -1591,7 +1537,6 @@ export type Mounts = {
           url: string;
         }>;
         status: "pending" | "success" | "failed";
-        stepId?: string;
         stepOrder: number;
         text?: string;
         threadId: string;
@@ -1623,16 +1568,7 @@ export type Mounts = {
         _creationTime: number;
         _id: string;
         agentName?: string;
-        embeddingId?:
-          | string
-          | string
-          | string
-          | string
-          | string
-          | string
-          | string
-          | string
-          | string;
+        embeddingId?: string;
         error?: string;
         files?: Array<{
           data?: ArrayBuffer | string;
@@ -1736,7 +1672,6 @@ export type Mounts = {
             };
         model?: string;
         order: number;
-        parentMessageId?: string;
         provider?: string;
         providerMetadata?: Record<string, Record<string, any>>;
         providerOptions?: Record<string, Record<string, any>>;
@@ -1753,7 +1688,6 @@ export type Mounts = {
           url: string;
         }>;
         status: "pending" | "success" | "failed";
-        stepId?: string;
         stepOrder: number;
         text?: string;
         threadId: string;

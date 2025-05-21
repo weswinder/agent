@@ -283,16 +283,7 @@ export declare const components: {
             _creationTime: number;
             _id: string;
             agentName?: string;
-            embeddingId?:
-              | string
-              | string
-              | string
-              | string
-              | string
-              | string
-              | string
-              | string
-              | string;
+            embeddingId?: string;
             error?: string;
             files?: Array<{
               data?: ArrayBuffer | string;
@@ -420,7 +411,6 @@ export declare const components: {
                 };
             model?: string;
             order: number;
-            parentMessageId?: string;
             provider?: string;
             providerMetadata?: Record<string, Record<string, any>>;
             providerOptions?: Record<string, Record<string, any>>;
@@ -437,7 +427,6 @@ export declare const components: {
               url: string;
             }>;
             status: "pending" | "success" | "failed";
-            stepId?: string;
             stepOrder: number;
             text?: string;
             threadId: string;
@@ -462,16 +451,7 @@ export declare const components: {
             _creationTime: number;
             _id: string;
             agentName?: string;
-            embeddingId?:
-              | string
-              | string
-              | string
-              | string
-              | string
-              | string
-              | string
-              | string
-              | string;
+            embeddingId?: string;
             error?: string;
             files?: Array<{
               data?: ArrayBuffer | string;
@@ -599,7 +579,6 @@ export declare const components: {
                 };
             model?: string;
             order: number;
-            parentMessageId?: string;
             provider?: string;
             providerMetadata?: Record<string, Record<string, any>>;
             providerOptions?: Record<string, Record<string, any>>;
@@ -616,7 +595,6 @@ export declare const components: {
               url: string;
             }>;
             status: "pending" | "success" | "failed";
-            stepId?: string;
             stepOrder: number;
             text?: string;
             threadId: string;
@@ -1229,16 +1207,7 @@ export declare const components: {
             _creationTime: number;
             _id: string;
             agentName?: string;
-            embeddingId?:
-              | string
-              | string
-              | string
-              | string
-              | string
-              | string
-              | string
-              | string
-              | string;
+            embeddingId?: string;
             error?: string;
             files?: Array<{
               data?: ArrayBuffer | string;
@@ -1366,7 +1335,6 @@ export declare const components: {
                 };
             model?: string;
             order: number;
-            parentMessageId?: string;
             provider?: string;
             providerMetadata?: Record<string, Record<string, any>>;
             providerOptions?: Record<string, Record<string, any>>;
@@ -1383,7 +1351,6 @@ export declare const components: {
               url: string;
             }>;
             status: "pending" | "success" | "failed";
-            stepId?: string;
             stepOrder: number;
             text?: string;
             threadId: string;
@@ -1434,16 +1401,7 @@ export declare const components: {
             _creationTime: number;
             _id: string;
             agentName?: string;
-            embeddingId?:
-              | string
-              | string
-              | string
-              | string
-              | string
-              | string
-              | string
-              | string
-              | string;
+            embeddingId?: string;
             error?: string;
             files?: Array<{
               data?: ArrayBuffer | string;
@@ -1571,7 +1529,6 @@ export declare const components: {
                 };
             model?: string;
             order: number;
-            parentMessageId?: string;
             provider?: string;
             providerMetadata?: Record<string, Record<string, any>>;
             providerOptions?: Record<string, Record<string, any>>;
@@ -1588,7 +1545,6 @@ export declare const components: {
               url: string;
             }>;
             status: "pending" | "success" | "failed";
-            stepId?: string;
             stepOrder: number;
             text?: string;
             threadId: string;
@@ -1637,16 +1593,7 @@ export declare const components: {
           _creationTime: number;
           _id: string;
           agentName?: string;
-          embeddingId?:
-            | string
-            | string
-            | string
-            | string
-            | string
-            | string
-            | string
-            | string
-            | string;
+          embeddingId?: string;
           error?: string;
           files?: Array<{
             data?: ArrayBuffer | string;
@@ -1750,7 +1697,6 @@ export declare const components: {
               };
           model?: string;
           order: number;
-          parentMessageId?: string;
           provider?: string;
           providerMetadata?: Record<string, Record<string, any>>;
           providerOptions?: Record<string, Record<string, any>>;
@@ -1767,7 +1713,6 @@ export declare const components: {
             url: string;
           }>;
           status: "pending" | "success" | "failed";
-          stepId?: string;
           stepOrder: number;
           text?: string;
           threadId: string;
@@ -1799,16 +1744,7 @@ export declare const components: {
           _creationTime: number;
           _id: string;
           agentName?: string;
-          embeddingId?:
-            | string
-            | string
-            | string
-            | string
-            | string
-            | string
-            | string
-            | string
-            | string;
+          embeddingId?: string;
           error?: string;
           files?: Array<{
             data?: ArrayBuffer | string;
@@ -1912,7 +1848,6 @@ export declare const components: {
               };
           model?: string;
           order: number;
-          parentMessageId?: string;
           provider?: string;
           providerMetadata?: Record<string, Record<string, any>>;
           providerOptions?: Record<string, Record<string, any>>;
@@ -1929,7 +1864,6 @@ export declare const components: {
             url: string;
           }>;
           status: "pending" | "success" | "failed";
-          stepId?: string;
           stepOrder: number;
           text?: string;
           threadId: string;
