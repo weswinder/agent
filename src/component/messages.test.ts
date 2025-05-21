@@ -9,9 +9,6 @@ import { Id } from "./_generated/dataModel.js";
 import { getMaxMessage } from "./messages.js";
 
 describe("agent", () => {
-  test("add and subtract", async () => {
-    const t = convexTest(schema, modules);
-  });
   test("getMaxMessage works for threads", async () => {
     const t = convexTest(schema, modules);
     const thread = await t.mutation(api.threads.createThread, {
