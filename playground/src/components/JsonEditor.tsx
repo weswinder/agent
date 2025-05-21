@@ -1,13 +1,19 @@
 
 import React, { useState } from 'react';
 import { Textarea } from "@/components/ui/textarea";
+import { Validator } from "convex/values";
+import { validate, ValidationError } from "convex-helpers/validators";
 
-interface JsonEditorProps<T> {
+const JsonEditor = <T,>({
+  initialValue,
+  onChange,
+  validator,
+}: {
   initialValue: T;
   onChange?: (value: T) => void;
-}
-
-const JsonEditor = <T,>({ initialValue, onChange }: JsonEditorProps<T>) => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  validator: Validator<T, "required", any>;
+}) => {
   const [value, setValue] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -16,12 +22,17 @@ const JsonEditor = <T,>({ initialValue, onChange }: JsonEditorProps<T>) => {
 
     try {
       const parsedJson = JSON.parse(newValue);
+      validate(validator, parsedJson, { throw: true });
       setError(null);
       onChange?.(parsedJson);
       setValue(null);
     } catch (err) {
       setValue(newValue);
-      setError("Invalid JSON");
+      if (err instanceof ValidationError) {
+        setError(err.message);
+      } else {
+        setError("Invalid JSON");
+      }
     }
   };
 

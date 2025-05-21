@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Message, ContextMessage } from "../types";
 import ContextMessages from "./ContextMessages";
-import { ContextOptions } from "@convex-dev/agent";
+import { ContextOptions, vContextOptions } from "@convex-dev/agent";
 import { Button } from "@/components/ui/button";
 import CollapsibleSection from "./CollapsibleSection";
 import JsonEditor from "./JsonEditor";
@@ -45,6 +45,7 @@ const RightPanel: React.FC<RightPanelProps> = ({
                 <JsonEditor
                   initialValue={contextOptions}
                   onChange={setContextOptions}
+                  validator={vContextOptions}
                 />
               </CollapsibleSection>
 

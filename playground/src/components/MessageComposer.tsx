@@ -3,7 +3,12 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import CollapsibleSection from "./CollapsibleSection";
 import JsonEditor from "./JsonEditor";
-import { ContextOptions, StorageOptions } from "@convex-dev/agent";
+import {
+  ContextOptions,
+  StorageOptions,
+  vContextOptions,
+  vStorageOptions,
+} from "@convex-dev/agent";
 import { toast } from "sonner";
 import {
   Select,
@@ -142,6 +147,7 @@ const MessageComposer: React.FC<MessageComposerProps> = ({
             <JsonEditor
               initialValue={contextOptions}
               onChange={setContextOptions}
+              validator={vContextOptions}
             />
           </div>
           <div className="w-1/2">
@@ -151,6 +157,7 @@ const MessageComposer: React.FC<MessageComposerProps> = ({
             <JsonEditor
               initialValue={storageOptions}
               onChange={setStorageOptions}
+              validator={vStorageOptions}
             />
           </div>
         </div>
