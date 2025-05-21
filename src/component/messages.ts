@@ -105,8 +105,14 @@ async function addMessagesHandler(
     assert(thread, `Thread ${args.threadId} not found`);
     userId = thread.userId;
   }
-  const { failPendingSteps, pending, messages, promptMessageId, ...rest } =
-    args;
+  const {
+    embeddings,
+    failPendingSteps,
+    pending,
+    messages,
+    promptMessageId,
+    ...rest
+  } = args;
   const parentMessage = promptMessageId && (await ctx.db.get(promptMessageId));
   if (failPendingSteps) {
     assert(args.threadId, "threadId is required to fail pending steps");
@@ -142,19 +148,19 @@ async function addMessagesHandler(
   }
   const toReturn: Doc<"messages">[] = [];
   if (messages.length > 0) {
-    if (args.embeddings) {
+    if (embeddings) {
       assert(
-        args.embeddings.vectors.length === messages.length,
+        embeddings.vectors.length === messages.length,
         "embeddings.vectors.length must match messages.length"
       );
     }
     for (let i = 0; i < messages.length; i++) {
       const message = messages[i];
       let embeddingId: VectorTableId | undefined;
-      if (args.embeddings && args.embeddings.vectors[i]) {
-        embeddingId = await insertVector(ctx, args.embeddings.dimension, {
-          vector: args.embeddings.vectors[i]!,
-          model: args.embeddings.model,
+      if (embeddings && embeddings.vectors[i]) {
+        embeddingId = await insertVector(ctx, embeddings.dimension, {
+          vector: embeddings.vectors[i]!,
+          model: embeddings.model,
           table: "messages",
           userId,
           threadId,
