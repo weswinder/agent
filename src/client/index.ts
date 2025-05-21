@@ -744,7 +744,6 @@ export class Agent<AgentTools extends ToolSet> {
     ) as TOOLS extends undefined ? AgentTools : TOOLS;
     const saveOutputMessages =
       options?.storageOptions?.saveOutputMessages ??
-      args.saveOutputMessages ??
       this.options.storageOptions?.saveOutputMessages;
     const model = aiArgs.model ?? this.options.chat;
     const trackUsage = usageHandler ?? this.options.usageHandler;
@@ -851,7 +850,6 @@ export class Agent<AgentTools extends ToolSet> {
     ) as TOOLS extends undefined ? AgentTools : TOOLS;
     const saveOutputMessages =
       options?.storageOptions?.saveOutputMessages ??
-      args.saveOutputMessages ??
       this.options.storageOptions?.saveOutputMessages;
     const model = aiArgs.model ?? this.options.chat;
     const trackUsage = usageHandler ?? this.options.usageHandler;
@@ -932,8 +930,8 @@ export class Agent<AgentTools extends ToolSet> {
     args: T;
     messageId: string | undefined;
   }> {
-    contextOptions ||= this.options.contextOptions ?? (args as ContextOptions);
-    storageOptions ||= this.options.storageOptions ?? (args as StorageOptions);
+    contextOptions ||= this.options.contextOptions;
+    storageOptions ||= this.options.storageOptions;
     const messages = promptOrMessagesToCoreMessages(args);
     const contextMessages = await this.fetchContextMessages(ctx, {
       userId,
@@ -977,8 +975,9 @@ export class Agent<AgentTools extends ToolSet> {
    * to a thread (and optionally userId).
    * @param ctx The context passed from the action function calling this.
    * @param { userId, threadId }: The user and thread to associate the message with
-   * @param args The arguments to the generateObject function, along with extra controls
-   * for the {@link ContextOptions} and {@link StorageOptions}.
+   * @param args The arguments to the generateObject function, similar to the ai.generateObject function.
+   * @param options The {@link ContextOptions} and {@link StorageOptions}
+   * options to use for fetching contextual messages and saving input/output messages.
    * @returns The result of the generateObject function.
    */
   async generateObject<T>(
@@ -1000,7 +999,6 @@ export class Agent<AgentTools extends ToolSet> {
     const trackUsage = usageHandler ?? this.options.usageHandler;
     const saveOutputMessages =
       options?.storageOptions?.saveOutputMessages ??
-      args.saveOutputMessages ??
       this.options.storageOptions?.saveOutputMessages;
     try {
       const result = (await generateObject({
@@ -1051,8 +1049,9 @@ export class Agent<AgentTools extends ToolSet> {
    * to a thread (and optionally userId).
    * @param ctx The context passed from the action function calling this.
    * @param { userId, threadId }: The user and thread to associate the message with
-   * @param args The arguments to the streamObject function, along with extra controls
-   * for the {@link ContextOptions} and {@link StorageOptions}.
+   * @param args The arguments to the streamObject function, similar to the ai.streamObject function.
+   * @param options The {@link ContextOptions} and {@link StorageOptions}
+   * options to use for fetching contextual messages and saving input/output messages.
    * @returns The result of the streamObject function.
    */
   async streamObject<T>(
@@ -1077,7 +1076,6 @@ export class Agent<AgentTools extends ToolSet> {
     const trackUsage = usageHandler ?? this.options.usageHandler;
     const saveOutputMessages =
       options?.storageOptions?.saveOutputMessages ??
-      args.saveOutputMessages ??
       this.options.storageOptions?.saveOutputMessages;
     const stream = streamObject<T>({
       // Can be overridden
@@ -1249,11 +1247,11 @@ export class Agent<AgentTools extends ToolSet> {
    * Create an action out of this agent so you can call it from workflows or other actions
    * without a wrapping function.
    * @param spec Configuration for the agent acting as an action, including
-   *   {@link ContextOptions} and maxSteps.
+   *   {@link ContextOptions}, {@link StorageOptions}, and maxSteps.
    */
   asTextAction(spec?: {
-    contextOptions?: ContextOptions;
     maxSteps?: number;
+    contextOptions?: ContextOptions;
     storageOptions?: StorageOptions;
   }) {
     const maxSteps = spec?.maxSteps ?? this.options.maxSteps;
@@ -1350,7 +1348,6 @@ export function filterOutOrphanedToolMessages(docs: MessageDoc[]) {
   }
   return result;
 }
-
 
 export type ToolCtx = RunActionCtx & {
   userId?: string;
@@ -1493,8 +1490,7 @@ type TextArgs<
    * specified in the tools array. e.g. {toolName: "getWeather", type: "tool"}
    */
   toolChoice?: ToolChoice<TOOLS extends undefined ? AgentTools : TOOLS>;
-} & ContextOptions & // DEPRECATED: pass them in the subsequent parameter instead
-  StorageOptions;
+};
 
 type StreamingTextArgs<
   AgentTools extends ToolSet,
@@ -1526,38 +1522,35 @@ type StreamingTextArgs<
    * specified in the tools array. e.g. {toolName: "getWeather", type: "tool"}
    */
   toolChoice?: ToolChoice<TOOLS extends undefined ? AgentTools : TOOLS>;
-} & ContextOptions &
-  StorageOptions;
+};
 
-type BaseGenerateObjectOptions = StorageOptions &
-  ContextOptions &
-  CallSettings & {
-    /**
-     * The model to use for the object generation. This will override the model
-     * specified in the Agent constructor.
-     */
-    model?: LanguageModelV1;
-    /**
-     * The system prompt to use for the object generation. This will override the
-     * system prompt specified in the Agent constructor.
-     */
-    system?: string;
-    /**
-     * The prompt to the LLM to use for the object generation.
-     * Specify this or messages, but not both.
-     */
-    prompt?: string;
-    /**
-     * The messages to use for the object generation.
-     * Note: recent messages are automatically added based on the thread it's
-     * associated with and your contextOptions.
-     */
-    messages?: CoreMessage[];
-    experimental_repairText?: RepairTextFunction;
-    experimental_telemetry?: TelemetrySettings;
-    providerOptions?: ProviderOptions;
-    experimental_providerMetadata?: ProviderMetadata;
-  };
+type BaseGenerateObjectOptions = CallSettings & {
+  /**
+   * The model to use for the object generation. This will override the model
+   * specified in the Agent constructor.
+   */
+  model?: LanguageModelV1;
+  /**
+   * The system prompt to use for the object generation. This will override the
+   * system prompt specified in the Agent constructor.
+   */
+  system?: string;
+  /**
+   * The prompt to the LLM to use for the object generation.
+   * Specify this or messages, but not both.
+   */
+  prompt?: string;
+  /**
+   * The messages to use for the object generation.
+   * Note: recent messages are automatically added based on the thread it's
+   * associated with and your contextOptions.
+   */
+  messages?: CoreMessage[];
+  experimental_repairText?: RepairTextFunction;
+  experimental_telemetry?: TelemetrySettings;
+  providerOptions?: ProviderOptions;
+  experimental_providerMetadata?: ProviderMetadata;
+};
 
 type GenerateObjectObjectOptions<T extends Record<string, unknown>> =
   BaseGenerateObjectOptions & {
