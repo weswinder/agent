@@ -1348,22 +1348,31 @@ export class Agent<AgentTools extends ToolSet> {
       handler: async (ctx, args) => {
         const { contextOptions, storageOptions, ...rest } = args;
         const stream = args.stream ?? spec?.stream ?? false;
-        const value = await (stream ? this.streamText : this.generateText)(
-          ctx,
-          { userId: args.userId, threadId: args.threadId },
-          { maxSteps, ...rest },
-          {
-            contextOptions:
-              contextOptions ??
-              spec?.contextOptions ??
-              this.options.contextOptions,
-            storageOptions:
-              storageOptions ??
-              spec?.storageOptions ??
-              this.options.storageOptions,
-          }
-        );
-        return value.text;
+        const targetArgs = { userId: args.userId, threadId: args.threadId };
+        const llmArgs = { maxSteps, ...rest };
+        const opts = {
+          contextOptions:
+            contextOptions ??
+            spec?.contextOptions ??
+            this.options.contextOptions,
+          storageOptions:
+            storageOptions ??
+            spec?.storageOptions ??
+            this.options.storageOptions,
+        };
+        if (stream) {
+          const result = await this.streamText(ctx, targetArgs, llmArgs, opts);
+          await result.consumeStream();
+          return { text: await result.text };
+        } else {
+          const { text } = await this.generateText(
+            ctx,
+            targetArgs,
+            llmArgs,
+            opts
+          );
+          return { text };
+        }
       },
     });
   }
