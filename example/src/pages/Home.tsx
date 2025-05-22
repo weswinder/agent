@@ -68,7 +68,7 @@ export function Home() {
                 }}
                 onKeyDown={handleKeyDown}
                 className="w-full min-h-[4rem] max-h-[70vh] p-4 pb-16 rounded-xl border-2 border-indigo-100 text-lg focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all shadow-lg overflow-hidden"
-                placeholder="Write your thoughts..."
+                placeholder="Where do you want an outfit for?"
               />
               <button
                 type="submit"
@@ -97,33 +97,100 @@ export function Home() {
           </form>
         </div>
         <div className="space-y-6">
-          {[...messages.results].reverse().map((message) =>
-            message.tool ? (
-              message.message ? (
-                message.message.role === "tool" ? (
-                  <div key={message._id}>
-                    <pre>
-                      {JSON.stringify(message.message.content, null, 2)}
-                    </pre>
+          {[...messages.results].reverse().map((message) => {
+            // Tool-related messages
+            if (
+              message.tool &&
+              message.message &&
+              typeof message.message === "object" &&
+              message.message !== null &&
+              "role" in message.message &&
+              "content" in message.message
+            ) {
+              const { role, content } = message.message as {
+                role: string;
+                content: any;
+              };
+
+              // Tool-call: assistant is calling a tool
+              if (role === "assistant") {
+                const calls = Array.isArray(content) ? content : [content];
+                const callElements = calls
+                  .filter((c: any) => c && c.type === "tool-call")
+                  .map((c: any, i: number) => (
+                    <div key={i} className="font-mono text-sm text-indigo-700">
+                      <strong>Call:</strong> {c.toolName}
+                      {c.args && (
+                        <>
+                          (
+                          <span className="text-gray-700">
+                            {Object.entries(c.args)
+                              .map(([k, v]) => `${k}: ${JSON.stringify(v)}`)
+                              .join(", ")}
+                          </span>
+                          )
+                        </>
+                      )}
+                    </div>
+                  ));
+                return callElements.length > 0 ? (
+                  <div
+                    key={message._id}
+                    className="bg-gray-50 border rounded p-4 my-2"
+                  >
+                    {callElements}
                   </div>
-                ) : (
-                  <div key={message._id}>
-                    <pre>
-                      {JSON.stringify(message.message?.content, null, 2)}
-                    </pre>
+                ) : null;
+              }
+
+              // Tool-result: tool is returning a result
+              if (role === "tool") {
+                const results = Array.isArray(content) ? content : [content];
+                const resultElements = results
+                  .filter((c: any) => c && c.type === "tool-result")
+                  .map((c: any, i: number) => (
+                    <div key={i} className="font-mono text-sm text-green-700">
+                      <strong>Result from {c.toolName}:</strong>
+                      <pre className="bg-white border rounded p-2 mt-1 text-xs">
+                        {JSON.stringify(c.result, null, 2)}
+                      </pre>
+                    </div>
+                  ));
+                return resultElements.length > 0 ? (
+                  <div
+                    key={message._id}
+                    className="bg-gray-50 border rounded p-4 my-2"
+                  >
+                    {resultElements}
                   </div>
-                )
-              ) : (
+                ) : null;
+              }
+
+              // Fallback for unknown role: render nothing
+              return null;
+            }
+
+            // Pending tool message (no message content yet)
+            if (message.tool) {
+              return (
                 <div key={message._id}>
                   Pending...
                   <pre>{JSON.stringify(message, null, 2)}</pre>
                 </div>
-              )
-            ) : (
+              );
+            }
+
+            // Normal user/assistant message
+            return (
               <div
                 key={message._id}
                 className="p-6 rounded-xl border border-indigo-100 shadow-sm"
               >
+                {message.message?.role === "assistant" && message.agentName && (
+                  <span className="px-3 py-1 rounded-full bg-indigo-50 text-indigo-700 font-medium text-sm shadow-sm border border-indigo-100">
+                    {message.agentName}
+                  </span>
+                )}
                 <div className="prose prose-lg prose-indigo max-w-none prose-p:mt-2 prose-p:mb-2">
                   <ReactMarkdown>{message.text}</ReactMarkdown>
                 </div>
@@ -131,45 +198,82 @@ export function Home() {
                   {new Date(message._creationTime).toLocaleString()}
                 </div>
               </div>
-            ),
-          )}
+            );
+          })}
         </div>
-        <h2>In Progress</h2>
-        {inProgressMessages && (
-          <div>
-            {inProgressMessages.map((message) => (
-              <div key={"pending-" + message.id}>{message.text}</div>
-            ))}
-          </div>
+        {inProgressMessages && inProgressMessages.length > 0 && (
+          <>
+            <h2>In Progress</h2>
+            <div>
+              {inProgressMessages.map((message) => (
+                <div key={"pending-" + message.id}>{message.text}</div>
+              ))}
+            </div>
+          </>
         )}
-        <h2>Follow-up questions</h2>
         {loading && text && <div>{text}</div>}
         {messages.results.find((m) => m.agentName === "Fashion Agent") && (
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              const prompt = followUpContent;
-              setFollowUpContent("");
-              void submitFollowUp(prompt).catch(() => {
-                setFollowUpContent(prompt);
-              });
-            }}
-          >
-            <textarea
-              value={followUpContent}
-              onChange={(e) => {
-                setFollowUpContent(e.target.value);
+          <>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                const prompt = followUpContent;
+                setFollowUpContent("");
+                void submitFollowUp(prompt).catch(() => {
+                  setFollowUpContent(prompt);
+                });
               }}
-            />
-            <button type="submit">Submit</button>
-          </form>
+              className="max-w-lg mx-auto w-full bg-white rounded-xl border border-indigo-100 shadow-lg p-6 flex flex-col gap-4"
+            >
+              <label
+                htmlFor="followup"
+                className="font-medium text-indigo-700 mb-1"
+              >
+                Ask a follow-up question
+              </label>
+              <textarea
+                id="followup"
+                value={followUpContent}
+                onChange={(e) => {
+                  setFollowUpContent(e.target.value);
+                  e.target.style.height = "auto";
+                  e.target.style.height = e.target.scrollHeight + "px";
+                }}
+                className="w-full min-h-[3rem] max-h-[40vh] p-4 rounded-lg border-2 border-indigo-100 text-base focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all shadow-inner resize-none"
+                placeholder="Type your follow-up question..."
+              />
+              <button
+                type="submit"
+                disabled={!followUpContent.trim()}
+                className="self-end flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg font-medium text-base hover:from-indigo-500 hover:to-purple-500 disabled:opacity-50 disabled:hover:from-indigo-600 disabled:hover:to-purple-600 transition-all shadow-inner"
+              >
+                <span>Send</span>
+                {followUpContent.trim() && (
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="18"
+                    height="18"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M5 12h14" />
+                    <path d="m12 5 7 7-7 7" />
+                  </svg>
+                )}
+              </button>
+            </form>
+          </>
         )}
       </div>
       <h2 className="text-2xl font-bold text-center my-8 text-indigo-700">
         Previous Threads
       </h2>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 p-4">
-        {[...threads.results].reverse().map((thread) => (
+        {[...threads.results].map((thread) => (
           <button
             key={thread._id}
             className="flex flex-col p-4 rounded-lg border hover:border-indigo-500 hover:shadow-md transition-all bg-white"
