@@ -7,12 +7,25 @@ import NotFound from "./pages/NotFound";
 import ApiKeyGate from "@/components/ApiKeyGate";
 import ConvexProviderGate from "@/components/ConvexProviderGate";
 import Play from "./pages/Play";
+import { useEffect } from "react";
 
 const base = import.meta.env.BASE_URL;
+
+function RestorePath() {
+  useEffect(() => {
+    const redirectPath = sessionStorage.getItem("redirectPath");
+    if (redirectPath) {
+      window.history.replaceState(null, "", redirectPath);
+      sessionStorage.removeItem("redirectPath");
+    }
+  }, []);
+  return null;
+}
 
 const App = () => {
   return (
     <TooltipProvider>
+      <RestorePath />
       <Toaster />
       <Sonner />
       <BrowserRouter basename={base}>
