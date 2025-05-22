@@ -105,24 +105,7 @@ export const streamMessageDeltas = query({
   },
   handler: async (ctx, { streamArgs, threadId }) => {
     await authorizeThreadAccess(ctx, threadId);
-    const syncResult = await storyAgent.syncDeltas(ctx, {
-      threadId,
-      streamArgs,
-    });
-    return {
-      extraData: "some extra data",
-      foo: syncResult.isDone ? "bar" : "baz",
-      ...syncResult,
-      // If you wanted, you could modify the data going down: modify the deltas,
-      // add metadata, etc. The requirement is that the return value has:
-      // {
-      //   isDone: boolean,
-      //   messages: {key: string, cursor: number, delta: TextStreamPart[], metadata: ...}[],
-      // }
-      // Note: If you use useStreamingMessages on the frontend and want to modify
-      // the deltas, make sure they stay a valid array of TextStreamPart.
-      // If you aren't using useStreamingMessages, you can return any T[][].
-    };
+    return storyAgent.syncDeltas(ctx, { threadId, streamArgs });
   },
 });
 
