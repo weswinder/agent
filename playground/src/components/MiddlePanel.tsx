@@ -63,7 +63,7 @@ const MiddlePanel: React.FC<MiddlePanelProps> = ({
           </div>
         )}
       </div>
-      <div>
+      <div className="border-t">
         <MessageComposer
           agents={agents}
           selectedAgent={selectedAgent}
