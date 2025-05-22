@@ -165,21 +165,32 @@ export function Home() {
           </form>
         )}
       </div>
-      <h2>Threads</h2>
-      {[...threads.results].reverse().map((thread) => (
-        <div key={thread._id}>
+      <h2 className="text-2xl font-bold text-center my-8 text-indigo-700">
+        Previous Threads
+      </h2>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 p-4">
+        {[...threads.results].reverse().map((thread) => (
           <button
-            className="p-4 rounded-lg border hover:border-indigo-500"
+            key={thread._id}
+            className="flex flex-col p-4 rounded-lg border hover:border-indigo-500 hover:shadow-md transition-all bg-white"
             onClick={() => setThreadId(thread._id)}
           >
-            <h3>{thread.title}</h3>
-            <p>{thread.summary}</p>
-            <p>{thread.status}</p>
-            <p>{thread.userId}</p>
-            <p>{new Date(thread._creationTime).toLocaleString()}</p>
+            <div className="flex-1">
+              <h3 className="font-semibold text-lg mb-2 line-clamp-2">
+                {thread.title || "Untitled Thread"}
+              </h3>
+              {thread.summary && (
+                <p className="text-gray-600 text-sm line-clamp-2 mb-2">
+                  {thread.summary}
+                </p>
+              )}
+            </div>
+            <div className="text-xs text-gray-500 mt-2">
+              {new Date(thread._creationTime).toLocaleDateString()}
+            </div>
           </button>
-        </div>
-      ))}
+        ))}
+      </div>
     </div>
   );
 }
