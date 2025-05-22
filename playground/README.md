@@ -73,7 +73,6 @@ It uses the `VITE_CONVEX_URL` env variable, usually pulling it from .env.local.
 - Show threads that aren't associated with a user as "no user" in the dropdown.
 - Add a "fork thread" button in the right message detail sidebar.
 - Add a "retry" button to regenerate a response while tuning the prompt/context.
-- Show and allow editing the agent's instructions (system) prompt.
 - Show the contextual messages with their rank in vector & text search, to get
   a sense of what is being found via text vs. vector vs. recency search.
 - Show the agent's default context & storage options.

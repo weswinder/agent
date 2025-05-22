@@ -4,11 +4,11 @@
 
 - UI Playground, to host locally or embed into your app.
   - On the left panel it has a dropdown to select a users, then lists the user's treads
-  - In the middle you can see the thread's messages and tool calls
-  - On the right you can see the selected message's details, as well as:
-    - Fetch context messages with different ContextOptions
-    - Send a message in the thread - optionally saving it to the thread.
-  - Run it with `npx @convex-dev/agent-playground` - uses Vite internally for now.
+  - In the middle you can see the thread's messages and tool calls, as well as send new messages in the thread:
+    - Configurable context & message saving options
+    - Play with the system prompt for rapid prototyping.
+  - On the right you can see the selected message's details, as well as fetch contextual messages to investigate what messages would get fetched for that message, with configurable ContextOptions.
+  - Use the [hosted version](https://get-convex.github.io/agent/) or run it locally with `npx @convex-dev/agent-playground` - uses Vite internally for now.
   - API key management (to authenticate into the UI Playground)
 - The `order` and `stepOrder` is now well defined: each call to something like `generateText` will be on the next "order" and each message generated from it will have increasing "subOrder" indexes.
 - Adds a function to turn MessageDoc[] into UIMessage[].
