@@ -382,6 +382,7 @@ const vCommonArgs = {
 
 export const vTextArgs = v.object({
   ...vCommonArgs,
+  stream: v.optional(v.boolean()),
   toolChoice: v.optional(
     v.union(
       v.literal("auto"),
@@ -395,7 +396,6 @@ export const vTextArgs = v.object({
   ),
   maxSteps: v.optional(v.number()),
   experimental_continueSteps: v.optional(v.boolean()),
-  providerOptions,
 });
 export type TextArgs = Infer<typeof vTextArgs>;
 

@@ -1276,13 +1276,15 @@ export class Agent<AgentTools extends ToolSet> {
     maxSteps?: number;
     contextOptions?: ContextOptions;
     storageOptions?: StorageOptions;
+    stream?: boolean;
   }) {
     const maxSteps = spec?.maxSteps ?? this.options.maxSteps;
     return internalActionGeneric({
       args: vTextArgs,
       handler: async (ctx, args) => {
         const { contextOptions, storageOptions, ...rest } = args;
-        const value = await this.generateText(
+        const stream = args.stream ?? spec?.stream ?? false;
+        const value = await (stream ? this.streamText : this.generateText)(
           ctx,
           { userId: args.userId, threadId: args.threadId },
           { maxSteps, ...rest },
