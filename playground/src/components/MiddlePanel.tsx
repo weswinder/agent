@@ -1,6 +1,5 @@
-
-import React from 'react';
-import MessageList from './MessageList';
+import React from "react";
+import MessageList from "./MessageList";
 import { Agent, Message, User } from "../types";
 import MessageComposer from "./MessageComposer";
 import { ContextOptions, StorageOptions } from "../../../dist/esm/client";
@@ -21,7 +20,8 @@ interface MiddlePanelProps {
     message: string,
     agentName: string,
     context: ContextOptions | undefined,
-    storage: StorageOptions | undefined
+    storage: StorageOptions | undefined,
+    systemPrompt?: string
   ) => Promise<string | undefined>;
   selectedThreadTitle?: string;
 }

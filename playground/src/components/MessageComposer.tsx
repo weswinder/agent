@@ -31,7 +31,8 @@ interface MessageComposerProps {
     message: string,
     agentName: string,
     context: ContextOptions | undefined,
-    storage: StorageOptions | undefined
+    storage: StorageOptions | undefined,
+    systemPrompt?: string
   ) => Promise<string | undefined>;
 }
 
@@ -48,6 +49,24 @@ const MessageComposer: React.FC<MessageComposerProps> = ({
   const [message, setMessage] = useState("");
   const [response, setResponse] = useState<string | null>(null);
   const [isSendingMessage, setIsSendingMessage] = useState(false);
+  // System prompt state
+  const [systemPrompt, setSystemPrompt] = useState<string | undefined>(
+    undefined
+  );
+  const [isSystemPromptDirty, setIsSystemPromptDirty] = useState(false);
+  const handleResetSystemPrompt = () => {
+    setSystemPrompt(undefined);
+    setIsSystemPromptDirty(false);
+  };
+
+  // When user edits system prompt
+  const handleSystemPromptChange = (
+    e: React.ChangeEvent<HTMLTextAreaElement>
+  ) => {
+    const isDirty = e.target.value !== (selectedAgent?.instructions || "");
+    setSystemPrompt(isDirty ? e.target.value : undefined);
+    setIsSystemPromptDirty(isDirty);
+  };
 
   const handleSend = async () => {
     if (!message.trim() || !selectedAgent) {
@@ -61,7 +80,8 @@ const MessageComposer: React.FC<MessageComposerProps> = ({
         message,
         selectedAgent.name,
         contextOptions,
-        storageOptions
+        storageOptions,
+        isSystemPromptDirty ? systemPrompt : undefined
       );
       return setResponse(
         storageOptions.saveOutputMessages ? null : text ?? null
@@ -136,6 +156,33 @@ const MessageComposer: React.FC<MessageComposerProps> = ({
             {isSendingMessage ? "Sending..." : "Send Message"}
           </Button>
         </div>
+      </div>
+      <div className="px-4 bg-muted/30 rounded-lg">
+        <CollapsibleSection title="System Prompt">
+          <div className="flex flex-row gap-2 items-end relative">
+            <div className="w-full">
+              <Textarea
+                aria-label="System prompt"
+                value={systemPrompt || selectedAgent?.instructions || ""}
+                onChange={handleSystemPromptChange}
+                placeholder="System prompt for the agent..."
+                className="font-mono text-sm h-24"
+                rows={3}
+              />
+            </div>
+            <Button
+              className={`ml-2 mb-1 absolute right-0 ${
+                isSystemPromptDirty ? "visible" : "invisible"
+              }`}
+              variant="secondary"
+              onClick={handleResetSystemPrompt}
+              disabled={!isSystemPromptDirty}
+              title="Reset to agent's default prompt"
+            >
+              Reset
+            </Button>
+          </div>
+        </CollapsibleSection>
       </div>
       <div className="px-4 bg-muted/30 rounded-lg">
         <CollapsibleSection title="Context & Storage Options">

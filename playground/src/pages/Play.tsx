@@ -157,7 +157,8 @@ const Play = ({ apiKey, api }: PlayProps) => {
     message: string,
     agentName: string,
     context: ContextOptions | undefined,
-    storage: StorageOptions | undefined
+    storage: StorageOptions | undefined,
+    system?: string
   ) => {
     if (!selectedThreadId || !selectedUserId) {
       toast({ title: "Select a thread and user first" });
@@ -172,6 +173,7 @@ const Play = ({ apiKey, api }: PlayProps) => {
         prompt: message,
         contextOptions: context,
         storageOptions: storage,
+        system,
       });
       return text;
       // Optionally, refresh messages or update UI here

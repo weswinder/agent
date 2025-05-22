@@ -221,6 +221,7 @@ export function definePlaygroundAPI(
       // Args passed through to generateText
       prompt: v.optional(v.string()),
       messages: v.optional(v.array(vMessage)),
+      system: v.optional(v.string()),
     },
     handler: async (ctx, args) => {
       const {
@@ -230,16 +231,20 @@ export function definePlaygroundAPI(
         threadId,
         contextOptions,
         storageOptions,
+        system,
         ...rest
       } = args;
       await validateApiKey(ctx, apiKey);
       const agent = agentMap[agentName];
       if (!agent) throw new Error(`Unknown agent: ${agentName}`);
       const { thread } = await agent.continueThread(ctx, { threadId, userId });
-      const { messageId, text } = await thread.generateText(rest, {
-        contextOptions,
-        storageOptions,
-      });
+      const { messageId, text } = await thread.generateText(
+        { ...rest, ...(system ? { system } : {}) },
+        {
+          contextOptions,
+          storageOptions,
+        }
+      );
       return { messageId, text };
     },
   });
