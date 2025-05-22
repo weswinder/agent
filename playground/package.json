@@ -1,7 +1,11 @@
 {
   "name": "@convex-dev/agent-playground",
   "description": "A dashboard for the Convex Agent component.",
-  "repository": "github:get-convex/agent",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/get-convex/agent",
+    "directory": "playground"
+  },
   "homepage": "https://get-convex.github.io/agent/",
   "bugs": {
     "email": "support@convex.dev",
