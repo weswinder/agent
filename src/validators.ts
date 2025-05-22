@@ -427,3 +427,7 @@ export function paginationResultValidator<
     ),
   });
 }
+
+export const vStreamArgs = v.array(
+  v.object({ key: v.string(), cursor: v.number() })
+);
