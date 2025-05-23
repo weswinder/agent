@@ -4,30 +4,15 @@ import type {
   DeepPartial,
   GenerateObjectResult,
   GenerateTextResult,
-  JSONValue,
-  RepairTextFunction,
-  Schema,
   StepResult,
   StreamObjectResult,
   StreamTextResult,
-  TelemetrySettings,
-  Tool,
-  ToolChoice,
-  ToolExecutionOptions,
   ToolSet,
 } from "ai";
-import {
-  generateObject,
-  generateText,
-  streamObject,
-  streamText,
-  tool,
-} from "ai";
+import { generateObject, generateText, streamObject, streamText } from "ai";
 import { assert } from "convex-helpers";
 import { internalActionGeneric, internalMutationGeneric } from "convex/server";
 import { v } from "convex/values";
-import { z } from "zod";
-import { Mounts } from "../component/_generated/api.js";
 import {
   validateVectorDimension,
   type VectorDimension,
@@ -48,10 +33,8 @@ import {
   isTool,
 } from "../shared.js";
 import {
-  type CallSettings,
   type MessageWithMetadata as InnerMessageWithMetadata,
   type ProviderMetadata,
-  type ProviderOptions,
   type SearchOptions,
   type Usage,
   vMessageWithMetadata,
@@ -59,18 +42,39 @@ import {
   vTextArgs,
 } from "../validators.js";
 import type {
+  AgentComponent,
+  ContextOptions,
+  GenerationOutputMetadata,
+  StorageOptions,
+  Thread,
+  UsageHandler,
   OpaqueIds,
   RunActionCtx,
   RunMutationCtx,
   RunQueryCtx,
-  UseApi,
+  TextArgs,
+  Options,
+  StreamingTextArgs,
+  OurObjectArgs,
+  OurStreamObjectArgs,
 } from "./types.js";
 
 import type { MessageDoc, ThreadDoc } from "../component/schema.js";
+import { wrapTools, createTool } from "./createTool.js";
 
 export { vMessageDoc, vThreadDoc } from "../component/schema.js";
-export { extractText, isTool };
-export type { Usage, ProviderMetadata, MessageDoc, ThreadDoc };
+export { extractText, isTool, createTool };
+export type {
+  Usage,
+  ProviderMetadata,
+  MessageDoc,
+  ThreadDoc,
+  AgentComponent,
+  ContextOptions,
+  StorageOptions,
+  UsageHandler,
+  Thread,
+};
 export {
   /** @deprecated Use vPaginationResult instead. */
   paginationResultValidator,
@@ -86,128 +90,6 @@ export {
   vMessage,
   vStreamArgs,
 } from "../validators.js";
-
-/**
- * Options to configure what messages are fetched as context,
- * automatically with thread.generateText, or directly via search.
- */
-export type ContextOptions = {
-  /** @deprecated Use excludeToolMessages instead. */
-  includeToolCalls?: boolean;
-  /**
-   * Whether to include tool messages in the context.
-   * By default, tool calls and results are not included.
-   */
-  excludeToolMessages?: boolean;
-  /**
-   * How many recent messages to include. These are added after the search
-   * messages, and do not count against the search limit.
-   * Default: 100
-   */
-  recentMessages?: number;
-  /**
-   * Options for searching messages.
-   */
-  searchOptions?: {
-    /**
-     * The maximum number of messages to fetch. Default is 10.
-     */
-    limit: number;
-    /**
-     * Whether to use text search to find messages. Default is false.
-     */
-    textSearch?: boolean;
-    /**
-     * Whether to use vector search to find messages. Default is false.
-     * At least one of textSearch or vectorSearch must be true.
-     */
-    vectorSearch?: boolean;
-    /**
-     * What messages around the search results to include.
-     * Default: { before: 2, after: 1 }
-     * (two before, and one after each message found in the search)
-     * Note, this is after the limit is applied.
-     * By default this will quadruple the number of messages fetched.
-     */
-    messageRange?: { before: number; after: number };
-  };
-  /**
-   * Whether to search across other threads for relevant messages.
-   * By default, only the current thread is searched.
-   */
-  searchOtherThreads?: boolean;
-};
-
-/**
- * Options to configure the automatic saving of messages
- * when generating text / objects in a thread.
- */
-export type StorageOptions = {
-  /**
-   * Defaults to false, allowing you to pass in arbitrary context that will
-   * be in addition to automatically fetched content.
-   * Pass true to have all input messages saved to the thread history.
-   */
-  saveAllInputMessages?: boolean;
-  /** Defaults to true, saving the prompt, or last message passed to generateText. */
-  saveAnyInputMessages?: boolean;
-  /** Defaults to true. Whether to save messages generated while chatting. */
-  saveOutputMessages?: boolean;
-  /**
-   * Whether to save incremental data (deltas) from streaming responses.
-   * Defaults to false.
-   * If false, it will not save any deltas to the database.
-   * If true, it will save deltas using the default options:
-   * { granularity: "word", min: 1, throttleMs: 100 }.
-   *
-   * Regardless of this option, when streaming you are able to iterate over the
-   * response in the action and/or return an http streaming response.
-   */
-  saveStreamDeltas?:
-    | boolean
-    | {
-        /**
-         * The minimum granularity of deltas to save.
-         * Note: this is not a guarantee that every delta will be exactly one line.
-         * E.g. if "line" is specified, it won't save any deltas until it encounters
-         * a newline character.
-         * Defaults to "word".
-         */
-        granularity?: "word" | "line" | "paragraph";
-        /**
-         * The minimum number of units of the granularity to save.
-         * E.g. if "line" and 10 are specified, it won't save any deltas until it encounters
-         * 10 lines of text.
-         * Defaults to 1.
-         */
-        min?: number;
-        /**
-         * The minimum number of milliseconds to wait before saving another delta.
-         * Defaults to 100.
-         */
-        throttleMs?: number;
-      };
-};
-
-export type GenerationOutputMetadata = { messageId?: string };
-
-type CoreMessageMaybeWithId = CoreMessage & { id?: string | undefined };
-
-export type UsageHandler = (
-  ctx: RunActionCtx,
-  args: {
-    userId: string | undefined;
-    threadId: string | undefined;
-    agentName: string | undefined;
-    usage: Usage;
-    // Often has more information, like cached token usage in the case of openai.
-    providerMetadata: ProviderMetadata | undefined;
-    model: string;
-    provider: string;
-  }
-) => void | Promise<void>;
-
-export type AgentComponent = UseApi<Mounts>;
 
 export class Agent<AgentTools extends ToolSet> {
   constructor(
@@ -1450,390 +1332,5 @@ export type ToolCtx = RunActionCtx & {
   messageId?: string;
 };
 
-// Vendoring in from "ai" package since it wasn't exported
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type ToolParameters = z.ZodTypeAny | Schema<any>;
-type inferParameters<PARAMETERS extends ToolParameters> =
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  PARAMETERS extends Schema<any>
-    ? PARAMETERS["_type"]
-    : PARAMETERS extends z.ZodTypeAny
-      ? z.infer<PARAMETERS>
-      : never;
-
-/**
- * This is a wrapper around the ai.tool function that adds extra context to the
- * tool call, including the action context, userId, threadId, and messageId.
- * @param tool The tool. See https://sdk.vercel.ai/docs/ai-sdk-core/tools-and-tool-calling
- * but swap parameters for args and handler for execute.
- * @returns A tool to be used with the AI SDK.
- */
-export function createTool<PARAMETERS extends ToolParameters, RESULT>(t: {
-  /**
-  An optional description of what the tool does.
-  Will be used by the language model to decide whether to use the tool.
-  Not used for provider-defined tools.
-     */
-  description?: string;
-  /**
-  The schema of the input that the tool expects. The language model will use this to generate the input.
-  It is also used to validate the output of the language model.
-  Use descriptions to make the input understandable for the language model.
-     */
-  args: PARAMETERS;
-  /**
-  An async function that is called with the arguments from the tool call and produces a result.
-  If not provided, the tool will not be executed automatically.
-
-  @args is the input of the tool call.
-  @options.abortSignal is a signal that can be used to abort the tool call.
-     */
-  handler: (
-    ctx: ToolCtx,
-    args: inferParameters<PARAMETERS>,
-    options: ToolExecutionOptions
-  ) => PromiseLike<RESULT>;
-  ctx?: ToolCtx;
-}): Tool<PARAMETERS, RESULT> & {
-  execute: (
-    args: inferParameters<PARAMETERS>,
-    options: ToolExecutionOptions
-  ) => PromiseLike<RESULT>;
-} {
-  const args = {
-    __acceptsCtx: true,
-    ctx: t.ctx,
-    description: t.description,
-    parameters: t.args,
-    async execute(
-      args: inferParameters<PARAMETERS>,
-      options: ToolExecutionOptions
-    ) {
-      if (!this.ctx) {
-        throw new Error(
-          "To use a Convex tool, you must either provide the ctx" +
-            " at definition time (dynamically in an action), or use the Agent to" +
-            " call it (which injects the ctx, userId and threadId)"
-        );
-      }
-      return t.handler(this.ctx, args, options);
-    },
-  };
-  return tool(args);
-}
-
-function wrapTools(
-  ctx: ToolCtx,
-  ...toolSets: (ToolSet | undefined)[]
-): ToolSet {
-  const output = {} as ToolSet;
-  for (const toolSet of toolSets) {
-    if (!toolSet) {
-      continue;
-    }
-    for (const [name, tool] of Object.entries(toolSet)) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      if (!(tool as any).__acceptsCtx) {
-        output[name] = tool;
-      } else {
-        const out = { ...tool, ctx };
-        output[name] = out;
-      }
-    }
-  }
-  return output;
-}
-
-type Options = {
-  /**
-   * The context options to use for passing in message history to the LLM.
-   */
-  contextOptions?: ContextOptions;
-  /**
-   * The storage options to use for saving the input and output messages to the thread.
-   */
-  storageOptions?: StorageOptions;
-};
-
-type TextArgs<
-  AgentTools extends ToolSet,
-  TOOLS extends ToolSet | undefined = undefined,
-  OUTPUT = never,
-  OUTPUT_PARTIAL = never,
-> = Omit<
-  Parameters<
-    typeof generateText<
-      TOOLS extends undefined ? AgentTools : TOOLS,
-      OUTPUT,
-      OUTPUT_PARTIAL
-    >
-  >[0],
-  "toolChoice" | "tools" | "model"
-> & {
-  /**
-   * If provided, this message will be used as the "prompt" for the LLM call,
-   * instead of the prompt or messages.
-   * This is useful if you want to first save a user message, then use it as
-   * the prompt for the LLM call in another call.
-   */
-  promptMessageId?: string;
-  /**
-   * The model to use for the tool calls. This will override the model specified
-   * in the Agent constructor.
-   */
-  model?: LanguageModelV1;
-  /**
-   * The tools to use for the tool calls. This will override tools specified
-   * in the Agent constructor or createThread / continueThread.
-   */
-  tools?: TOOLS;
-  /**
-   * The tool choice to use for the tool calls. This must be one of the tools
-   * specified in the tools array. e.g. {toolName: "getWeather", type: "tool"}
-   */
-  toolChoice?: ToolChoice<TOOLS extends undefined ? AgentTools : TOOLS>;
-};
-
-type StreamingTextArgs<
-  AgentTools extends ToolSet,
-  TOOLS extends ToolSet | undefined = undefined,
-  OUTPUT = never,
-  OUTPUT_PARTIAL = never,
-> = Omit<
-  Parameters<
-    typeof streamText<
-      TOOLS extends undefined ? AgentTools : TOOLS,
-      OUTPUT,
-      OUTPUT_PARTIAL
-    >
-  >[0],
-  "toolChoice" | "tools" | "model"
-> & {
-  /**
-   * The model to use for the tool calls. This will override the model specified
-   * in the Agent constructor.
-   */
-  model?: LanguageModelV1;
-  /**
-   * The tools to use for the tool calls. This will override tools specified
-   * in the Agent constructor or createThread / continueThread.
-   */
-  tools?: TOOLS;
-  /**
-   * The tool choice to use for the tool calls. This must be one of the tools
-   * specified in the tools array. e.g. {toolName: "getWeather", type: "tool"}
-   */
-  toolChoice?: ToolChoice<TOOLS extends undefined ? AgentTools : TOOLS>;
-};
-
-type BaseGenerateObjectOptions = CallSettings & {
-  /**
-   * The model to use for the object generation. This will override the model
-   * specified in the Agent constructor.
-   */
-  model?: LanguageModelV1;
-  /**
-   * The system prompt to use for the object generation. This will override the
-   * system prompt specified in the Agent constructor.
-   */
-  system?: string;
-  /**
-   * The prompt to the LLM to use for the object generation.
-   * Specify this or messages, but not both.
-   */
-  prompt?: string;
-  /**
-   * The messages to use for the object generation.
-   * Note: recent messages are automatically added based on the thread it's
-   * associated with and your contextOptions.
-   */
-  messages?: CoreMessage[];
-  /**
-   * The message to use as the "prompt" for the object generation.
-   * If this is provided, it will be used instead of the prompt or messages.
-   * This is useful if you want to first save a user message, then use it as
-   * the prompt for the object generation in another call.
-   */
-  promptMessageId?: string;
-  experimental_repairText?: RepairTextFunction;
-  experimental_telemetry?: TelemetrySettings;
-  providerOptions?: ProviderOptions;
-  experimental_providerMetadata?: ProviderMetadata;
-};
-
-type GenerateObjectObjectOptions<T extends Record<string, unknown>> =
-  BaseGenerateObjectOptions & {
-    output?: "object";
-    mode?: "auto" | "json" | "tool";
-    schema: z.Schema<T>;
-    schemaName?: string;
-    schemaDescription?: string;
-  };
-
-type GenerateObjectArrayOptions<T> = BaseGenerateObjectOptions & {
-  output: "array";
-  mode?: "auto" | "json" | "tool";
-  schema: z.Schema<T>;
-  schemaName?: string;
-  schemaDescription?: string;
-};
-
-type GenerateObjectWithEnumOptions<T extends string> =
-  BaseGenerateObjectOptions & {
-    output: "enum";
-    enum: Array<T>;
-    mode?: "auto" | "json" | "tool";
-  };
-
-type GenerateObjectNoSchemaOptions = BaseGenerateObjectOptions & {
-  schema?: undefined;
-  mode?: "json";
-};
-
-// TODO: simplify this to just use the generateObject args, with an optional
-// model and tool/toolChoice types
-type GenerateObjectArgs<T> =
-  T extends Record<string, unknown>
-    ? GenerateObjectObjectOptions<T>
-    : T extends Array<unknown>
-      ? GenerateObjectArrayOptions<T>
-      : T extends string
-        ? GenerateObjectWithEnumOptions<T>
-        : GenerateObjectNoSchemaOptions;
-
-type StreamObjectArgs<T> =
-  T extends Record<string, unknown>
-    ? GenerateObjectObjectOptions<T>
-    : T extends Array<unknown>
-      ? GenerateObjectArrayOptions<T>
-      : GenerateObjectNoSchemaOptions;
-
-type OurObjectArgs<T> = GenerateObjectArgs<T> &
-  Pick<
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    Parameters<typeof generateObject<any>>[0],
-    "experimental_repairText" | "abortSignal"
-  >;
-
-type OurStreamObjectArgs<T> = StreamObjectArgs<T> &
-  Pick<
-    Parameters<typeof streamObject<T>>[0],
-    "onError" | "onFinish" | "abortSignal"
-  >;
-
-type ThreadOutputMetadata = GenerationOutputMetadata & {
-  messageId: string;
-};
-
-/**
- * The interface for a thread returned from {@link createThread} or {@link continueThread}.
- * This is contextual to a thread and/or user.
- */
-interface Thread<DefaultTools extends ToolSet> {
-  /**
-   * The target threadId, from the startThread or continueThread initializers.
-   */
-  threadId: string;
-  /**
-   * This behaves like {@link generateText} from the "ai" package except that
-   * it add context based on the userId and threadId and saves the input and
-   * resulting messages to the thread, if specified.
-   * Use {@link continueThread} to get a version of this function already scoped
-   * to a thread (and optionally userId).
-   * @param args The arguments to the generateText function, along with extra controls
-   * for the {@link ContextOptions} and {@link StorageOptions}.
-   * @returns The result of the generateText function.
-   */
-  generateText<
-    TOOLS extends ToolSet | undefined = undefined,
-    OUTPUT = never,
-    OUTPUT_PARTIAL = never,
-  >(
-    args: TextArgs<
-      TOOLS extends undefined ? DefaultTools : TOOLS,
-      TOOLS,
-      OUTPUT,
-      OUTPUT_PARTIAL
-    >,
-    options?: Options
-  ): Promise<
-    GenerateTextResult<TOOLS extends undefined ? DefaultTools : TOOLS, OUTPUT> &
-      ThreadOutputMetadata
-  >;
-
-  /**
-   * This behaves like {@link streamText} from the "ai" package except that
-   * it add context based on the userId and threadId and saves the input and
-   * resulting messages to the thread, if specified.
-   * Use {@link continueThread} to get a version of this function already scoped
-   * to a thread (and optionally userId).
-   * @param args The arguments to the streamText function, along with extra controls
-   * for the {@link ContextOptions} and {@link StorageOptions}.
-   * @returns The result of the streamText function.
-   */
-  streamText<
-    TOOLS extends ToolSet | undefined = undefined,
-    OUTPUT = never,
-    PARTIAL_OUTPUT = never,
-  >(
-    args: StreamingTextArgs<
-      TOOLS extends undefined ? DefaultTools : TOOLS,
-      TOOLS,
-      OUTPUT,
-      PARTIAL_OUTPUT
-    >,
-    options?: Options
-  ): Promise<
-    StreamTextResult<
-      TOOLS extends undefined ? DefaultTools : TOOLS,
-      PARTIAL_OUTPUT
-    > &
-      ThreadOutputMetadata
-  >;
-  /**
-   * This behaves like {@link generateObject} from the "ai" package except that
-   * it add context based on the userId and threadId and saves the input and
-   * resulting messages to the thread, if specified. This overload is for objects, arrays, and enums.
-   * Use {@link continueThread} to get a version of this function already scoped
-   * to a thread (and optionally userId).
-   * @param args The arguments to the generateObject function, along with extra controls
-   * for the {@link ContextOptions} and {@link StorageOptions}.
-   * @returns The result of the generateObject function.
-   */
-  generateObject<T>(
-    args: OurObjectArgs<T>,
-    options?: Options
-  ): Promise<GenerateObjectResult<T> & ThreadOutputMetadata>;
-  /**
-   * This behaves like {@link generateObject} from the "ai" package except that
-   * it add context based on the userId and threadId and saves the input and
-   * resulting messages to the thread, if specified. This overload is for when there's no schema.
-   * Use {@link continueThread} to get a version of this function already scoped
-   * to a thread (and optionally userId).
-   * @param args The arguments to the generateObject function, along with extra controls
-   * for the {@link ContextOptions} and {@link StorageOptions}.
-   * @returns The result of the generateObject function.
-   */
-  generateObject(
-    args: GenerateObjectNoSchemaOptions,
-    options?: Options
-  ): Promise<GenerateObjectResult<JSONValue> & ThreadOutputMetadata>;
-  /**
-   * This behaves like {@link streamObject} from the "ai" package except that
-   * it add context based on the userId and threadId and saves the input and
-   * resulting messages to the thread, if specified.
-   * Use {@link continueThread} to get a version of this function already scoped
-   * to a thread (and optionally userId).
-   * @param args The arguments to the streamObject function, along with extra controls
-   * for the {@link ContextOptions} and {@link StorageOptions}.
-   * @returns The result of the streamObject function.
-   */
-  streamObject<T>(
-    args: OurStreamObjectArgs<T>,
-    options?: Options
-  ): Promise<
-    StreamObjectResult<DeepPartial<T>, T, never> & ThreadOutputMetadata
-  >;
-}
-
 type MessageWithMetadata = OpaqueIds<InnerMessageWithMetadata>;
+type CoreMessageMaybeWithId = CoreMessage & { id?: string | undefined };
