@@ -2,21 +2,27 @@ import { usePaginatedQuery } from "convex/react";
 import { useMutation } from "convex/react";
 import { Toaster } from "./components/ui/toaster";
 import { api } from "../convex/_generated/api";
-import { toUIMessages } from "../../../dist/esm/client";
+import { toUIMessages } from "@convex-dev/agent";
 import { UIMessage } from "ai";
 import { useState } from "react";
 
-export default function App() {
+export default function ChatStreaming() {
   const createThread = useMutation(api.chat.createThread);
   const [threadId, setThreadId] = useState<string | undefined>(undefined);
   return (
     <div className="min-h-screen flex flex-col">
       <main className="flex-1 p-8">
         {threadId ? (
-          <Story threadId={threadId} />
-          <button onClick={() => createThread().then(setThreadId)}>Restart</button>
+          <>
+            <Story threadId={threadId} />
+            <button onClick={() => void createThread().then(setThreadId)}>
+              Restart
+            </button>
+          </>
         ) : (
-          <button onClick={() => createThread().then(setThreadId)}>Create thread</button>
+          <button onClick={() => void createThread().then(setThreadId)}>
+            Create thread
+          </button>
         )}
       </main>
       <Toaster />
@@ -32,14 +38,14 @@ function Story({ threadId }: { threadId: string }) {
   );
   const sendMessage = useMutation(api.chat.streamStoryInternalAction);
 
-  async function onSendClicked() {
-    await sendMessage({ threadId, prompt, stream: true });
+  function onSendClicked() {
+    void sendMessage({ threadId, prompt, stream: true });
     // TODO: .withOptimisticUpdate(... patch messages);
   }
 
   return (
     <>
-      {toUIMessages(messages ?? []).map((m) => (
+      {toUIMessages(messages.results ?? []).map((m) => (
         <Message m={m} />
       ))}
       <StreamedMessages threadId={threadId} />
@@ -49,7 +55,9 @@ function Story({ threadId }: { threadId: string }) {
 }
 
 function Message({ m }: { m: UIMessage }) {
-  return <div>{m.content}</div>;
+  return (
+    <pre className="whitespace-pre-wrap">{JSON.stringify(m, null, 2)}</pre>
+  );
 }
 // A separate component helps avoid re-rendering all messages when only the streaming ones are changing
 function StreamedMessages({ threadId }: { threadId: string }) {
