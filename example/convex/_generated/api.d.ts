@@ -1381,7 +1381,7 @@ export declare const components: {
         {
           excludeToolMessages?: boolean;
           isTool?: "use excludeToolMessages instead of this";
-          order?: "asc" | "desc";
+          order: "asc" | "desc";
           paginationOpts?: {
             cursor: string | null;
             endCursor?: string | null;

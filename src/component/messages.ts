@@ -388,7 +388,8 @@ export const listMessagesByThreadId = query({
     excludeToolMessages: v.optional(v.boolean()),
     /** @deprecated Use excludeToolMessages instead. */
     isTool: v.optional(v.literal("use excludeToolMessages instead of this")),
-    order: v.optional(v.union(v.literal("asc"), v.literal("desc"))),
+    /** What order to sort the messages in. To get the latest, use "desc". */
+    order: v.union(v.literal("asc"), v.literal("desc")),
     paginationOpts: v.optional(paginationOptsValidator),
     statuses: v.optional(v.array(vMessageStatus)),
     upToAndIncludingMessageId: v.optional(v.id("messages")),

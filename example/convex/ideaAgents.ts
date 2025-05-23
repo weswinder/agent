@@ -282,7 +282,7 @@ export const inProgressMessages = query({
     }
     const messages = await ctx.runQuery(
       components.agent.messages.listMessagesByThreadId,
-      { threadId, statuses: ["pending"] },
+      { threadId, statuses: ["pending"], order: "desc" },
     );
     return messages.page;
   },

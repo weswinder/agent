@@ -162,7 +162,7 @@ export const listMessagesByThreadId = query({
   handler: async (ctx, { threadId, paginationOpts }) => {
     const messages = await ctx.runQuery(
       components.agent.messages.listMessagesByThreadId,
-      { threadId, paginationOpts },
+      { threadId, paginationOpts, order: "desc" },
     );
     return messages;
   },
@@ -173,7 +173,7 @@ export const getInProgressMessages = query({
   handler: async (ctx, { threadId }) => {
     const { page } = await ctx.runQuery(
       components.agent.messages.listMessagesByThreadId,
-      { threadId, statuses: ["pending"] },
+      { threadId, statuses: ["pending"], order: "desc" },
     );
     return page;
   },
