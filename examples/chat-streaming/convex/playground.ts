@@ -1,6 +1,6 @@
 import { definePlaygroundAPI } from "@convex-dev/agent-playground";
 import { components } from "./_generated/api";
-import { weatherAgent, fashionAgent } from "./example";
+import { storyAgent } from "./chat";
 
 /**
  * Here we expose the API so the frontend can access it.
@@ -20,5 +20,5 @@ export const {
   generateText,
   fetchPromptContext,
 } = definePlaygroundAPI(components.agent, {
-  agents: [weatherAgent, fashionAgent],
+  agents: [storyAgent],
 });
