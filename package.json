@@ -18,6 +18,7 @@
   "type": "module",
   "scripts": {
     "build": "npm run build:esm && npm run build:cjs",
+    "build:watch": "cd src && npx chokidar '*.ts' 'client/**/*.ts' -c 'npm run build' --initial",
     "build:esm": "tsc --project ./esm.json && echo '{\\n  \"type\": \"module\"\\n}' > dist/esm/package.json",
     "build:cjs": "tsc --project ./commonjs.json && echo '{\\n  \"type\": \"commonjs\"\\n}' > dist/commonjs/package.json",
     "dev": "cd example; npm run dev",
@@ -101,6 +102,7 @@
     "@eslint/js": "^9.9.1",
     "@types/node": "^18.19.86",
     "@types/react": "^19.1.1",
+    "chokidar-cli": "^3.0.0",
     "convex-test": "^0.0.37",
     "eslint": "^9.24.0",
     "globals": "^15.15.0",
