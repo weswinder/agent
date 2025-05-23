@@ -188,7 +188,7 @@ const Play = ({ apiKey, api }: PlayProps) => {
         <h1 className="font-bold text-lg">Playground</h1>
       </div>
       <div className="flex-grow flex overflow-hidden">
-        <div className="w-1/4 h-full">
+        <div className="w-1/5 h-full">
           <LeftPanel
             users={users.results}
             threads={threads.results}
@@ -200,7 +200,7 @@ const Play = ({ apiKey, api }: PlayProps) => {
             canLoadMoreThreads={threads.status === "CanLoadMore"}
           />
         </div>
-        <div className="w-1/2 h-full border-x">
+        <div className="w-2/5 h-full border-x">
           <MiddlePanel
             agents={agents}
             selectedAgent={selectedAgent}
@@ -217,7 +217,7 @@ const Play = ({ apiKey, api }: PlayProps) => {
             onSendMessage={handleSendMessage}
           />
         </div>
-        <div className="w-1/4 h-full">
+        <div className="w-2/5 h-full">
           <RightPanel
             selectedMessage={selectedMessage}
             contextMessages={contextMessages}

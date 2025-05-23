@@ -19,6 +19,7 @@ import {
 } from "@convex-dev/agent";
 import type { ToolSet } from "ai";
 import { v } from "convex/values";
+import { DEFAULT_CONTEXT_OPTIONS } from "./types/defaults";
 
 export type PlaygroundAPI = ApiFromModules<{
   playground: ReturnType<typeof definePlaygroundAPI>;
@@ -264,6 +265,15 @@ export function definePlaygroundAPI(
       await validateApiKey(ctx, args.apiKey);
       const agent = agentMap[args.agentName];
       if (!agent) throw new Error(`Unknown agent: ${args.agentName}`);
+      const contextOptions =
+        args.contextOptions ??
+        agent.options.contextOptions ??
+        DEFAULT_CONTEXT_OPTIONS;
+      if (args.beforeMessageId) {
+        contextOptions.recentMessages =
+          (contextOptions.recentMessages ??
+            DEFAULT_CONTEXT_OPTIONS.recentMessages) + 1;
+      }
       const messages = await agent.fetchContextMessages(ctx, {
         userId: args.userId,
         threadId: args.threadId,

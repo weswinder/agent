@@ -13,8 +13,7 @@ export const componentModules = import.meta.glob(
 
 export function initConvexTest() {
   const t = convexTest(schema, modules);
-  t.registerComponent("bigPool", componentSchema, componentModules);
-  t.registerComponent("smallPool", componentSchema, componentModules);
+  t.registerComponent("agent", componentSchema, componentModules);
   return t;
 }
 

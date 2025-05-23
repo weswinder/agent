@@ -66,7 +66,7 @@ function ApiKeyGate({
 
   // Validate on every keystroke
   useEffect(() => {
-    if (!apiKeyInput) return;
+    if (!apiPathInput) return;
     const nextApi = getApi(apiPathInput);
     convex
       .query(nextApi.isApiKeyValid, { apiKey: apiKeyInput })
@@ -86,14 +86,16 @@ function ApiKeyGate({
         }
         setIsConnected(true);
       })
-      .catch(() => {
+      .catch((err) => {
         if (!convex.connectionState().isWebSocketConnected) {
           setIsConnected(false);
+        } else {
+          setApiPath("");
         }
         setError(
-          "Invalid playground path (could not find isApiKeyValid). Please check the path and try again." +
-            "e.g. if you exported the API in convex/foo/playground.ts, it would be foo/playground." +
-            " The code there should be:\n" +
+          "Invalid playground path (could not find isApiKeyValid).\nPlease check the path and try again.\n" +
+            "e.g. if you exported the API in convex/foo/playground.ts, it would be foo/playground.\n" +
+            "The code there should be:\n" +
             PLAYGROUND_CODE
         );
       });
@@ -118,10 +120,10 @@ function ApiKeyGate({
 
   if (!apiKey || !apiPath || !apiKeyValid) {
     return (
-      <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-60 z-50">
+      <div className="fixed inset-0 flex py-8 items-start justify-center bg-black bg-opacity-60 z-50">
         <form
           onSubmit={handleSubmit}
-          className="bg-white rounded-xl shadow-2xl p-8 flex flex-col gap-6 min-w-[400px] max-w-[90vw] border border-muted"
+          className="bg-white rounded-xl shadow-2xl p-8 flex flex-col gap-6 w-full max-w-4xl border border-muted min-h-[600px]"
         >
           <div className="flex flex-col gap-2">
             <h2 className="text-2xl font-bold mb-1 text-foreground">
@@ -150,8 +152,8 @@ function ApiKeyGate({
               placeholder="playground"
             />
             <span className="text-xs text-muted-foreground">
-              Usually <code>playground</code>, or the path to your Convex
-              playground module.
+              Where you exported the playground api with definePlaygroundAPI.
+              Usually <code>playground</code>.
             </span>
           </div>
           <h3 className="text-xl font-bold mb-1 text-foreground">
