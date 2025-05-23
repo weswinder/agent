@@ -10,23 +10,30 @@ export default function ChatStreaming() {
   const createThread = useMutation(api.chat.createThread);
   const [threadId, setThreadId] = useState<string | undefined>(undefined);
   return (
-    <div className="min-h-screen flex flex-col">
-      <main className="flex-1 p-8">
-        {threadId ? (
-          <>
-            <Story threadId={threadId} />
+    <>
+      <header className="sticky top-0 z-10 bg-white/80 backdrop-blur-sm p-4 flex justify-between items-center border-b">
+        <h1 className="text-xl font-semibold accent-text">
+          Streaming Chat Example
+        </h1>
+      </header>
+      <div className="min-h-screen flex flex-col">
+        <main className="flex-1 p-8">
+          {threadId ? (
+            <>
+              <Story threadId={threadId} />
+              <button onClick={() => void createThread().then(setThreadId)}>
+                Restart
+              </button>
+            </>
+          ) : (
             <button onClick={() => void createThread().then(setThreadId)}>
-              Restart
+              Create thread
             </button>
-          </>
-        ) : (
-          <button onClick={() => void createThread().then(setThreadId)}>
-            Create thread
-          </button>
-        )}
-      </main>
-      <Toaster />
-    </div>
+          )}
+        </main>
+        <Toaster />
+      </div>
+    </>
   );
 }
 

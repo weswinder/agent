@@ -1,0 +1,58 @@
+import { Link } from "react-router-dom";
+
+export function Index() {
+  return (
+    <>
+      <header className="sticky top-0 z-10 bg-white/80 backdrop-blur-sm p-4 flex justify-between items-center border-b">
+        <nav className="flex gap-4 items-center">
+          <h1 className="text-xl font-semibold accent-text">
+            Convex Agent Component
+          </h1>
+        </nav>
+      </header>
+      <div className="max-w-2xl mx-auto space-y-8">
+        <h1 className="text-3xl font-bold mb-4">Agent Example Index</h1>
+        <p className="mb-6 text-lg">
+          Explore the available agent/AI examples below. You can also{" "}
+          <span className="font-mono bg-gray-100 px-2 py-1 rounded">cd</span>{" "}
+          into an{" "}
+          <span className="font-mono bg-gray-100 px-2 py-1 rounded">
+            examples
+          </span>{" "}
+          directory and run just that example directly.
+        </p>
+        <ul className="space-y-4">
+          <li className="border rounded p-4 hover:shadow transition">
+            <Link
+              to="/chat-streaming"
+              className="text-xl font-semibold text-indigo-700 hover:underline"
+            >
+              Streaming Chat
+            </Link>
+            <p className="mt-2 text-gray-700">
+              A simple streaming chat interface with an AI agent. Shows how to
+              stream responses from an LLM in real time (without HTTP
+              streaming!).
+            </p>
+          </li>
+          <li className="border rounded p-4 hover:shadow transition">
+            <Link
+              to="/weather-fashion"
+              className="text-xl font-semibold text-indigo-700 hover:underline"
+            >
+              Weather & Fashion
+            </Link>
+            <p className="mt-2 text-gray-700">
+              Get outfit suggestions for any location, powered by weather and
+              fashion agents. Demonstrates multi-step agent reasoning and tool
+              use.
+            </p>
+          </li>
+        </ul>
+        <div className="mt-8 text-sm text-gray-500">
+          More examples coming soon!
+        </div>
+      </div>
+    </>
+  );
+}

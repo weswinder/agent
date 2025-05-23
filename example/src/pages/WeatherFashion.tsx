@@ -5,7 +5,7 @@ import ReactMarkdown from "react-markdown";
 import { useStreamingText } from "@convex-dev/agent/react";
 const userId = "test_user"; // You'd use auth to access this on the server in a real app
 
-export function Home() {
+export function WeatherFashion() {
   const [content, setContent] = useState("");
   const [threadId, setThreadId] = useState<string | null>(null);
   const threads = usePaginatedQuery(

@@ -21,7 +21,12 @@ AI Agent framework built on Convex.
 
 [Read the associated Stack post here](https://stack.convex.dev/ai-agents).
 
-Example usage:
+Play with the [examples](./examples) by cloning this repo and running:
+```sh
+npm run example
+```
+
+## Example usage:
 
 ```ts
 // Define an agent similarly to the AI SDK
