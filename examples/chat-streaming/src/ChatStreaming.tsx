@@ -2,7 +2,7 @@ import { usePaginatedQuery } from "convex/react";
 import { useMutation } from "convex/react";
 import { Toaster } from "./components/ui/toaster";
 import { api } from "../convex/_generated/api";
-import { toUIMessages } from "@convex-dev/agent/react";
+import { toUIMessages, useStreamMessagesQuery } from "@convex-dev/agent/react";
 import { UIMessage } from "ai";
 import { useState } from "react";
 
@@ -68,7 +68,7 @@ function Message({ m }: { m: UIMessage }) {
 }
 // A separate component helps avoid re-rendering all messages when only the streaming ones are changing
 function StreamedMessages({ threadId }: { threadId: string }) {
-  const streamedMessages = useStreamingMessagesQuery(
+  const streamedMessages = useStreamMessagesQuery(
     api.chat.streamMessageDeltas,
     { threadId }, // other parameters can be passed
   );
