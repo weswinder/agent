@@ -464,7 +464,7 @@ export class Agent<AgentTools extends ToolSet> {
     assert(args.userId || args.threadId, "Specify userId or threadId");
     // Fetch the latest messages from the thread
     let included: Set<string> | undefined;
-    const opts = this.mergedContextOptions(args.contextOptions);
+    const opts = this._mergedContextOptions(args.contextOptions);
     const contextMessages: MessageDoc[] = [];
     if (
       args.threadId &&
@@ -507,7 +507,7 @@ export class Agent<AgentTools extends ToolSet> {
           userId: opts?.searchOtherThreads ? args.userId : undefined,
           threadId: args.threadId,
           beforeMessageId: args.upToAndIncludingMessageId,
-          ...(await this.searchOptionsWithDefaults(opts, messagesToSearch)),
+          ...(await this._searchOptionsWithDefaults(opts, messagesToSearch)),
         }
       );
       // TODO: track what messages we used for context
@@ -1246,7 +1246,7 @@ export class Agent<AgentTools extends ToolSet> {
     });
   }
 
-  mergedContextOptions(opts: ContextOptions | undefined): ContextOptions {
+  _mergedContextOptions(opts: ContextOptions | undefined): ContextOptions {
     const searchOptions = {
       ...this.options.contextOptions?.searchOptions,
       ...opts?.searchOptions,
@@ -1260,7 +1260,7 @@ export class Agent<AgentTools extends ToolSet> {
     };
   }
 
-  async searchOptionsWithDefaults(
+  async _searchOptionsWithDefaults(
     contextOptions: ContextOptions,
     messages: CoreMessage[]
   ): Promise<SearchOptions> {
