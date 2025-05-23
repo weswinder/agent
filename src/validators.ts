@@ -410,7 +410,7 @@ export const vEmbeddingsWithMetadata = v.object({
 });
 export type EmbeddingsWithMetadata = Infer<typeof vEmbeddingsWithMetadata>;
 
-export function paginationResultValidator<
+export function vPaginationResult<
   T extends Validator<Value, "required", string>,
 >(itemValidator: T) {
   return v.object({

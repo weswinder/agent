@@ -2,7 +2,7 @@ import { assert, omit, pick } from "convex-helpers";
 import { paginator } from "convex-helpers/server/pagination";
 import { partial } from "convex-helpers/validators";
 import { ObjectType } from "convex/values";
-import { paginationResultValidator } from "../validators.js";
+import { vPaginationResult } from "../validators.js";
 import { api, internal } from "./_generated/api.js";
 import { Doc } from "./_generated/dataModel.js";
 import {
@@ -53,7 +53,7 @@ export const listThreadsByUserId = query({
       page: threads.page.map(publicThread),
     };
   },
-  returns: paginationResultValidator(vThreadDoc),
+  returns: vPaginationResult(vThreadDoc),
 });
 
 const vThread = schema.tables.threads.validator;

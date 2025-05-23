@@ -8,7 +8,7 @@ import {
   isTool,
 } from "../shared.js";
 import {
-  paginationResultValidator,
+  vPaginationResult,
   vMessageEmbeddings,
   vMessageStatus,
   vMessageWithMetadata,
@@ -440,7 +440,7 @@ export const listMessagesByThreadId = query({
     );
     return { ...messages, page: messages.page.map(publicMessage) };
   },
-  returns: paginationResultValidator(vMessageDoc),
+  returns: vPaginationResult(vMessageDoc),
 });
 
 /** @deprecated Use listMessagesByThreadId instead. */
@@ -449,7 +449,7 @@ export const getThreadMessages = query({
   handler: async () => {
     throw new Error("Use listMessagesByThreadId instead of getThreadMessages");
   },
-  returns: paginationResultValidator(vMessageDoc),
+  returns: vPaginationResult(vMessageDoc),
 });
 
 export const searchMessages = action({

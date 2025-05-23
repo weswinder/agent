@@ -76,9 +76,7 @@ export type {
   Thread,
 };
 export {
-  /** @deprecated Use vPaginationResult instead. */
-  paginationResultValidator,
-  paginationResultValidator as vPaginationResult,
+  vPaginationResult,
   vContextOptions,
   vUsage,
   vProviderMetadata,

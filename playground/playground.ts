@@ -10,7 +10,7 @@ import {
 import {
   vMessageDoc,
   vThreadDoc,
-  paginationResultValidator,
+  vPaginationResult,
   vMessage,
   vContextOptions,
   vStorageOptions,
@@ -95,7 +95,7 @@ export function definePlaygroundAPI(
         ),
       };
     },
-    returns: paginationResultValidator(
+    returns: vPaginationResult(
       v.object({
         _id: v.string(),
         name: v.string(),
@@ -143,7 +143,7 @@ export function definePlaygroundAPI(
         ),
       };
     },
-    returns: paginationResultValidator(
+    returns: vPaginationResult(
       v.object({
         ...vThreadDoc.fields,
         latestMessage: v.optional(v.string()),
@@ -168,7 +168,7 @@ export function definePlaygroundAPI(
         statuses: ["success", "failed", "pending"],
       });
     },
-    returns: paginationResultValidator(vMessageDoc),
+    returns: vPaginationResult(vMessageDoc),
   });
 
   // Create a thread (mutation)

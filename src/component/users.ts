@@ -13,7 +13,7 @@ import { schema, v } from "./schema.js";
 import { deleteMessage } from "./messages.js";
 import { paginationOptsValidator } from "convex/server";
 import { stream } from "convex-helpers/server/stream";
-import { paginationResultValidator } from "../validators.js";
+import { vPaginationResult } from "../validators.js";
 import { Id } from "./_generated/dataModel.js";
 
 // Note: it only searches for users with threads
@@ -33,7 +33,7 @@ export const listUsersWithThreads = query({
       page: results.page.map((t) => t.userId).filter((t): t is string => !!t),
     };
   },
-  returns: paginationResultValidator(v.string()),
+  returns: vPaginationResult(v.string()),
 });
 
 export const deleteAllForUserId = action({
