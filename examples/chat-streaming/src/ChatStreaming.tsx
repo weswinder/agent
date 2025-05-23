@@ -2,7 +2,7 @@ import { usePaginatedQuery } from "convex/react";
 import { useMutation } from "convex/react";
 import { Toaster } from "./components/ui/toaster";
 import { api } from "../convex/_generated/api";
-import { toUIMessages } from "@convex-dev/agent";
+import { toUIMessages } from "@convex-dev/agent/react";
 import { UIMessage } from "ai";
 import { useState } from "react";
 

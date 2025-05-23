@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+export { toUIMessages } from "./toUIMessages";
 
 if (typeof window === "undefined") {
   throw new Error("this is frontend code, but it's running somewhere else!");
