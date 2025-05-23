@@ -428,6 +428,34 @@ export function vPaginationResult<
   });
 }
 
-export const vStreamArgs = v.array(
-  v.object({ key: v.string(), cursor: v.number() })
+export const vStreamArgs = v.array(v.object({ key: v.string(), cursor: v.number() }));
+export type StreamArgs = Infer<typeof vStreamArgs>;
+
+export const vTextStreamPart = v.union(
+  v.object({
+    type: v.literal("text-delta"),
+    textDelta: v.string(),
+  }),
+  v.object({
+    type: v.literal("reasoning"),
+    textDelta: v.string(),
+  }),
+  v.object({
+    type: v.literal("source"),
+    source: vSource,
+  }),
+  vToolCallPart,
+  v.object({
+    type: v.literal("tool-call-streaming-start"),
+    toolCallId: v.string(),
+    toolName: v.string(),
+  }),
+  v.object({
+    type: v.literal("tool-call-delta"),
+    toolCallId: v.string(),
+    toolName: v.string(),
+    argsTextDelta: v.string(),
+  }),
+  vToolResultPart
 );
+export type TextStreamPart = Infer<typeof vTextStreamPart>;
