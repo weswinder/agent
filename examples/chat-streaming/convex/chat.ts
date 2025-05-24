@@ -32,11 +32,20 @@ export const storyAgent = new Agent(components.agent, {
   tools: {
     makeUpName: tool({
       description: "Make up a name for a user",
-      parameters: z.object({}),
-      execute: async (args, options) => {
-        return ["John", "Jane", "Jim", "Jill", "Jack"][
-          Math.floor(Math.random() * 5)
-        ];
+      parameters: z.object({
+        currentNames: z
+          .array(z.string())
+          .describe("The names of the users that have been mentioned so far"),
+      }),
+      execute: async ({ currentNames }) => {
+        const names = ["John", "Jane", "Jim", "Jill", "Jack"].filter(
+          (name) => !currentNames.includes(name),
+        );
+        if (names.length === 0) {
+          return { name: "another person" };
+        }
+        const name = names[Math.floor(Math.random() * names.length)];
+        return { name };
       },
     }),
   },
