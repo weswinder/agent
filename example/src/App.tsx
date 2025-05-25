@@ -3,6 +3,7 @@ import { IdeasPage } from "./pages/Ideas";
 import { IdeaDetail } from "./pages/IdeaDetail";
 import { Toaster } from "./components/ui/toaster";
 import { Home } from "./pages/Home";
+import { Images } from "./pages/Images";
 export default function App() {
   return (
     <BrowserRouter>
@@ -13,8 +14,8 @@ export default function App() {
             <Link to="/" className="hover:text-indigo-600">
               Home
             </Link>
-            <Link to="/ideas" className="hover:text-indigo-600">
-              Ideas
+            <Link to="/images" className="hover:text-indigo-600">
+              Image example
             </Link>
           </nav>
         </header>
@@ -23,6 +24,7 @@ export default function App() {
             <Route path="/" element={<Home />} />
             <Route path="/ideas" element={<IdeasPage />} />
             <Route path="/ideas/:id" element={<IdeaDetail />} />
+            <Route path="/images" element={<Images />} />
           </Routes>
         </main>
         <Toaster />
