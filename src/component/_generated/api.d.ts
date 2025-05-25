@@ -58,8 +58,9 @@ export type Mounts = {
       "mutation",
       "public",
       { hash: string; storageId: string },
-      string
+      { fileId: string; storageIdUnused: boolean }
     >;
+    copyFile: FunctionReference<"mutation", "public", { fileId: string }, null>;
     getFilesToDelete: FunctionReference<
       "query",
       "public",
@@ -76,11 +77,11 @@ export type Mounts = {
         isDone: boolean;
       }
     >;
-    resuseFile: FunctionReference<
+    useExistingFile: FunctionReference<
       "mutation",
       "public",
-      { fileId: string },
-      null
+      { hash: string },
+      string | null
     >;
   };
   messages: {
