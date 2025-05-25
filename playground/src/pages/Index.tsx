@@ -35,7 +35,7 @@ const Index = () => {
               <img
                 src={import.meta.env.BASE_URL + "convexlogo.png"}
                 alt="Convex"
-                className="h-4 w-auto"
+                className="h-3.5 w-auto"
               />
             </div>
 
@@ -43,10 +43,10 @@ const Index = () => {
             <div className="flex items-center">
               <nav className="hidden md:flex">
                 <a
-                  href="https://docs.convex.dev"
-                  className="text-gray-600 hover:text-gray-900"
+                  href="https://github.com/get-convex/agent#installation"
+                  className="neutral-800 hover:text-gray-900"
                 >
-                  Docs
+                  Readme
                 </a>
               </nav>
             </div>
@@ -60,11 +60,11 @@ const Index = () => {
           <h1 className="text-4xl font-bold mb-6 text-gray-900">
             Agent Playground
           </h1>
-          <p className="text-xl text-gray-600 max-w-3xl mx-auto leading-relaxed">
+          <p className="text-lg text-gray-600 max-w-3xl mx-auto leading-relaxed">
             A powerful playground for experimenting with{" "}
             <a
               href="https://convex.dev/components/agent"
-              className="text-orange-500 hover:text-orange-600 font-medium"
+              className="text-violet-900 hover:text-violet-950 font-normal  hover:underline"
             >
               @convex-dev/agent
             </a>
@@ -73,7 +73,7 @@ const Index = () => {
           </p>
           <Button
             size="lg"
-            className="mt-10 text-lg px-10 py-3 bg-gray-900 hover:bg-gray-800 text-white rounded-full"
+            className="mt-10 text-base px-10 py-3 bg-gray-800 hover:bg-gray-900 text-white rounded-full shadow-sm focus:ring-1 focus:ring-[#B02A5B] hover:shadow-[0_0_20px_rgba(176,42,91,0.3)] border-2 border-[#B02A5B]"
             onClick={() => navigate("/play")}
           >
             Launch Playground
@@ -84,14 +84,14 @@ const Index = () => {
         <div className="flex flex-col items-center mb-10">
           <div className="grid md:grid-cols-3 gap-8 max-w-6xl">
             <div
-              className="bg-white rounded-lg p-6 border text-left"
+              className="bg-white rounded-lg p-4 border text-left"
               style={{ borderColor: "#E5E7EB" }}
             >
               <div className="flex items-center mb-4">
                 <div className="w-8 h-8 bg-orange-500 rounded-lg flex items-center justify-center mr-4 shadow-sm">
                   <ChatBubbleIcon className="w-4 h-4 text-white" />
                 </div>
-                <h3 className="text-lg font-bold text-gray-900">
+                <h3 className="text-lg features-title text-gray-900">
                   Thread Management
                 </h3>
               </div>
@@ -100,14 +100,14 @@ const Index = () => {
               </p>
             </div>
             <div
-              className="bg-white rounded-lg p-6 border text-left"
+              className="bg-white rounded-lg p-4 border text-left"
               style={{ borderColor: "#E5E7EB" }}
             >
               <div className="flex items-center mb-4">
                 <div className="w-8 h-8 bg-purple-600 rounded-lg flex items-center justify-center mr-4 shadow-sm">
                   <MagnifyingGlassIcon className="w-4 h-4 text-white" />
                 </div>
-                <h3 className="text-lg font-bold text-gray-900">
+                <h3 className="text-lg features-title text-gray-900">
                   Message Analysis
                 </h3>
               </div>
@@ -116,14 +116,14 @@ const Index = () => {
               </p>
             </div>
             <div
-              className="bg-white rounded-lg p-6 border text-left"
+              className="bg-white rounded-lg p-4 border text-left"
               style={{ borderColor: "#E5E7EB" }}
             >
               <div className="flex items-center mb-4">
                 <div className="w-8 h-8 bg-yellow-500 rounded-lg flex items-center justify-center mr-4 shadow-sm">
                   <LightningBoltIcon className="w-4 h-4 text-white" />
                 </div>
-                <h3 className="text-lg font-bold text-gray-900">
+                <h3 className="text-lg features-title text-gray-900">
                   Context Experimentation
                 </h3>
               </div>
@@ -362,7 +362,7 @@ export const {
           <div className="mt-16 text-center">
             <Button
               size="lg"
-              className="text-lg px-10 py-4 bg-gray-900 hover:bg-gray-800 text-white rounded-full"
+              className="text-base px-10 py-4 bg-gray-800 hover:bg-gray-900 text-white rounded-full shadow-sm focus:ring-1 focus:ring-[#B02A5B] hover:shadow-[0_0_20px_rgba(176,42,91,0.3)] border-2 border-[#B02A5B]"
               onClick={() => navigate("/play")}
             >
               Try the Playground Now
@@ -376,28 +376,22 @@ export const {
         <div className="container mx-auto px-4 py-8">
           <div className="flex flex-col md:flex-row items-center justify-between">
             <div className="text-white text-sm">
-              Built with{" "}
               <a
                 href="https://convex.dev"
                 className="text-white hover:text-orange-500 font-medium"
               >
                 Convex
               </a>{" "}
-              for the developer community
+              Agent Playground
             </div>
             <div className="flex items-center space-x-6 mt-4 md:mt-0">
               <a
-                href="https://docs.convex.dev"
+                href="https://github.com/get-convex/agent#installation"
                 className="text-white hover:text-gray-300 text-sm"
               >
-                Documentation
+                Readme
               </a>
-              <a
-                href="https://github.com/get-convex/agent"
-                className="text-white hover:text-gray-300 text-sm"
-              >
-                GitHub
-              </a>
+
               <a
                 href="https://convex.dev/components/agent"
                 className="text-white hover:text-gray-300 text-sm"
