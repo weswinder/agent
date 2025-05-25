@@ -14,6 +14,7 @@ import {
   vReasoningDetails,
   vFile,
   vFileWithStringId,
+  vTextStreamPart,
 } from "../validators.js";
 import { typedV } from "convex-helpers/validators";
 import vectorTables, { vVectorId } from "./vector/tables.js";
@@ -104,6 +105,39 @@ export const schema = defineSchema({
       "order",
       "stepOrder",
     ]),
+
+  // Status: if it's done, it's deleted, then deltas are vacuumed
+  streamingMessages: defineTable({
+    threadId: v.id("threads"),
+    order: v.number(),
+    stepOrder: v.number(),
+    state: v.union(
+      v.object({
+        kind: v.literal("streaming"),
+        lastHeartbeat: v.number(),
+      }),
+      v.object({
+        kind: v.literal("finished"),
+        endedAt: v.number(),
+      }),
+      v.object({
+        kind: v.literal("error"),
+        error: v.string(),
+      })
+    ),
+    vacuumFnId: v.optional(v.id("_scheduled_functions")),
+  })
+    // There should only be one per "order" index
+    // If another exists, it's deleted and replaced
+    .index("threadId_order_stepOrder", ["threadId", "order", "stepOrder"]),
+
+  streamDeltas: defineTable({
+    streamId: v.id("streamingMessages"),
+    // the indexes work like: 0 <first> 1 <second> 2 <third> 3 ...
+    start: v.number(), // inclusive
+    end: v.number(), // exclusive
+    deltas: v.array(vTextStreamPart),
+  }).index("streamId_start_end", ["streamId", "start", "end"]),
 
   memories: defineTable({
     threadId: v.optional(v.id("threads")),
