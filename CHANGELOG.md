@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.1 (alpha)
+
+- The file api has been improved to allow for upserting files more correctly.
+  You can use it to track images and files in messages, and have a cron that queries for images that can be safely deleted.
+  When adding it to a message, call `addFile`, `useExistingFile`, or `copyFile` to get the `fileId` and add it to the message metadata.
+  When the message is deleted, it will delete the file (if it has the last reference to it).
+- Added an example for passing in images to LLMs.
+
 ## 0.1.0
 
 - UI Playground, to host locally or embed into your app.
