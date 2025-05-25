@@ -9,30 +9,75 @@ export const addFile = mutation({
     hash: v.string(),
   },
   handler: addFileHandler,
-  returns: v.id("files"),
+  returns: {
+    fileId: v.id("files"),
+    storageIdUnused: v.boolean(),
+  },
 });
 
 export async function addFileHandler(
   ctx: MutationCtx,
   args: { storageId: string; hash: string }
 ) {
+  const existingFile = await ctx.db
+    .query("files")
+    .withIndex("hash", (q) => q.eq("hash", args.hash))
+    .first();
+  if (existingFile) {
+    // increment the refcount
+    await ctx.db.patch(existingFile._id, {
+      refcount: existingFile.refcount + 1,
+    });
+    return {
+      fileId: existingFile._id,
+      storageIdUnused: existingFile.storageId !== args.storageId,
+    };
+  }
   const fileId = await ctx.db.insert("files", {
     storageId: args.storageId,
     hash: args.hash,
     refcount: 1,
   });
-  return fileId;
+  return {
+    fileId,
+    storageIdUnused: false,
+  };
 }
 
-export const resuseFile = mutation({
+/**
+ * If you plan to have the same file added over and over without a reference to
+ * the fileId, you can use this query to get the fileId of the existing file.
+ * And if it's
+ */
+export const useExistingFile = mutation({
+  args: {
+    hash: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const file = await ctx.db
+      .query("files")
+      .withIndex("hash", (q) => q.eq("hash", args.hash))
+      .first();
+    if (!file) {
+      return null;
+    }
+    await ctx.db.patch(file._id, {
+      refcount: file.refcount + 1,
+    });
+    return file._id;
+  },
+  returns: v.union(v.id("files"), v.null()),
+});
+
+export const copyFile = mutation({
   args: {
     fileId: v.id("files"),
   },
-  handler: reuseFileHandler,
+  handler: copyFileHandler,
   returns: v.null(),
 });
 
-export async function reuseFileHandler(
+export async function copyFileHandler(
   ctx: MutationCtx,
   args: { fileId: Id<"files"> }
 ) {
