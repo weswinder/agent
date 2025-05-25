@@ -340,3 +340,31 @@ export const runAgentAsTool = action({
     return result.text;
   },
 });
+
+export const askAboutImage = action({
+  args: {
+    prompt: v.string(),
+    data: v.bytes(),
+    mimeType: v.string(),
+  },
+  handler: async (ctx, { prompt, data, mimeType }) => {
+    const storageId = await ctx.storage.store(
+      new Blob([data], { type: mimeType }),
+    );
+    const url = (await ctx.storage.getUrl(storageId))!;
+    const { thread } = await weatherAgent.createThread(ctx, {});
+    const result = await thread.generateText({
+      prompt,
+      messages: [
+        {
+          role: "user",
+          content: [
+            { type: "image", image: new URL(url), mimeType },
+            { type: "text", text: prompt },
+          ],
+        },
+      ],
+    });
+    return result.text;
+  },
+});
