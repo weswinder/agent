@@ -693,7 +693,7 @@ export class Agent<AgentTools extends ToolSet> {
       args,
       { userId, threadId, ...options }
     );
-    const toolCtx = { ...ctx, userId, threadId, messageId };
+    const toolCtx = { ...ctx, userId, threadId, messageId, agent: this };
     const tools = wrapTools(
       toolCtx,
       args.tools ?? threadTools ?? this.options.tools
@@ -798,7 +798,7 @@ export class Agent<AgentTools extends ToolSet> {
       args,
       { userId, threadId, ...options }
     );
-    const toolCtx = { ...ctx, userId, threadId, messageId };
+    const toolCtx = { ...ctx, userId, threadId, messageId, agent: this };
     const tools = wrapTools(
       toolCtx,
       args.tools ?? threadTools ?? this.options.tools
@@ -1327,12 +1327,6 @@ export function filterOutOrphanedToolMessages(docs: MessageDoc[]) {
   }
   return result;
 }
-
-export type ToolCtx = RunActionCtx & {
-  userId?: string;
-  threadId?: string;
-  messageId?: string;
-};
 
 type MessageWithMetadata = OpaqueIds<InnerMessageWithMetadata>;
 type CoreMessageMaybeWithId = CoreMessage & { id?: string | undefined };

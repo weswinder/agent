@@ -133,8 +133,6 @@ const supportAgent = new Agent(components.agent, {
   // The default system prompt if not overriden.
   instructions: "You are a helpful assistant.",
   tools: {
-    // Standard AI SDK tool
-    myTool: tool({ description, parameters, execute: () => {}}),
     // Convex tool
     myConvexTool: createTool({
       description: "My Convex tool",
@@ -144,6 +142,8 @@ const supportAgent = new Agent(components.agent, {
         return "Hello, world!";
       },
     }),
+    // Standard AI SDK tool
+    myTool: tool({ description, parameters, execute: () => {}}),
   },
   // Embedding model to power vector search of message history (RAG).
   textEmbedding: openai.embedding("text-embedding-3-small"),

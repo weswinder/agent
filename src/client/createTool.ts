@@ -2,8 +2,16 @@ import { tool } from "ai";
 import { Schema, Tool } from "ai";
 import { ToolExecutionOptions } from "ai";
 import { ToolSet } from "ai";
-import { ToolCtx } from "./index.js";
 import { z } from "zod";
+import { RunActionCtx } from "./types.js";
+import { Agent } from "./index.js";
+
+export type ToolCtx<TOOLS extends ToolSet = ToolSet> = RunActionCtx & {
+  agent: Agent<TOOLS>;
+  userId?: string;
+  threadId?: string;
+  messageId?: string;
+};
 
 /**
  * This is a wrapper around the ai.tool function that adds extra context to the
