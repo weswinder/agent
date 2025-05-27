@@ -428,7 +428,17 @@ export function vPaginationResult<
   });
 }
 
-export const vStreamArgs = v.array(v.object({ key: v.string(), cursor: v.number() }));
+export const vStreamCursor = v.object({
+  streamId: v.string(),
+  cursor: v.number(),
+});
+export type StreamCursor = Infer<typeof vStreamCursor>;
+
+export const vStreamArgs = v.object({
+  cursors: v.array(vStreamCursor),
+  // TODO: needed? just empty cursors to list?
+  listOnly: v.optional(v.boolean()),
+});
 export type StreamArgs = Infer<typeof vStreamArgs>;
 
 export const vTextStreamPart = v.union(

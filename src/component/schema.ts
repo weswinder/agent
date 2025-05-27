@@ -108,8 +108,20 @@ export const schema = defineSchema({
 
   // Status: if it's done, it's deleted, then deltas are vacuumed
   streamingMessages: defineTable({
+    // extra metadata?
+    userId: v.optional(v.string()),
+    agentName: v.optional(v.string()),
+    model: v.optional(v.string()),
+    provider: v.optional(v.string()),
+    providerOptions: v.optional(vProviderOptions), // Sent to model
+
     threadId: v.id("threads"),
     order: v.number(),
+    /**
+     * The step order of the first message in the stream.
+     * If the stream ends up with both a tool call and a tool result,
+     * the stepOrder of the result will be +1 of the tool call.
+     */
     stepOrder: v.number(),
     state: v.union(
       v.object({
