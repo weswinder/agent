@@ -103,43 +103,77 @@ export const streamStoryInternalAction = storyAgent.asTextAction({
  * Query & subscribe to messages & threads
  */
 
-// Because this takes in streamArgs: vStreamArgs and returns s
-export const streamMessageDeltas = query({
+export const listThreadMessages = query({
   args: {
-    // This argument is required:
-    streamArgs: vStreamArgs,
-    // But you can pass other arguments too:
+    // These arguments are required:
     threadId: v.string(),
+
+    // This is used to paginate the messages.
+    paginationOpts: paginationOptsValidator,
+
+    // Because this takes in streamArgs: vStreamArgs and returns stream data,
+    // this can be used to stream messages.
+    streamArgs: vStreamArgs,
+
+    // But you could pass other arguments too:
+    // foo: v.number(),
   },
-  handler: async (ctx, { streamArgs, threadId }) => {
+  handler: async (ctx, args) => {
+    const { threadId, paginationOpts, streamArgs } = args;
     await authorizeThreadAccess(ctx, threadId);
-    return storyAgent.syncDeltas(ctx, { threadId, streamArgs });
+    const streams = await storyAgent.syncStreams(ctx, { threadId, streamArgs });
+    // Here you could filter out / modify the stream of deltas / filter out
+    // deltas.
+
+    const messages = await storyAgent.listMessages(ctx, {
+      threadId,
+      paginationOpts,
+    });
+    // Here you could filter out metadata that you don't want from any optional
+    // fields on the messages.
+    // You can also join data onto the messages. They need only extend the
+    // MessageDoc type.
+    // { ...messages, page: messages.page.map(...)}
+
+    return {
+      streams,
+      messages,
+
+      // ... you can return other metadata here too.
+      // note: this function will be called with various permutations of delta
+      // and message args, so returning derived data .
+    };
   },
 });
 
 // This fetches full messages. Streamed messages are not included.
-export const listMessages = query({
-  args: { threadId: v.string() },
-  handler: async (ctx, { threadId }) => {
-    await authorizeThreadAccess(ctx, threadId);
-    const { page: messages } = await storyAgent.listMessages(ctx, {
-      threadId,
-      order: "desc",
-      take: 10,
-    });
-    // Return them in ascending order (oldest first)
-    return messages.reverse();
-  },
-});
+// export const listRecentMessages = query({
+//   args: { threadId: v.string() },
+//   handler: async (ctx, { threadId }) => {
+//     await authorizeThreadAccess(ctx, threadId);
+//     const { page: messages } = await storyAgent.listMessages(ctx, {
+//       threadId,
+//       order: "desc",
+//       take: 10,
+//     });
+//     // Return them in ascending order (oldest first)
+//     return messages.reverse();
+//   },
+// });
 
 export const createThread = mutation({
   args: {},
   handler: async (ctx) => {
-    const userId = getUserId(ctx);
+    const userId = await getUserId(ctx);
     const { threadId } = await storyAgent.createThread(ctx, { userId });
     return threadId;
   },
 });
+
+/**
+ * Functions for demo purposes.
+ * In a real app, you'd use real authentication & authorization.
+ */
 
 async function getUserId(ctx: QueryCtx | MutationCtx | ActionCtx) {
   // For demo purposes. Usually you'd use auth here.
@@ -150,5 +184,9 @@ async function authorizeThreadAccess(
   ctx: QueryCtx | MutationCtx | ActionCtx,
   threadId: string,
 ) {
+  const userId = await getUserId(ctx);
   // For demo purposes. Usually you'd use auth here.
+  if (!userId || !threadId || userId !== "storytelling user") {
+    throw new Error("Unauthorized");
+  }
 }
