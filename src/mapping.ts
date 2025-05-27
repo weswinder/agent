@@ -108,7 +108,9 @@ export function serializeNewMessagesInStep<TOOLS extends ToolSet>(
   ).map(
     (message): MessageWithMetadata => ({
       message: serializeMessage(message),
-      id: message.id,
+      // Let's not store the ID by default here. It's being generated internally
+      // and not referenced elsewhere that we know of.
+      // id: message.id,
       ...(message.role === "tool" ? toolFields : assistantFields),
       text: step.text,
       // fileId: message.fileId,
