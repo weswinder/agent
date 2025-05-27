@@ -1240,15 +1240,19 @@ export class Agent<AgentTools extends ToolSet> {
         if (stream) {
           const result = await this.streamText(ctx, targetArgs, llmArgs, opts);
           await result.consumeStream();
-          return { text: await result.text };
+          return {
+            text: await result.text,
+            finishReason: await result.finishReason,
+            messageId: result.messageId,
+          };
         } else {
-          const { text } = await this.generateText(
+          const { text, messageId, finishReason } = await this.generateText(
             ctx,
             targetArgs,
             llmArgs,
             opts
           );
-          return { text };
+          return { text, messageId, finishReason };
         }
       },
     });
