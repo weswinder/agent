@@ -3,9 +3,14 @@ import type { ToolInvocationUIPart } from "@ai-sdk/ui-utils";
 import { MessageDoc } from "../client";
 import { deserializeMessage, toUIFilePart } from "../mapping";
 
-export function toUIMessages(messages: MessageDoc[]): UIMessage[] {
-  const uiMessages: UIMessage[] = [];
-  let assistantMessage: UIMessage | undefined;
+export type UIMessageOrdered = UIMessage & {
+  order: number;
+  stepOrder: number;
+};
+
+export function toUIMessages(messages: MessageDoc[]): UIMessageOrdered[] {
+  const uiMessages: UIMessageOrdered[] = [];
+  let assistantMessage: UIMessageOrdered | undefined;
   for (const message of messages) {
     const coreMessage = message.message && deserializeMessage(message.message);
     const text = message.text ?? "";
@@ -20,6 +25,8 @@ export function toUIMessages(messages: MessageDoc[]): UIMessage[] {
         role: "system",
         content: text,
         parts: [{ type: "text", text }],
+        order: message.order,
+        stepOrder: message.stepOrder,
       });
     } else if (coreMessage.role === "user") {
       const parts: UIMessage["parts"] = [];
@@ -35,6 +42,8 @@ export function toUIMessages(messages: MessageDoc[]): UIMessage[] {
         role: "user",
         content: message.text ?? "",
         parts,
+        order: message.order,
+        stepOrder: message.stepOrder,
       });
     } else {
       if (coreMessage.role === "tool" && !assistantMessage) {
@@ -51,6 +60,8 @@ export function toUIMessages(messages: MessageDoc[]): UIMessage[] {
           role: "assistant",
           content: message.text ?? "",
           parts: [],
+          order: message.order,
+          stepOrder: message.stepOrder,
         };
         uiMessages.push(assistantMessage);
       }
