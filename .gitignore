@@ -17,5 +17,3 @@ react/package.json
 # npm pack output
 *.tgz
 
-# Cursor rules (personal configuration)
-.cursor/rules/
