@@ -1,13 +1,10 @@
-import { paginationOptsValidator, PaginationResult } from "convex/server";
-import { WorkflowManager } from "@convex-dev/workflow";
-import { Agent, createTool, vStreamArgs } from "@convex-dev/agent";
-import type { ThreadDoc, UsageHandler } from "@convex-dev/agent";
+import { paginationOptsValidator } from "convex/server";
+import { Agent, vStreamArgs } from "@convex-dev/agent";
 import { components, internal } from "./_generated/api";
 import { openai } from "@ai-sdk/openai";
 import {
   action,
   ActionCtx,
-  httpAction,
   mutation,
   MutationCtx,
   query,
@@ -125,7 +122,7 @@ export const listThreadMessages = query({
     // Here you could filter out / modify the stream of deltas / filter out
     // deltas.
 
-    const messages = await storyAgent.listMessages(ctx, {
+    const paginated = await storyAgent.listMessages(ctx, {
       threadId,
       paginationOpts,
     });
@@ -136,8 +133,8 @@ export const listThreadMessages = query({
     // { ...messages, page: messages.page.map(...)}
 
     return {
+      ...paginated,
       streams,
-      messages,
 
       // ... you can return other metadata here too.
       // note: this function will be called with various permutations of delta
@@ -175,7 +172,7 @@ export const createThread = mutation({
  * In a real app, you'd use real authentication & authorization.
  */
 
-async function getUserId(ctx: QueryCtx | MutationCtx | ActionCtx) {
+async function getUserId(_ctx: QueryCtx | MutationCtx | ActionCtx) {
   // For demo purposes. Usually you'd use auth here.
   return "storytelling user";
 }

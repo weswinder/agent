@@ -148,7 +148,7 @@ export const schema = defineSchema({
     // the indexes work like: 0 <first> 1 <second> 2 <third> 3 ...
     start: v.number(), // inclusive
     end: v.number(), // exclusive
-    deltas: v.array(vTextStreamPart),
+    parts: v.array(vTextStreamPart),
   }).index("streamId_start_end", ["streamId", "start", "end"]),
 
   memories: defineTable({

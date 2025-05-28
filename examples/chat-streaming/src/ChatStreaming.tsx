@@ -1,10 +1,10 @@
-import { usePaginatedQuery } from "convex/react";
-import { useMutation } from "convex/react";
+import { useMutation, insertAtTop } from "convex/react";
 import { Toaster } from "./components/ui/toaster";
 import { api } from "../convex/_generated/api";
-import { toUIMessages, useStreamMessagesQuery } from "@convex-dev/agent/react";
+import { toUIMessages, useThreadMessages } from "@convex-dev/agent/react";
 import { UIMessage } from "ai";
 import { useState } from "react";
+import { OptimisticLocalStore } from "convex/browser";
 
 export default function ChatStreaming() {
   const createThread = useMutation(api.chat.createThread);
@@ -38,15 +38,18 @@ export default function ChatStreaming() {
 }
 
 function Story({ threadId }: { threadId: string }) {
-  const messages = usePaginatedQuery(
-    api.chat.listMessages,
+  const messages = useThreadMessages(
+    api.chat.listThreadMessages,
     { threadId },
-    { initialNumItems: 10 },
+    { initialNumItems: 10, stream: true },
   );
-  const sendMessage = useMutation(api.chat.streamStoryInternalAction);
+  const sendMessage = useMutation(
+    api.chat.streamStoryAsynchronously,
+  ).withOptimisticUpdate(optimisticallySendMessage);
+  const [prompt, setPrompt] = useState("");
 
   function onSendClicked() {
-    void sendMessage({ threadId, prompt, stream: true });
+    void sendMessage({ threadId, prompt });
     // TODO: .withOptimisticUpdate(... patch messages);
   }
 
@@ -55,7 +58,12 @@ function Story({ threadId }: { threadId: string }) {
       {toUIMessages(messages.results ?? []).map((m) => (
         <Message m={m} />
       ))}
-      <StreamedMessages threadId={threadId} />
+
+      <input
+        type="text"
+        value={prompt}
+        onChange={(e) => setPrompt(e.target.value)}
+      />
       <button onClick={onSendClicked}>Send</button>
     </>
   );
@@ -66,11 +74,41 @@ function Message({ m }: { m: UIMessage }) {
     <pre className="whitespace-pre-wrap">{JSON.stringify(m, null, 2)}</pre>
   );
 }
-// A separate component helps avoid re-rendering all messages when only the streaming ones are changing
-function StreamedMessages({ threadId }: { threadId: string }) {
-  const streamedMessages = useStreamMessagesQuery(
-    api.chat.streamMessageDeltas,
-    { threadId }, // other parameters can be passed
-  );
-  return <>{streamedMessages?.map((m) => <Message m={m} />)}</>;
+
+function optimisticallySendMessage(
+  store: OptimisticLocalStore,
+  args: { threadId: string; prompt: string },
+) {
+  const queries = store.getAllQueries(api.chat.listThreadMessages);
+  let maxOrder = 0;
+  let maxStepOrder = 0;
+  for (const q of queries) {
+    if (q.args?.threadId !== args.threadId) continue;
+    if (q.args.streamArgs) continue;
+    for (const m of q.value?.page ?? []) {
+      maxOrder = Math.max(maxOrder, m.order);
+      maxStepOrder = Math.max(maxStepOrder, m.stepOrder);
+    }
+  }
+  const order = maxOrder + 1;
+  const stepOrder = 0;
+  insertAtTop({
+    paginatedQuery: api.chat.listThreadMessages,
+    argsToMatch: { threadId: args.threadId, streamArgs: undefined },
+    item: {
+      _creationTime: Date.now(),
+      _id: crypto.randomUUID(),
+      order,
+      stepOrder,
+      status: "pending",
+      threadId: args.threadId,
+      tool: false,
+      message: {
+        role: "user",
+        content: args.prompt,
+      },
+      text: args.prompt,
+    },
+    localQueryStore: store,
+  });
 }

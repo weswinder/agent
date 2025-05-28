@@ -428,19 +428,6 @@ export function vPaginationResult<
   });
 }
 
-export const vStreamCursor = v.object({
-  streamId: v.string(),
-  cursor: v.number(),
-});
-export type StreamCursor = Infer<typeof vStreamCursor>;
-
-export const vStreamArgs = v.object({
-  cursors: v.array(vStreamCursor),
-  // TODO: needed? just empty cursors to list?
-  listOnly: v.optional(v.boolean()),
-});
-export type StreamArgs = Infer<typeof vStreamArgs>;
-
 export const vTextStreamPart = v.union(
   v.object({
     type: v.literal("text-delta"),
@@ -469,3 +456,53 @@ export const vTextStreamPart = v.union(
   vToolResultPart
 );
 export type TextStreamPart = Infer<typeof vTextStreamPart>;
+
+export const vStreamCursor = v.object({
+  streamId: v.string(),
+  cursor: v.number(),
+});
+export type StreamCursor = Infer<typeof vStreamCursor>;
+
+export const vStreamArgs = v.union(
+  v.object({
+    kind: v.literal("list"),
+  }),
+  v.object({
+    kind: v.literal("deltas"),
+    cursors: v.array(vStreamCursor),
+  })
+);
+export type StreamArgs = Infer<typeof vStreamArgs>;
+
+export const vStreamMessage = v.object({
+  streamId: v.string(),
+  order: v.number(),
+  stepOrder: v.number(),
+  // metadata
+  userId: v.optional(v.string()),
+  agentName: v.optional(v.string()),
+  model: v.optional(v.string()),
+  provider: v.optional(v.string()),
+  providerOptions: v.optional(vProviderOptions), // Sent to model
+});
+
+export const vStreamDelta = v.object({
+  streamId: v.string(),
+  start: v.number(), // inclusive
+  end: v.number(), // exclusive
+  parts: v.array(vTextStreamPart),
+});
+export type StreamDelta = Infer<typeof vStreamDelta>;
+
+export const vStreamSyncReturns = v.union(
+  v.object({
+    // TODO: share this with the schema def?
+    kind: v.literal("list"),
+    messages: v.array(vStreamMessage),
+  }),
+  v.object({
+    kind: v.literal("deltas"),
+    deltas: v.array(vStreamDelta),
+  })
+);
+export type StreamSyncReturns = Infer<typeof vStreamSyncReturns>;

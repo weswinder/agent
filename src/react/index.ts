@@ -1,22 +1,19 @@
 import {
   FunctionArgs,
   FunctionReference,
-  OptionalRestArgs,
   PaginationOptions,
   PaginationResult,
 } from "convex/server";
-import { useState, useMemo, useEffect } from "react";
-import { StreamArgs, StreamCursor } from "../validators";
-import { BetterOmit, EmptyObject } from "convex-helpers";
-import { JSONValue, TextStreamPart } from "ai";
-import { ToolInvocationUIPart } from "@ai-sdk/ui-utils";
+import { useState, useMemo } from "react";
+import { StreamArgs, StreamCursor, StreamSyncReturns } from "../validators";
+import { BetterOmit, ErrorMessage, Expand } from "convex-helpers";
+import { TextStreamPart } from "ai";
 import { ToolSet } from "ai";
 import {
   useQuery,
   usePaginatedQuery,
   UsePaginatedQueryResult,
   PaginatedQueryArgs,
-  OptionalRestArgsOrSkip,
 } from "convex/react";
 import { toUIMessages } from "./toUIMessages";
 import type { UIMessageOrdered } from "./toUIMessages";
@@ -74,11 +71,11 @@ type ThreadQuery<
      */
     streamArgs?: StreamArgs;
   } & Args,
-  ThreadQueryReturns<M>
+  PaginationResult<M> & { streams?: StreamSyncReturns }
 >;
 
 type ThreadStreamQuery<
-  Args = unknown,
+  Args = Record<string, unknown>,
   M extends MessageDoc = MessageDoc,
 > = FunctionReference<
   "query",
@@ -88,23 +85,16 @@ type ThreadStreamQuery<
     paginationOpts: PaginationOptions;
     streamArgs: StreamArgs; // required for stream query
   } & Args,
-  ThreadQueryReturns<M>
+  PaginationResult<M> & { streams: StreamSyncReturns }
 >;
 
-type ThreadUIMessagesArgs<Query extends ThreadQuery<unknown, MessageDoc>> =
-  Query extends ThreadStreamQuery<infer Args, MessageDoc>
-    ?
-        | (BetterOmit<FunctionArgs<Query>, "paginationOpts" | "streamArgs"> &
-            Args)
-        | "skip"
-    : // TODO: instead have an error string here that's more useful
-      never;
+type ThreadMessagesArgs<Query extends ThreadQuery<unknown, MessageDoc>> =
+  Query extends ThreadQuery<unknown, MessageDoc>
+    ? Expand<BetterOmit<FunctionArgs<Query>, "paginationOpts" | "streamArgs">>
+    : never;
 
-type ThreadUIMessagesResult<Query extends ThreadQuery<unknown, MessageDoc>> =
-  Query extends ThreadQuery<unknown, infer M>
-    ? UsePaginatedQueryResult<M & { streaming?: boolean }>
-    : // TODO: instead have an error string here that's more useful
-      never;
+type ThreadMessagesResult<Query extends ThreadQuery<unknown, MessageDoc>> =
+  Query extends ThreadQuery<unknown, infer M> ? M : never;
 
 // export function useThreadUIMessages<Query extends ThreadStreamQuery>(
 //   query: Query,
@@ -126,49 +116,108 @@ type ThreadUIMessagesResult<Query extends ThreadQuery<unknown, MessageDoc>> =
 // ): UsePaginatedQueryResult<
 //   UIMessageOrdered & { order: number; stepOrder: number }
 // >;
-export function useThreadUIMessages<
+export function useThreadMessages<
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   Query extends ThreadQuery<any, any>,
 >(
   query: Query,
-  args: ThreadUIMessagesArgs<Query>,
+  args: ThreadMessagesArgs<Query> | "skip",
   options: {
     initialNumItems: number;
-    stream?: Query extends ThreadStreamQuery ? boolean : false;
+    stream?: Query extends ThreadStreamQuery
+      ? boolean
+      : ErrorMessage<"To enable streaming, your query must take in streamArgs">;
   }
-): ThreadUIMessagesResult<Query> {
+): UsePaginatedQueryResult<
+  ThreadMessagesResult<Query> & { streaming?: boolean }
+> {
   const messages = usePaginatedQuery(
     query,
     args as PaginatedQueryArgs<Query> | "skip",
     { initialNumItems: options.initialNumItems }
   );
-  const streamArgs =
+
+  const streamMessages = useStreamingThreadMessages(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    query as ThreadStreamQuery<any, any>,
     !options.stream || args === "skip"
-      ? ("skip" as const)
-      : {
+      ? "skip"
+      : ({
           ...args,
           paginationOpts: { cursor: null, numItems: 0 },
           streamArgs: {
             cursors: [],
             listOnly: true,
           },
-        };
-
-  const streamList = useQuery(query, streamArgs);
+        } as FunctionArgs<Query>)
+  );
   // TODO: for each stream, set up delta syncing state machine.
 
   const merged = useMemo(() => {
-    // TODO: merge in the streamList and order them by order/stepOrder
+    const streamListMessages =
+      streamMessages?.map((m) => ({
+        ...m,
+        streaming: true,
+      })) ?? [];
     return {
       ...messages,
-      results: messages.results.map((m) => ({
-        ...m,
-        streaming: false as const,
-      })),
+      results: messages.results
+        .map((m) => ({
+          ...m,
+          streaming: false,
+        }))
+        .concat(
+          streamListMessages.filter(
+            // TODO: make this more efficient if necessary?
+            (m) =>
+              !messages.results.some(
+                (m2: MessageDoc) =>
+                  m2.order === m.order && m2.stepOrder === m.stepOrder
+              )
+          )
+        )
+        .sort((a, b) =>
+          a.order === b.order ? a.stepOrder - b.stepOrder : a.order - b.order
+        ),
     };
   }, [messages]);
 
-  return merged as ThreadUIMessagesResult<Query>;
+  return merged as ThreadMessagesResult<Query>;
+}
+
+export function useStreamingThreadMessages<
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  Query extends ThreadStreamQuery<any, any>,
+>(
+  query: Query,
+  args: ThreadMessagesArgs<Query> | "skip"
+): Array<ThreadMessagesResult<Query>> | undefined {
+  const [messages, setMessages] = useState<StreamsChunk[] | undefined>(
+    undefined
+  );
+  const listArgs =
+    args === "skip"
+      ? args
+      : ({
+          ...args,
+          paginationOpts: { cursor: null, numItems: 0 },
+          streamArgs: {
+            cursors: [],
+            listOnly: true,
+          },
+        } as FunctionArgs<Query>);
+  const streamList = useQuery(query, listArgs);
+  // const cursorQuery = useQuery(query, {
+  //   kind: "deltas",
+  //   cursors: messages?.map((m) => m.cursor) ?? [],
+  // } satisfies StreamArgs);
+  // TODO: state machine doing delta syncing
+  return undefined;
+}
+
+function chunksToMessages(chunks: StreamsChunk[] | undefined): MessageDoc[] {
+  // TODO:
+  return [];
 }
 
 // TODO: pass in the messages we need to watch? that way it can be consistent..

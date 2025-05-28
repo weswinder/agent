@@ -1899,6 +1899,81 @@ export declare const components: {
         }>
       >;
     };
+    streams: {
+      getDeltas: FunctionReference<
+        "query",
+        "internal",
+        {
+          cursors: Array<{ cursor: number; streamId: string }>;
+          threadId: string;
+        },
+        Array<{
+          end: number;
+          parts: Array<
+            | { textDelta: string; type: "text-delta" }
+            | { textDelta: string; type: "reasoning" }
+            | {
+                source: {
+                  id: string;
+                  providerOptions?: Record<string, Record<string, any>>;
+                  sourceType: "url";
+                  title?: string;
+                  url: string;
+                };
+                type: "source";
+              }
+            | {
+                args: any;
+                providerOptions?: Record<string, Record<string, any>>;
+                toolCallId: string;
+                toolName: string;
+                type: "tool-call";
+              }
+            | {
+                toolCallId: string;
+                toolName: string;
+                type: "tool-call-streaming-start";
+              }
+            | {
+                argsTextDelta: string;
+                toolCallId: string;
+                toolName: string;
+                type: "tool-call-delta";
+              }
+            | {
+                args?: any;
+                experimental_content?: Array<
+                  | { text: string; type: "text" }
+                  | { data: string; mimeType?: string; type: "image" }
+                >;
+                isError?: boolean;
+                providerOptions?: Record<string, Record<string, any>>;
+                result: any;
+                toolCallId: string;
+                toolName: string;
+                type: "tool-result";
+              }
+          >;
+          start: number;
+          streamId: string;
+        }>
+      >;
+      list: FunctionReference<
+        "query",
+        "internal",
+        { threadId: string },
+        Array<{
+          agentName?: string;
+          model?: string;
+          order: number;
+          provider?: string;
+          providerOptions?: Record<string, Record<string, any>>;
+          stepOrder: number;
+          streamId: string;
+          userId?: string;
+        }>
+      >;
+    };
     threads: {
       createThread: FunctionReference<
         "mutation",

@@ -11,7 +11,12 @@ import type {
 } from "ai";
 import { generateObject, generateText, streamObject, streamText } from "ai";
 import { assert } from "convex-helpers";
-import { internalActionGeneric, internalMutationGeneric } from "convex/server";
+import {
+  internalActionGeneric,
+  internalMutationGeneric,
+  PaginationOptions,
+  PaginationResult,
+} from "convex/server";
 import { v } from "convex/values";
 import {
   validateVectorDimension,
@@ -34,8 +39,11 @@ import {
 } from "../shared.js";
 import {
   type MessageWithMetadata as InnerMessageWithMetadata,
+  MessageStatus,
   type ProviderMetadata,
   type SearchOptions,
+  StreamArgs,
+  StreamSyncReturns,
   type Usage,
   vMessageWithMetadata,
   vSafeObjectArgs,
@@ -316,6 +324,71 @@ export class Agent<AgentTools extends ToolSet> {
         streamObject: this.streamObject.bind(this, ctx, args),
       } as Thread<ThreadTools extends undefined ? AgentTools : ThreadTools>,
     };
+  }
+
+  /**
+   * List messages from a thread.
+   * @param ctx A ctx object from a query, mutation, or action.
+   * @param args.threadId The thread to list messages from.
+   * @param args.paginationOpts Pagination options (e.g. via usePaginatedQuery).
+   * @param args.excludeToolMessages Whether to exclude tool messages.
+   *   False by default.
+   * @param args.statuses What statuses to include. All by default.
+   * @returns The MessageDoc's in a format compatible with usePaginatedQuery.
+   */
+  async listMessages(
+    ctx: RunQueryCtx,
+    args: {
+      threadId: string;
+      paginationOpts: PaginationOptions;
+      excludeToolMessages?: boolean;
+      statuses?: MessageStatus[];
+    }
+  ): Promise<PaginationResult<MessageDoc>> {
+    if (args.paginationOpts.numItems === 0) {
+      return {
+        page: [],
+        isDone: true,
+        continueCursor: "",
+      };
+    }
+    return ctx.runQuery(this.component.messages.listMessagesByThreadId, {
+      order: "desc",
+      ...args,
+    });
+  }
+
+  /**
+   * A function that handles fetching stream deltas, used with the React hooks
+   * `useThreadMessages` or `useStreamingThreadMessages`.
+   * @param ctx A ctx object from a query, mutation, or action.
+   * @param args.threadId The thread to sync streams for.
+   * @param args.streamArgs The stream arguments with per-stream cursors.
+   * @returns The deltas for each stream from their existing cursor.
+   */
+  async syncStreams(
+    ctx: RunQueryCtx,
+    args: {
+      threadId: string;
+      streamArgs: StreamArgs;
+    }
+  ): Promise<StreamSyncReturns> {
+    if (args.streamArgs.kind === "list") {
+      return {
+        kind: "list",
+        messages: await ctx.runQuery(this.component.streams.list, {
+          threadId: args.threadId,
+        }),
+      };
+    } else {
+      return {
+        kind: "deltas",
+        deltas: await ctx.runQuery(this.component.streams.getDeltas, {
+          threadId: args.threadId,
+          cursors: args.streamArgs.cursors,
+        }),
+      };
+    }
   }
 
   /**
