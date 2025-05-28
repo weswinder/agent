@@ -590,7 +590,7 @@ export class Agent<AgentTools extends ToolSet> {
     }
   ): Promise<{
     lastMessageId: string;
-    messageIds: string[];
+    messages: MessageDoc[];
   }> {
     const embeddings = await this.generateEmbeddings(args.messages);
     const result = await ctx.runMutation(this.component.messages.addMessages, {
@@ -611,7 +611,7 @@ export class Agent<AgentTools extends ToolSet> {
     });
     return {
       lastMessageId: result.messages.at(-1)!._id,
-      messageIds: result.messages.map((m) => m._id),
+      messages: result.messages,
     };
   }
 
@@ -636,11 +636,15 @@ export class Agent<AgentTools extends ToolSet> {
         failPendingSteps: v.optional(v.boolean()),
       },
       handler: async (ctx, args) => {
-        return this.saveMessages(ctx, {
+        const { lastMessageId, messages } = await this.saveMessages(ctx, {
           ...args,
           messages: args.messages.map((m) => m.message),
           metadata: args.messages.map(({ message: _, ...m }) => m),
         });
+        return {
+          lastMessageId,
+          messageIds: messages.map((m) => m._id),
+        };
       },
     });
   }
