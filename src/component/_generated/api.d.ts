@@ -1730,7 +1730,98 @@ export type Mounts = {
     >;
   };
   streams: {
-    getDeltas: FunctionReference<
+    addDelta: FunctionReference<
+      "mutation",
+      "public",
+      {
+        end: number;
+        parts: Array<
+          | { textDelta: string; type: "text-delta" }
+          | { textDelta: string; type: "reasoning" }
+          | {
+              source: {
+                id: string;
+                providerOptions?: Record<string, Record<string, any>>;
+                sourceType: "url";
+                title?: string;
+                url: string;
+              };
+              type: "source";
+            }
+          | {
+              args: any;
+              providerOptions?: Record<string, Record<string, any>>;
+              toolCallId: string;
+              toolName: string;
+              type: "tool-call";
+            }
+          | {
+              toolCallId: string;
+              toolName: string;
+              type: "tool-call-streaming-start";
+            }
+          | {
+              argsTextDelta: string;
+              toolCallId: string;
+              toolName: string;
+              type: "tool-call-delta";
+            }
+          | {
+              args?: any;
+              experimental_content?: Array<
+                | { text: string; type: "text" }
+                | { data: string; mimeType?: string; type: "image" }
+              >;
+              isError?: boolean;
+              providerOptions?: Record<string, Record<string, any>>;
+              result: any;
+              toolCallId: string;
+              toolName: string;
+              type: "tool-result";
+            }
+        >;
+        start: number;
+        streamId: string;
+      },
+      any
+    >;
+    create: FunctionReference<
+      "mutation",
+      "public",
+      {
+        agentName?: string;
+        model?: string;
+        order: number;
+        provider?: string;
+        providerOptions?: Record<string, Record<string, any>>;
+        stepOrder: number;
+        threadId: string;
+        userId?: string;
+      },
+      string
+    >;
+    heartbeatStream: FunctionReference<
+      "mutation",
+      "public",
+      { streamId: string },
+      any
+    >;
+    list: FunctionReference<
+      "query",
+      "public",
+      { threadId: string },
+      Array<{
+        agentName?: string;
+        model?: string;
+        order: number;
+        provider?: string;
+        providerOptions?: Record<string, Record<string, any>>;
+        stepOrder: number;
+        streamId: string;
+        userId?: string;
+      }>
+    >;
+    listDeltas: FunctionReference<
       "query",
       "public",
       {
@@ -1786,21 +1877,6 @@ export type Mounts = {
         >;
         start: number;
         streamId: string;
-      }>
-    >;
-    list: FunctionReference<
-      "query",
-      "public",
-      { threadId: string },
-      Array<{
-        agentName?: string;
-        model?: string;
-        order: number;
-        provider?: string;
-        providerOptions?: Record<string, Record<string, any>>;
-        stepOrder: number;
-        streamId: string;
-        userId?: string;
       }>
     >;
   };

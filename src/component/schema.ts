@@ -127,6 +127,7 @@ export const schema = defineSchema({
       v.object({
         kind: v.literal("streaming"),
         lastHeartbeat: v.number(),
+        timeoutFnId: v.optional(v.id("_scheduled_functions")),
       }),
       v.object({
         kind: v.literal("finished"),
@@ -137,7 +138,6 @@ export const schema = defineSchema({
         error: v.string(),
       })
     ),
-    vacuumFnId: v.optional(v.id("_scheduled_functions")),
   })
     // There should only be one per "order" index
     // If another exists, it's deleted and replaced

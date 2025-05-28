@@ -349,7 +349,7 @@ export class Agent<AgentTools extends ToolSet> {
       return {
         page: [],
         isDone: true,
-        continueCursor: "",
+        continueCursor: args.paginationOpts.cursor ?? "",
       };
     }
     return ctx.runQuery(this.component.messages.listMessagesByThreadId, {
@@ -383,7 +383,7 @@ export class Agent<AgentTools extends ToolSet> {
     } else {
       return {
         kind: "deltas",
-        deltas: await ctx.runQuery(this.component.streams.getDeltas, {
+        deltas: await ctx.runQuery(this.component.streams.listDeltas, {
           threadId: args.threadId,
           cursors: args.streamArgs.cursors,
         }),
