@@ -156,8 +156,8 @@ export const {
               <div className="relative">
                 <pre className="bg-muted p-4 rounded-lg overflow-x-auto">
                   <code>
-                    npx convex run --component agent apiKeys:issue{" "}
-                    {`'{name: "my key"}'`}
+                    npx convex run --component agent apiKeys:issue
+                    {` '{name: "my key"}'`}
                   </code>
                 </pre>
                 <Button
