@@ -50,7 +50,6 @@ function Story({ threadId }: { threadId: string }) {
 
   function onSendClicked() {
     void sendMessage({ threadId, prompt });
-    // TODO: .withOptimisticUpdate(... patch messages);
   }
 
   return (
