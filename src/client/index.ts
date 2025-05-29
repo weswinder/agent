@@ -44,6 +44,7 @@ import {
   type SearchOptions,
   StreamArgs,
   StreamSyncReturns,
+  TextStreamPart,
   type Usage,
   vMessageWithMetadata,
   vSafeObjectArgs,
@@ -678,7 +679,7 @@ export class Agent<AgentTools extends ToolSet> {
        */
       provider?: string;
     }
-  ): Promise<void> {
+  ): Promise<MessageDoc[]> {
     const step = serializeStep(args.step as StepResult<ToolSet>);
     const messages = serializeNewMessagesInStep(args.step, {
       provider: args.provider ?? this.options.chat.provider,
@@ -687,13 +688,14 @@ export class Agent<AgentTools extends ToolSet> {
     const embeddings = await this.generateEmbeddings(
       messages.map((m) => m.message)
     );
-    await ctx.runMutation(this.component.messages.addStep, {
+    const saved = await ctx.runMutation(this.component.messages.addStep, {
       userId: args.userId,
       threadId: args.threadId,
       promptMessageId: args.promptMessageId,
       step: { step, messages, embeddings },
       failPendingSteps: false,
     });
+    return saved;
   }
 
   /**

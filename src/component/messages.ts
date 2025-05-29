@@ -245,7 +245,7 @@ const addStepArgs = {
 
 export const addStep = mutation({
   args: addStepArgs,
-  returns: v.array(v.doc("steps")),
+  returns: v.array(vMessageDoc),
   handler: addStepHandler,
 });
 async function addStepHandler(
@@ -280,7 +280,7 @@ async function addStepHandler(
     status: step.finishReason === "stop" ? "success" : "pending",
     step,
   });
-  await addMessagesHandler(ctx, {
+  const added = await addMessagesHandler(ctx, {
     userId: args.userId,
     threadId: args.threadId,
     stepId,
@@ -294,8 +294,7 @@ async function addStepHandler(
   if (step.finishReason === "stop") {
     await commitMessageHandler(ctx, { messageId: args.promptMessageId });
   }
-  steps.push((await ctx.db.get(stepId))!);
-  return steps;
+  return added.messages.map(publicMessage);
 }
 
 export const rollbackMessage = mutation({
