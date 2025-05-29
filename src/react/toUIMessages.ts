@@ -143,10 +143,10 @@ export function toUIMessages(messages: MessageDoc[]): UIMessageOrdered[] {
           }
         }
       }
-      if (!message.tool) {
-        // Reset it so the next set of tool calls will create a new assistant message
-        assistantMessage = undefined;
-      }
+    }
+    if (!message.tool) {
+      // Reset it so the next set of tool calls will create a new assistant message
+      assistantMessage = undefined;
     }
   }
   return uiMessages;
