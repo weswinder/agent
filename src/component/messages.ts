@@ -215,7 +215,7 @@ function orderedMessagesStream(
 ) {
   return mergedStream(
     [true, false].flatMap((tool) =>
-      ["success" as const, "pending" as const].map((status) =>
+      messageStatuses.map((status) =>
         stream(ctx.db, schema)
           .query("messages")
           .withIndex("threadId_status_tool_order_stepOrder", (q) => {
