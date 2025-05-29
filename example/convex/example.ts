@@ -59,14 +59,14 @@ export const fashionAgent = new Agent(components.agent, {
 // Create a thread from within a mutation and generate text
 export const createThreadAndGenerateText = action({
   args: { location: v.string(), userId: v.optional(v.string()) },
-  handler: async (ctx, { location, userId }) => {
+  handler: async (ctx, args) => {
     const { threadId, thread } = await weatherAgent.createThread(ctx, {
-      userId,
-      title: `Weather in ${location}`,
+      userId: args.userId,
+      title: `Weather in ${args.location}`,
     });
-    // Use the thread object from within an action to generate text:
+
     const result = await thread.generateText({
-      prompt: `What is the weather in ${location}?`,
+      prompt: `What is the weather in ${args.location}?`,
     });
     return { threadId, text: result.text };
   },
