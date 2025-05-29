@@ -116,7 +116,17 @@ export declare const components: {
         {
           agentName?: string;
           embeddings?: {
-            dimension: 128 | 256 | 512 | 768 | 1024 | 1536 | 2048 | 3072 | 4096;
+            dimension:
+              | 128
+              | 256
+              | 512
+              | 768
+              | 1024
+              | 1408
+              | 1536
+              | 2048
+              | 3072
+              | 4096;
             model: string;
             vectors: Array<Array<number> | null>;
           };
@@ -637,6 +647,7 @@ export declare const components: {
                 | 512
                 | 768
                 | 1024
+                | 1408
                 | 1536
                 | 2048
                 | 3072
@@ -2035,6 +2046,7 @@ export declare const components: {
               | string
               | string
               | string
+              | string
             >;
           },
           null
@@ -2053,6 +2065,7 @@ export declare const components: {
               | 512
               | 768
               | 1024
+              | 1408
               | 1536
               | 2048
               | 3072
@@ -2070,6 +2083,7 @@ export declare const components: {
               | 512
               | 768
               | 1024
+              | 1408
               | 1536
               | 2048
               | 3072
@@ -2098,6 +2112,7 @@ export declare const components: {
               | 512
               | 768
               | 1024
+              | 1408
               | 1536
               | 2048
               | 3072
@@ -2106,6 +2121,7 @@ export declare const components: {
           {
             continueCursor: string;
             ids: Array<
+              | string
               | string
               | string
               | string
@@ -2125,6 +2141,7 @@ export declare const components: {
           {
             vectors: Array<{
               id:
+                | string
                 | string
                 | string
                 | string

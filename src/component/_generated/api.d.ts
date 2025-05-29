@@ -91,7 +91,17 @@ export type Mounts = {
       {
         agentName?: string;
         embeddings?: {
-          dimension: 128 | 256 | 512 | 768 | 1024 | 1536 | 2048 | 3072 | 4096;
+          dimension:
+            | 128
+            | 256
+            | 512
+            | 768
+            | 1024
+            | 1408
+            | 1536
+            | 2048
+            | 3072
+            | 4096;
           model: string;
           vectors: Array<Array<number> | null>;
         };
@@ -522,7 +532,17 @@ export type Mounts = {
         promptMessageId: string;
         step: {
           embeddings?: {
-            dimension: 128 | 256 | 512 | 768 | 1024 | 1536 | 2048 | 3072 | 4096;
+            dimension:
+              | 128
+              | 256
+              | 512
+              | 768
+              | 1024
+              | 1408
+              | 1536
+              | 2048
+              | 3072
+              | 4096;
             model: string;
             vectors: Array<Array<number> | null>;
           };
@@ -1854,6 +1874,7 @@ export type Mounts = {
             | string
             | string
             | string
+            | string
           >;
         },
         null
@@ -1872,6 +1893,7 @@ export type Mounts = {
             | 512
             | 768
             | 1024
+            | 1408
             | 1536
             | 2048
             | 3072
@@ -1889,6 +1911,7 @@ export type Mounts = {
             | 512
             | 768
             | 1024
+            | 1408
             | 1536
             | 2048
             | 3072
@@ -1917,6 +1940,7 @@ export type Mounts = {
             | 512
             | 768
             | 1024
+            | 1408
             | 1536
             | 2048
             | 3072
@@ -1925,6 +1949,7 @@ export type Mounts = {
         {
           continueCursor: string;
           ids: Array<
+            | string
             | string
             | string
             | string
@@ -1944,6 +1969,7 @@ export type Mounts = {
         {
           vectors: Array<{
             id:
+              | string
               | string
               | string
               | string
