@@ -42,7 +42,11 @@ const MessageItem: React.FC<MessageItemProps> = ({
   return (
     <div
       className={`p-4 border-b cursor-pointer ${
-        isSelected ? "bg-secondary" : "hover:bg-muted/50"
+        message.status === "failed"
+          ? "bg-red-100 border-red-400 text-red-800"
+          : isSelected
+            ? "bg-secondary"
+            : "hover:bg-muted/50"
       }`}
       onClick={onClick}
     >
@@ -98,12 +102,12 @@ const MessageItem: React.FC<MessageItemProps> = ({
               />
             </div>
           ) : (
-            file.bytes &&
+            file.data &&
             (file.mimeType.startsWith("image/") ? (
               <div key={i} className="mt-2">
                 <img
                   src={URL.createObjectURL(
-                    new Blob([file.bytes], {
+                    new Blob([file.data], {
                       type: file.mimeType,
                     })
                   )}
