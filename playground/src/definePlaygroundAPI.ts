@@ -123,7 +123,7 @@ export function definePlaygroundAPI(
   const listThreads = queryGeneric({
     args: {
       apiKey: v.string(),
-      userId: v.string(),
+      userId: v.optional(v.string()),
       paginationOpts: paginationOptsValidator,
     },
     handler: async (ctx, args) => {

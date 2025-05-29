@@ -15,7 +15,7 @@ interface LeftPanelProps {
   threads: Thread[];
   selectedUserId?: string;
   selectedThreadId?: string;
-  onSelectUserId: (userId: string) => void;
+  onSelectUserId: (userId: string | undefined) => void;
   onSelectThread: (thread: Thread) => void;
   onLoadMoreThreads: (numItems: number) => void;
   canLoadMoreThreads: boolean;
@@ -35,13 +35,18 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
     <div className="flex flex-col h-full border-r">
       <div className="panel-header">
         <Select
-          value={selectedUserId || undefined}
-          onValueChange={(value) => onSelectUserId(value)}
+          value={selectedUserId || "no user"}
+          onValueChange={(value) =>
+            onSelectUserId(value === "no user" ? undefined : value)
+          }
         >
           <SelectTrigger>
             <SelectValue placeholder="Select a user" />
           </SelectTrigger>
           <SelectContent>
+            <SelectItem key="no user" value="no user">
+              No user
+            </SelectItem>
             {users.map((user) => (
               <SelectItem key={user._id} value={user._id}>
                 {user.name}

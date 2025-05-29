@@ -43,15 +43,10 @@ const Play = ({ apiKey, api }: PlayProps) => {
     { apiKey },
     { initialNumItems: 20 }
   );
-  useEffect(() => {
-    if (users.results.length > 0 && !selectedUserId) {
-      setSelectedUserId(users.results[0]._id);
-    }
-  }, [users.results, selectedUserId]);
 
   const threads = usePaginatedQuery(
     api.listThreads,
-    selectedUserId ? { apiKey, userId: selectedUserId } : "skip",
+    { apiKey, userId: selectedUserId },
     { initialNumItems: 20 }
   );
   useEffect(() => {
@@ -97,7 +92,7 @@ const Play = ({ apiKey, api }: PlayProps) => {
   );
 
   // Handlers
-  const handleSelectUserId = (userId: string) => {
+  const handleSelectUserId = (userId: string | undefined) => {
     setSelectedUserId(userId);
     setSelectedThreadId(undefined);
     setSelectedMessageId(undefined);

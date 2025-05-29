@@ -2094,7 +2094,7 @@ export declare const components: {
             maximumRowsRead?: number;
             numItems: number;
           };
-          userId: string;
+          userId?: string;
         },
         {
           continueCursor: string;

@@ -38,7 +38,7 @@ export const getThread = query({
 
 export const listThreadsByUserId = query({
   args: {
-    userId: v.string(),
+    userId: v.optional(v.string()),
     order: v.optional(v.union(v.literal("asc"), v.literal("desc"))),
     paginationOpts: v.optional(paginationOptsValidator),
   },
