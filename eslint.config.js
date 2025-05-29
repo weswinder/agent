@@ -32,6 +32,7 @@ export default [
 
       // allow (_arg: number) => {} and const _foo = 1;
       "no-unused-vars": "off",
+      "no-unused-private-class-members": "warn",
       "@typescript-eslint/no-unused-vars": [
         "warn",
         {
