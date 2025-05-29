@@ -1,18 +1,27 @@
 import { v } from "convex/values";
-import { internalMutation, mutation, query } from "./_generated/server";
+import {
+  internalMutation,
+  mutation,
+  MutationCtx,
+  query,
+} from "./_generated/server";
 import { omit, pick } from "convex-helpers";
 import { StreamDelta, vStreamDelta, vStreamMessage } from "../validators";
 import schema from "./schema";
 import { internal } from "./_generated/api";
+import { Id } from "./_generated/dataModel";
 
 const MAX_DELTAS_PER_REQUEST = 1000;
 const MAX_DELTAS_PER_STREAM = 100;
 const TIMEOUT_INTERVAL = 1000 * 60; // 1 minute
 
+const deltaValidator = schema.tables.streamDeltas.validator;
+
 export const addDelta = mutation({
-  args: schema.tables.streamDeltas.validator,
+  args: deltaValidator,
   handler: async (ctx, args) => {
     await ctx.db.insert("streamDeltas", args);
+    await heartbeatStream(ctx, { streamId: args.streamId });
   },
 });
 
@@ -106,49 +115,75 @@ export const list = query({
   },
 });
 
-export const heartbeatStream = mutation({
+export const finish = mutation({
   args: {
     streamId: v.id("streamingMessages"),
+    finalDelta: v.optional(deltaValidator),
   },
   handler: async (ctx, args) => {
+    if (args.finalDelta) {
+      await ctx.db.insert("streamDeltas", args.finalDelta);
+    }
     const stream = await ctx.db.get(args.streamId);
     if (!stream) {
-      console.warn("Stream not found", args.streamId);
-      return;
+      throw new Error(`Stream not found: ${args.streamId}`);
     }
     if (stream.state.kind !== "streaming") {
-      console.warn("Stream is not streaming", args.streamId);
-      return;
+      throw new Error(`Stream is not streaming: ${args.streamId}`);
     }
-    if (Date.now() - stream.state.lastHeartbeat < TIMEOUT_INTERVAL / 4) {
-      // Debounce heartbeating.
-      return;
+    if (stream.state.timeoutFnId) {
+      const timeoutFn = await ctx.db.system.get(stream.state.timeoutFnId);
+      if (timeoutFn?.state.kind === "pending") {
+        await ctx.scheduler.cancel(stream.state.timeoutFnId);
+      }
     }
-    if (!stream.state.timeoutFnId) {
-      throw new Error("Stream has no timeout function");
-    }
-    const timeoutFn = await ctx.db.system.get(stream.state.timeoutFnId);
-    if (!timeoutFn) {
-      throw new Error("Timeout function not found");
-    }
-    if (timeoutFn.state.kind !== "pending") {
-      throw new Error("Timeout function is not pending");
-    }
-    await ctx.scheduler.cancel(stream.state.timeoutFnId);
-    const timeoutFnId = await ctx.scheduler.runAfter(
-      TIMEOUT_INTERVAL,
-      internal.streams.timeoutStream,
-      { streamId: args.streamId }
-    );
     await ctx.db.patch(args.streamId, {
-      state: {
-        kind: "streaming",
-        lastHeartbeat: Date.now(),
-        timeoutFnId,
-      },
+      state: { kind: "finished", endedAt: Date.now() },
     });
   },
 });
+
+async function heartbeatStream(
+  ctx: MutationCtx,
+  args: { streamId: Id<"streamingMessages"> }
+) {
+  const stream = await ctx.db.get(args.streamId);
+  if (!stream) {
+    console.warn("Stream not found", args.streamId);
+    return;
+  }
+  if (stream.state.kind !== "streaming") {
+    console.warn("Stream is not streaming", args.streamId);
+    return;
+  }
+  if (Date.now() - stream.state.lastHeartbeat < TIMEOUT_INTERVAL / 4) {
+    // Debounce heartbeating.
+    return;
+  }
+  if (!stream.state.timeoutFnId) {
+    throw new Error("Stream has no timeout function");
+  }
+  const timeoutFn = await ctx.db.system.get(stream.state.timeoutFnId);
+  if (!timeoutFn) {
+    throw new Error("Timeout function not found");
+  }
+  if (timeoutFn.state.kind !== "pending") {
+    throw new Error("Timeout function is not pending");
+  }
+  await ctx.scheduler.cancel(stream.state.timeoutFnId);
+  const timeoutFnId = await ctx.scheduler.runAfter(
+    TIMEOUT_INTERVAL,
+    internal.streams.timeoutStream,
+    { streamId: args.streamId }
+  );
+  await ctx.db.patch(args.streamId, {
+    state: {
+      kind: "streaming",
+      lastHeartbeat: Date.now(),
+      timeoutFnId,
+    },
+  });
+}
 
 export const timeoutStream = internalMutation({
   args: { streamId: v.id("streamingMessages") },

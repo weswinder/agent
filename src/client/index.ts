@@ -44,7 +44,6 @@ import {
   type SearchOptions,
   StreamArgs,
   StreamSyncReturns,
-  TextStreamPart,
   type Usage,
   vMessageWithMetadata,
   vSafeObjectArgs,
@@ -70,6 +69,11 @@ import type {
 
 import type { MessageDoc, ThreadDoc } from "../component/schema.js";
 import { wrapTools, createTool } from "./createTool.js";
+import {
+  DeltaStreamer,
+  mergeTransforms,
+  StreamingOptions,
+} from "./streaming.js";
 
 export { vMessageDoc, vThreadDoc } from "../component/schema.js";
 export { extractText, isTool, createTool };
@@ -864,7 +868,19 @@ export class Agent<AgentTools extends ToolSet> {
      * The {@link ContextOptions} and {@link StorageOptions}
      * options to use for fetching contextual messages and saving input/output messages.
      */
-    options?: Options
+    options?: Options & {
+      /**
+       * Whether to save incremental data (deltas) from streaming responses.
+       * Defaults to false.
+       * If false, it will not save any deltas to the database.
+       * If true, it will save deltas with {@link DEFAULT_STREAMING_OPTIONS}.
+       *
+       * Regardless of this option, when streaming you are able to use this
+       * `streamText` function as you would with the "ai" package's version:
+       * iterating over the text, streaming it over HTTP, etc.
+       */
+      saveStreamDeltas?: boolean | StreamingOptions;
+    }
   ): Promise<
     StreamTextResult<
       TOOLS extends undefined ? AgentTools : TOOLS,
@@ -872,28 +888,50 @@ export class Agent<AgentTools extends ToolSet> {
     > &
       GenerationOutputMetadata
   > {
-    const { args: aiArgs, messageId } = await this._saveMessagesAndFetchContext(
-      ctx,
-      args,
-      { userId, threadId, ...options }
-    );
+    const context = await this._saveMessagesAndFetchContext(ctx, args, {
+      userId,
+      threadId,
+      ...options,
+    });
+    const { args: aiArgs, messageId, order, stepOrder } = context;
     const toolCtx = { ...ctx, userId, threadId, messageId, agent: this };
     const tools = wrapTools(
       toolCtx,
       args.tools ?? threadTools ?? this.options.tools
     ) as TOOLS extends undefined ? AgentTools : TOOLS;
-    const saveOutputMessages =
-      options?.storageOptions?.saveOutputMessages ??
-      this.options.storageOptions?.saveOutputMessages;
+    const storageOptions = {
+      ...this.options.storageOptions,
+      ...options?.storageOptions,
+    };
+    const saveOutputMessages = storageOptions.saveOutputMessages;
     const trackUsage = usageHandler ?? this.options.usageHandler;
+    const streamer =
+      threadId && options?.saveStreamDeltas
+        ? new DeltaStreamer(this.component, ctx, options.saveStreamDeltas, {
+            threadId,
+            userId,
+            agentName: this.options.name,
+            model: aiArgs.model.modelId,
+            provider: aiArgs.model.provider,
+            providerOptions: aiArgs.providerOptions,
+            order,
+            stepOrder,
+          })
+        : undefined;
+
     const result = streamText({
       // Can be overridden
       maxSteps: this.options.maxSteps,
       ...aiArgs,
       tools,
-      onChunk: async (chunk) => {
+      experimental_transform: mergeTransforms(
+        options?.saveStreamDeltas,
+        args.experimental_transform
+      ),
+      onChunk: async (event) => {
+        await streamer?.addParts([event.chunk]);
         // console.log("onChunk", chunk);
-        return args.onChunk?.(chunk);
+        return args.onChunk?.(event);
       },
       onError: async (error) => {
         console.error("onError", error);
@@ -909,12 +947,13 @@ export class Agent<AgentTools extends ToolSet> {
         // console.log("onStepFinish", step);
         // TODO: compare delta to the output. internally drop the deltas when committing
         if (threadId && messageId) {
-          await this.saveStep(ctx, {
+          const saved = await this.saveStep(ctx, {
             userId,
             threadId,
             promptMessageId: messageId,
             step,
           });
+          await streamer?.finish(saved);
         }
         if (trackUsage && step.usage) {
           await trackUsage(ctx, {
@@ -963,6 +1002,8 @@ export class Agent<AgentTools extends ToolSet> {
   ): Promise<{
     args: T & { model: LanguageModelV1 };
     messageId: string | undefined;
+    order: number | undefined;
+    stepOrder: number | undefined;
   }> {
     contextOptions ||= this.options.contextOptions;
     storageOptions ||= this.options.storageOptions;
@@ -983,6 +1024,12 @@ export class Agent<AgentTools extends ToolSet> {
       contextOptions,
     });
     let messageId = args.promptMessageId;
+    let order = args.promptMessageId
+      ? contextMessages.at(-1)?.order
+      : undefined;
+    let stepOrder = args.promptMessageId
+      ? contextMessages.at(-1)?.stepOrder
+      : undefined;
     if (
       threadId &&
       messages.length &&
@@ -999,6 +1046,8 @@ export class Agent<AgentTools extends ToolSet> {
         failPendingSteps: true,
       });
       messageId = saved.lastMessageId;
+      order = saved.messages.at(-1)?.order;
+      stepOrder = saved.messages.at(-1)?.stepOrder;
     }
     const { prompt: _, model, ...rest } = args;
     return {
@@ -1013,6 +1062,8 @@ export class Agent<AgentTools extends ToolSet> {
         ],
       } as T & { model: LanguageModelV1 },
       messageId,
+      order,
+      stepOrder,
     };
   }
 
@@ -1293,17 +1344,38 @@ export class Agent<AgentTools extends ToolSet> {
    *   {@link ContextOptions}, {@link StorageOptions}, and maxSteps.
    */
   asTextAction(spec?: {
+    /**
+     * The maximum number of steps to take in this action.
+     * Defaults to the {@link Agent.maxSteps} option.
+     */
     maxSteps?: number;
+    /**
+     * The {@link ContextOptions} to use for fetching contextual messages and
+     * saving input/output messages.
+     * Defaults to the {@link Agent.contextOptions} option.
+     */
     contextOptions?: ContextOptions;
+    /**
+     * The {@link StorageOptions} to use for saving input/output messages.
+     * Defaults to the {@link Agent.storageOptions} option.
+     */
     storageOptions?: StorageOptions;
-    stream?: boolean;
+    /**
+     * Whether to stream the text.
+     * If false, it will generate the text in a single call. (default)
+     * If true or {@link StreamingOptions}, it will stream the text from the LLM
+     * and save the chunks to the database with the options you specify, or the
+     * defaults if you pass true.
+     */
+    stream?: boolean | StreamingOptions;
   }) {
     const maxSteps = spec?.maxSteps ?? this.options.maxSteps;
     return internalActionGeneric({
       args: vTextArgs,
       handler: async (ctx, args) => {
         const { contextOptions, storageOptions, ...rest } = args;
-        const stream = args.stream ?? spec?.stream ?? false;
+        const stream =
+          args.stream === true ? spec?.stream || true : spec?.stream ?? false;
         const targetArgs = { userId: args.userId, threadId: args.threadId };
         const llmArgs = { maxSteps, ...rest };
         const opts = {
@@ -1315,6 +1387,7 @@ export class Agent<AgentTools extends ToolSet> {
             storageOptions ??
             spec?.storageOptions ??
             this.options.storageOptions,
+          saveStreamDeltas: stream,
         };
         if (stream) {
           const result = await this.streamText(ctx, targetArgs, llmArgs, opts);

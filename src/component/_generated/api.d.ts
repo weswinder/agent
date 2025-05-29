@@ -1746,10 +1746,62 @@ export type Mounts = {
       },
       string
     >;
-    heartbeatStream: FunctionReference<
+    finish: FunctionReference<
       "mutation",
       "public",
-      { streamId: string },
+      {
+        finalDelta?: {
+          end: number;
+          parts: Array<
+            | { textDelta: string; type: "text-delta" }
+            | { textDelta: string; type: "reasoning" }
+            | {
+                source: {
+                  id: string;
+                  providerOptions?: Record<string, Record<string, any>>;
+                  sourceType: "url";
+                  title?: string;
+                  url: string;
+                };
+                type: "source";
+              }
+            | {
+                args: any;
+                providerOptions?: Record<string, Record<string, any>>;
+                toolCallId: string;
+                toolName: string;
+                type: "tool-call";
+              }
+            | {
+                toolCallId: string;
+                toolName: string;
+                type: "tool-call-streaming-start";
+              }
+            | {
+                argsTextDelta: string;
+                toolCallId: string;
+                toolName: string;
+                type: "tool-call-delta";
+              }
+            | {
+                args?: any;
+                experimental_content?: Array<
+                  | { text: string; type: "text" }
+                  | { data: string; mimeType?: string; type: "image" }
+                >;
+                isError?: boolean;
+                providerOptions?: Record<string, Record<string, any>>;
+                result: any;
+                toolCallId: string;
+                toolName: string;
+                type: "tool-result";
+              }
+          >;
+          start: number;
+          streamId: string;
+        };
+        streamId: string;
+      },
       any
     >;
     list: FunctionReference<
@@ -1884,7 +1936,7 @@ export type Mounts = {
           maximumRowsRead?: number;
           numItems: number;
         };
-        userId: string;
+        userId?: string;
       },
       {
         continueCursor: string;

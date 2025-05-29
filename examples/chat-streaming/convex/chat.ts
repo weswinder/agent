@@ -19,13 +19,6 @@ export const storyAgent = new Agent(components.agent, {
   name: "Story Agent",
   chat: openai.chat("gpt-4o-mini"),
   instructions: "You tell stories with twist endings. ~ 200 words.",
-  storageOptions: {
-    saveStreamDeltas: {
-      granularity: "word",
-      min: 1,
-      throttleMs: 100,
-    },
-  },
   tools: {
     makeUpName: tool({
       description: "Make up a name for a user",
@@ -49,31 +42,6 @@ export const storyAgent = new Agent(components.agent, {
   maxSteps: 10,
 });
 
-// Not streaming, just used for comparison
-export const generateStoryWithoutStreaming = action({
-  args: { prompt: v.string(), threadId: v.string() },
-  handler: async (ctx, { prompt, threadId }) => {
-    await authorizeThreadAccess(ctx, threadId);
-    const { thread } = await storyAgent.continueThread(ctx, { threadId });
-    const result = await thread.generateText({ prompt });
-    return result.text;
-  },
-});
-
-// Streaming, but the action doesn't return until the streaming is done.
-export const streamStorySynchronously = action({
-  args: { prompt: v.string(), threadId: v.string() },
-  handler: async (ctx, { prompt, threadId }) => {
-    await authorizeThreadAccess(ctx, threadId);
-    const { thread } = await storyAgent.continueThread(ctx, { threadId });
-    const result = await thread.streamText({ prompt });
-    for await (const chunk of result.textStream) {
-      console.log(chunk);
-    }
-    return result.text;
-  },
-});
-
 // Streaming, where generate the prompt message first, then asynchronously
 // generate the stream response.
 export const streamStoryAsynchronously = mutation({
@@ -93,7 +61,37 @@ export const streamStoryAsynchronously = mutation({
 
 // Expose an internal action that streams text
 export const streamStoryInternalAction = storyAgent.asTextAction({
-  stream: true,
+  stream: { chunking: "word", throttleMs: 100 },
+  // saveStreamDeltas: { chunking: "word", throttleMs: 100 },
+});
+
+// Streaming, but the action doesn't return until the streaming is done.
+export const streamStorySynchronously = action({
+  args: { prompt: v.string(), threadId: v.string() },
+  handler: async (ctx, { prompt, threadId }) => {
+    await authorizeThreadAccess(ctx, threadId);
+    const { thread } = await storyAgent.continueThread(ctx, { threadId });
+    const result = await thread.streamText(
+      { prompt },
+      { saveStreamDeltas: { chunking: "line", throttleMs: 1000 } },
+    );
+    console.log("post streamText");
+    for await (const chunk of result.textStream) {
+      console.log(chunk);
+    }
+    return result.text;
+  },
+});
+
+// Not streaming, just used for comparison
+export const generateStoryWithoutStreaming = action({
+  args: { prompt: v.string(), threadId: v.string() },
+  handler: async (ctx, { prompt, threadId }) => {
+    await authorizeThreadAccess(ctx, threadId);
+    const { thread } = await storyAgent.continueThread(ctx, { threadId });
+    const result = await thread.generateText({ prompt });
+    return result.text;
+  },
 });
 
 /**

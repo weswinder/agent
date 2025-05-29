@@ -33,8 +33,9 @@ import type {
   ProviderOptions,
   Usage,
 } from "../validators.js";
-import { Mounts } from "../component/_generated/api.js";
+import type { Mounts } from "../component/_generated/api.js";
 import type { Schema } from "zod";
+import type { StreamingOptions } from "./streaming.js";
 
 /**
  * Options to configure what messages are fetched as context,
@@ -102,40 +103,6 @@ export type StorageOptions = {
   saveAnyInputMessages?: boolean;
   /** Defaults to true. Whether to save messages generated while chatting. */
   saveOutputMessages?: boolean;
-  /**
-   * Whether to save incremental data (deltas) from streaming responses.
-   * Defaults to false.
-   * If false, it will not save any deltas to the database.
-   * If true, it will save deltas using the default options:
-   * { granularity: "word", min: 1, throttleMs: 100 }.
-   *
-   * Regardless of this option, when streaming you are able to iterate over the
-   * response in the action and/or return an http streaming response.
-   */
-  saveStreamDeltas?:
-    | boolean
-    | {
-        /**
-         * The minimum granularity of deltas to save.
-         * Note: this is not a guarantee that every delta will be exactly one line.
-         * E.g. if "line" is specified, it won't save any deltas until it encounters
-         * a newline character.
-         * Defaults to "word".
-         */
-        granularity?: "word" | "line" | "paragraph";
-        /**
-         * The minimum number of units of the granularity to save.
-         * E.g. if "line" and 10 are specified, it won't save any deltas until it encounters
-         * 10 lines of text.
-         * Defaults to 1.
-         */
-        min?: number;
-        /**
-         * The minimum number of milliseconds to wait before saving another delta.
-         * Defaults to 100.
-         */
-        throttleMs?: number;
-      };
 };
 
 export type GenerationOutputMetadata = { messageId?: string };
@@ -383,7 +350,19 @@ export interface Thread<DefaultTools extends ToolSet> {
       OUTPUT,
       PARTIAL_OUTPUT
     >,
-    options?: Options
+    options?: Options & {
+      /**
+       * Whether to save incremental data (deltas) from streaming responses.
+       * Defaults to false.
+       * If false, it will not save any deltas to the database.
+       * If true, it will save deltas with {@link DEFAULT_STREAMING_OPTIONS}.
+       *
+       * Regardless of this option, when streaming you are able to use this
+       * `streamText` function as you would with the "ai" package's version:
+       * iterating over the text, streaming it over HTTP, etc.
+       */
+      saveStreamDeltas?: boolean | StreamingOptions;
+    }
   ): Promise<
     StreamTextResult<
       TOOLS extends undefined ? DefaultTools : TOOLS,
