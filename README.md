@@ -17,6 +17,7 @@ AI Agent framework built on Convex.
   Enables long-lived, durable workflows defined as code.
 - Reactive & realtime updates from asynchronous functions / workflows.
 - Support for streaming text and storing the final result.
+  See [examples/chat-streaming](./examples/chat-streaming/README.md).
 - Optionally filter tool calls out of the thread history.
 
 [Read the associated Stack post here](https://stack.convex.dev/ai-agents).
