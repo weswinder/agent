@@ -50,7 +50,7 @@ function Story({ threadId, reset }: { threadId: string; reset: () => void }) {
   const sendMessage = useMutation(
     api.streaming.streamStoryAsynchronously,
   ).withOptimisticUpdate(optimisticallySendMessage);
-  const [prompt, setPrompt] = useState("");
+  const [prompt, setPrompt] = useState("Tell me a story");
 
   function onSendClicked() {
     if (prompt.trim() === "") return;
@@ -63,8 +63,8 @@ function Story({ threadId, reset }: { threadId: string; reset: () => void }) {
       <div className="w-full max-w-2xl bg-white rounded-xl shadow-lg p-6 flex flex-col gap-6">
         {messages.results?.length > 0 && (
           <div className="flex flex-col gap-4 overflow-y-auto mb-4">
-            {toUIMessages(messages.results ?? []).map((m, i) => (
-              <Message key={i} m={m} />
+            {toUIMessages(messages.results ?? []).map((m) => (
+              <Message key={m.key} m={m} />
             ))}
           </div>
         )}
@@ -107,7 +107,13 @@ function Story({ threadId, reset }: { threadId: string; reset: () => void }) {
   );
 }
 
-function Message({ m, delayMs = 1 }: { m: UIMessage; delayMs?: number }) {
+function Message({
+  m,
+  charsPerSec = 512,
+}: {
+  m: UIMessage;
+  charsPerSec?: number;
+}) {
   const isUser = m.role === "user";
   const text =
     m.content ||
@@ -116,19 +122,33 @@ function Message({ m, delayMs = 1 }: { m: UIMessage; delayMs?: number }) {
       .map((p) => p.text)
       .join("");
   const [visibleText, setVisibleText] = useState(text);
-  const cursor = useRef(text.length);
+  const smoothState = useRef({ lastUpdated: Date.now(), cursor: text.length });
   const isStreaming = m.status === "streaming";
   useEffect(() => {
-    if (!isStreaming) return;
-    const interval = setInterval(() => {
-      if (cursor.current >= text.length) {
+    if (!isStreaming && smoothState.current.cursor >= text.length) {
+      setVisibleText(text);
+      return;
+    }
+    function update() {
+      if (smoothState.current.cursor >= text.length) {
         return;
       }
-      cursor.current += 1;
-      setVisibleText(text.slice(0, cursor.current));
-    }, delayMs);
+      const now = Date.now();
+      const timeSinceLastUpdate = now - smoothState.current.lastUpdated;
+      const chars = Math.floor((timeSinceLastUpdate * charsPerSec) / 1000);
+      smoothState.current.cursor = Math.min(
+        smoothState.current.cursor + chars,
+        text.length,
+      );
+      smoothState.current.lastUpdated = now;
+      setVisibleText(text.slice(0, smoothState.current.cursor));
+    }
+    update();
+    const interval = setInterval(() => {
+      update();
+    }, 1000 / 60);
     return () => clearInterval(interval);
-  }, [text, isStreaming, delayMs]);
+  }, [text, isStreaming, charsPerSec]);
   return (
     <div className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
       <div
@@ -136,7 +156,7 @@ function Message({ m, delayMs = 1 }: { m: UIMessage; delayMs?: number }) {
           isUser ? "bg-blue-100 text-blue-900" : "bg-gray-200 text-gray-800"
         }`}
       >
-        {isStreaming ? visibleText : text}
+        {visibleText}
       </div>
     </div>
   );
