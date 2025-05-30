@@ -141,7 +141,12 @@ export const schema = defineSchema({
   })
     // There should only be one per "order" index
     // If another exists, it's deleted and replaced
-    .index("threadId_order_stepOrder", ["threadId", "order", "stepOrder"]),
+    .index("threadId_state_order_stepOrder", [
+      "threadId",
+      "state.kind",
+      "order",
+      "stepOrder",
+    ]),
 
   streamDeltas: defineTable({
     streamId: v.id("streamingMessages"),

@@ -94,8 +94,8 @@ export const list = query({
   handler: async (ctx, args) => {
     return ctx.db
       .query("streamingMessages")
-      .withIndex("threadId_order_stepOrder", (q) =>
-        q.eq("threadId", args.threadId)
+      .withIndex("threadId_state_order_stepOrder", (q) =>
+        q.eq("threadId", args.threadId).eq("state.kind", "streaming")
       )
       .order("desc")
       .take(100)
