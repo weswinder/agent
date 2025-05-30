@@ -1,8 +1,11 @@
 import { useMutation, insertAtTop } from "convex/react";
 import { Toaster } from "./components/ui/toaster";
 import { api } from "../convex/_generated/api";
-import { toUIMessages, useThreadMessages } from "@convex-dev/agent/react";
-import { UIMessage } from "ai";
+import {
+  toUIMessages,
+  useThreadMessages,
+  type UIMessage,
+} from "@convex-dev/agent/react";
 import { useEffect, useState } from "react";
 import { OptimisticLocalStore } from "convex/browser";
 

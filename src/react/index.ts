@@ -21,10 +21,10 @@ import type {
   StreamMessage,
   TextStreamPart,
 } from "../validators";
-import type { UIMessageOrdered } from "./toUIMessages";
+import type { UIMessage } from "./toUIMessages";
 import { toUIMessages } from "./toUIMessages";
 
-export { toUIMessages, type UIMessageOrdered };
+export { toUIMessages, type UIMessage };
 
 /**
  * A hook that fetches messages from a thread.

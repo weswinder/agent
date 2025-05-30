@@ -1,16 +1,20 @@
-import { UIMessage } from "ai";
+import { UIMessage as AIUIMessage } from "ai";
 import type { ToolInvocationUIPart } from "@ai-sdk/ui-utils";
 import { MessageDoc } from "../client";
 import { deserializeMessage, toUIFilePart } from "../mapping";
+import { MessageStatus } from "../validators";
 
-export type UIMessageOrdered = UIMessage & {
+export type UIMessage = AIUIMessage & {
   order: number;
   stepOrder: number;
+  status: "streaming" | MessageStatus;
 };
 
-export function toUIMessages(messages: MessageDoc[]): UIMessageOrdered[] {
-  const uiMessages: UIMessageOrdered[] = [];
-  let assistantMessage: UIMessageOrdered | undefined;
+export function toUIMessages(
+  messages: (MessageDoc & { streaming?: boolean })[]
+): UIMessage[] {
+  const uiMessages: UIMessage[] = [];
+  let assistantMessage: UIMessage | undefined;
   for (const message of messages) {
     const coreMessage = message.message && deserializeMessage(message.message);
     const text = message.text ?? "";
@@ -18,15 +22,19 @@ export function toUIMessages(messages: MessageDoc[]): UIMessageOrdered[] {
     const nonStringContent =
       content && typeof content !== "string" ? content : [];
     if (!coreMessage) continue;
+    const common = {
+      id: message.id ?? message._id,
+      createdAt: new Date(message._creationTime),
+      order: message.order,
+      stepOrder: message.stepOrder,
+      status: message.streaming ? ("streaming" as const) : message.status,
+    };
     if (coreMessage.role === "system") {
       uiMessages.push({
-        id: message.id ?? message._id,
-        createdAt: new Date(message._creationTime),
+        ...common,
         role: "system",
         content: text,
         parts: [{ type: "text", text }],
-        order: message.order,
-        stepOrder: message.stepOrder,
       });
     } else if (coreMessage.role === "user") {
       const parts: UIMessage["parts"] = [];
@@ -37,13 +45,10 @@ export function toUIMessages(messages: MessageDoc[]): UIMessageOrdered[] {
         parts.push(...message.files.map(toUIFilePart));
       }
       uiMessages.push({
-        id: message.id ?? message._id,
-        createdAt: new Date(message._creationTime),
+        ...common,
         role: "user",
         content: message.text ?? "",
         parts,
-        order: message.order,
-        stepOrder: message.stepOrder,
       });
     } else {
       if (coreMessage.role === "tool" && !assistantMessage) {
@@ -55,13 +60,10 @@ export function toUIMessages(messages: MessageDoc[]): UIMessageOrdered[] {
       }
       if (!assistantMessage) {
         assistantMessage = {
-          id: message.id ?? message._id,
-          createdAt: new Date(message._creationTime),
+          ...common,
           role: "assistant",
           content: message.text ?? "",
           parts: [],
-          order: message.order,
-          stepOrder: message.stepOrder,
         };
         uiMessages.push(assistantMessage);
       }
