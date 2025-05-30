@@ -1895,7 +1895,7 @@ export declare const components: {
           start: number;
           streamId: string;
         },
-        any
+        null
       >;
       create: FunctionReference<
         "mutation",
@@ -1968,7 +1968,7 @@ export declare const components: {
           };
           streamId: string;
         },
-        any
+        null
       >;
       list: FunctionReference<
         "query",

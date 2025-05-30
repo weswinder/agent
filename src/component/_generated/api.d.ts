@@ -1729,7 +1729,7 @@ export type Mounts = {
         start: number;
         streamId: string;
       },
-      any
+      null
     >;
     create: FunctionReference<
       "mutation",
@@ -1802,7 +1802,7 @@ export type Mounts = {
         };
         streamId: string;
       },
-      any
+      null
     >;
     list: FunctionReference<
       "query",

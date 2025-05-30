@@ -19,6 +19,7 @@ const deltaValidator = schema.tables.streamDeltas.validator;
 
 export const addDelta = mutation({
   args: deltaValidator,
+  returns: v.null(),
   handler: async (ctx, args) => {
     await ctx.db.insert("streamDeltas", args);
     await heartbeatStream(ctx, { streamId: args.streamId });
@@ -120,6 +121,7 @@ export const finish = mutation({
     streamId: v.id("streamingMessages"),
     finalDelta: v.optional(deltaValidator),
   },
+  returns: v.null(),
   handler: async (ctx, args) => {
     if (args.finalDelta) {
       await ctx.db.insert("streamDeltas", args.finalDelta);
@@ -187,6 +189,7 @@ async function heartbeatStream(
 
 export const timeoutStream = internalMutation({
   args: { streamId: v.id("streamingMessages") },
+  returns: v.null(),
   handler: async (ctx, args) => {
     const stream = await ctx.db.get(args.streamId);
     if (!stream) {
