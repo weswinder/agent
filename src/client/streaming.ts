@@ -114,7 +114,6 @@ export class DeltaStreamer {
     ) {
       // We send again immediately with the accumulated deltas.
       this.#ongoingWrite = this.#sendDelta();
-      console.debug("Sent delta immediately");
     } else {
       this.#ongoingWrite = undefined;
     }

@@ -66,6 +66,10 @@ export function toUIMessages(
           parts: [],
         };
         uiMessages.push(assistantMessage);
+      } else {
+        assistantMessage.status = message.streaming
+          ? "streaming"
+          : message.status;
       }
       // update it to the last message's id
       assistantMessage.id = message.id ?? message._id;
