@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.3
+
+- Allows you to pass `promptMessageId` to `agent.streamText`.
+  This parameter allows you to create a message ahead of time and then
+  generate the response separately, responding to that message.
+
 ## 0.1.2
 
 - Added text delta streaming with `useThreadMessages` and `useStreamingThreadMessages` React hooks.
