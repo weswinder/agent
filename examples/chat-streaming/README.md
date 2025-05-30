@@ -44,6 +44,30 @@ const messages = useThreadMessages(
 );
 ```
 
+### Text smoothing
+
+The `useSmoothText` hook is a simple hook that smooths the text as it is streamed.
+
+```ts
+const [visibleText] = useSmoothText(message.content);
+```
+
+See [ChatStreaming.tsx](./src/ChatStreaming.tsx) for an example.
+
+### Optimistic updates for sending messages
+
+The `optimisticallySendMessage` function is a simple function that
+optimistically shows a message in the message list until the mutation has
+completed on the server.
+
+Pass in the query that you're using to list messages, and it will insert the
+ephemeral message at the top of the list.
+
+```ts
+const sendMessage = useMutation(api.streaming.streamStoryAsynchronously)
+  .withOptimisticUpdate(optimisticallySendMessage(api.streaming.listThreadMessages));
+```
+
 ## Running the example
 
 ```sh
