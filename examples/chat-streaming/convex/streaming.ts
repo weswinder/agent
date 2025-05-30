@@ -19,26 +19,26 @@ export const storyAgent = new Agent(components.agent, {
   name: "Story Agent",
   chat: openai.chat("gpt-4o-mini"),
   instructions: "You tell stories with twist endings. ~ 200 words.",
-  tools: {
-    makeUpName: tool({
-      description: "Make up a name for a user",
-      parameters: z.object({
-        currentNames: z
-          .array(z.string())
-          .describe("The names of the users that have been mentioned so far"),
-      }),
-      execute: async ({ currentNames }) => {
-        const names = ["John", "Jane", "Jim", "Jill", "Jack"].filter(
-          (name) => !currentNames.includes(name),
-        );
-        if (names.length === 0) {
-          return { name: "another person" };
-        }
-        const name = names[Math.floor(Math.random() * names.length)];
-        return { name };
-      },
-    }),
-  },
+  // tools: {
+  //   makeUpName: tool({
+  //     description: "Make up a name for a user",
+  //     parameters: z.object({
+  //       currentNames: z
+  //         .array(z.string())
+  //         .describe("The names of the users that have been mentioned so far"),
+  //     }),
+  //     execute: async ({ currentNames }) => {
+  //       const names = ["John", "Jane", "Jim", "Jill", "Jack"].filter(
+  //         (name) => !currentNames.includes(name),
+  //       );
+  //       if (names.length === 0) {
+  //         return { name: "another person" };
+  //       }
+  //       const name = names[Math.floor(Math.random() * names.length)];
+  //       return { name };
+  //     },
+  //   }),
+  // },
   maxSteps: 10,
 });
 
