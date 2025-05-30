@@ -21,27 +21,56 @@ import { MessageDoc } from "../client";
 
 export { toUIMessages, type UIMessageOrdered };
 
-
-// export function useThreadUIMessages<Query extends ThreadStreamQuery>(
-//   query: Query,
-//   args: ThreadUIMessagesArgs<Query>,
-//   options: {
-//     initialNumItems?: number;
-//     stream: true;
-//   }
-// ): UsePaginatedQueryResult<
-//   UIMessageOrdered & { order: number; stepOrder: number }
-// >;
-// export function useThreadUIMessages<Query extends ThreadQuery>(
-//   query: Query,
-//   args: ThreadUIMessagesArgs<Query>,
-//   options: {
-//     initialNumItems?: number;
-//     stream?: false;
-//   }
-// ): UsePaginatedQueryResult<
-//   UIMessageOrdered & { order: number; stepOrder: number }
-// >;
+/**
+ * A hook that fetches messages from a thread.
+ *
+ * This hook is a wrapper around `usePaginatedQuery` and `useStreamingThreadMessages`.
+ * It will fetch both full messages and streaming messages, and merge them together.
+ *
+ * The query must take as arguments `{ threadId, paginationOpts }` and return a
+ * pagination result of objects that extend `MessageDoc`.
+ *
+ * For streaming, it should look like this:
+ * ```ts
+ * export const listThreadMessages = query({
+ *   args: {
+ *     threadId: v.string(),
+ *     paginationOpts: paginationOptsValidator,
+ *     streamArgs: vStreamArgs,
+ *     ... other arguments you want
+ *   },
+ *   handler: async (ctx, { threadId, paginationOpts, streamArgs }) => {
+ *     // await authorizeThreadAccess(ctx, threadId);
+ *     const paginated = await agent.listMessages(ctx, { threadId, paginationOpts });
+ *     const streams = await agent.syncStreams(ctx, { threadId, streamArgs });
+ *     // Here you could filter out / modify the documents & stream deltas.
+ *     return { ...paginated, streams };
+ *   },
+ * });
+ * ```
+ *
+ * Then the hook can be used like this:
+ * ```ts
+ * const messages = useThreadMessages(
+ *   api.myModule.listThreadMessages,
+ *   { threadId },
+ *   { initialNumItems: 10, stream: true }
+ * );
+ * ```
+ *
+ * @param query The query to use to fetch messages.
+ * It must take as arguments `{ threadId, paginationOpts }` and return a
+ * pagination result of objects that extend `MessageDoc`.
+ * To support streaming, it must also take in `streamArgs: vStreamArgs` and
+ * return a `streams` object returned from `agent.syncStreams`.
+ * @param args The arguments to pass to the query other than `paginationOpts`
+ * and `streamArgs`. So `{ threadId }` at minimum, plus any other arguments that
+ * you want to pass to the query.
+ * @param options The options for the query. Similar to usePaginatedQuery.
+ * To enable streaming, pass `stream: true`.
+ * @returns The messages. If stream is true, it will return a list of messages
+ *   that includes both full messages and streaming messages.
+ */
 export function useThreadMessages<
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   Query extends ThreadQuery<any, any>,
@@ -52,7 +81,7 @@ export function useThreadMessages<
     initialNumItems: number;
     stream?: Query extends ThreadStreamQuery
       ? boolean
-      : ErrorMessage<"To enable streaming, your query must take in streamArgs">;
+      : ErrorMessage<"To enable streaming, your query must take in streamArgs: vStreamArgs and return a streams object returned from agent.syncStreams. See docs.">;
   }
 ): UsePaginatedQueryResult<
   ThreadMessagesResult<Query> & { streaming?: boolean }
