@@ -6,7 +6,7 @@ import {
   useThreadMessages,
   type UIMessage,
 } from "@convex-dev/agent/react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { OptimisticLocalStore } from "convex/browser";
 
 export default function ChatStreaming() {
@@ -107,16 +107,36 @@ function Story({ threadId, reset }: { threadId: string; reset: () => void }) {
   );
 }
 
-function Message({ m }: { m: UIMessage }) {
+function Message({ m, delayMs = 1 }: { m: UIMessage; delayMs?: number }) {
   const isUser = m.role === "user";
+  const text =
+    m.content ||
+    m.parts
+      .filter((p) => p.type === "text")
+      .map((p) => p.text)
+      .join("");
+  const [visibleText, setVisibleText] = useState(text);
+  const cursor = useRef(text.length);
+  const isStreaming = m.status === "streaming";
+  useEffect(() => {
+    if (!isStreaming) return;
+    const interval = setInterval(() => {
+      if (cursor.current >= text.length) {
+        return;
+      }
+      cursor.current += 1;
+      setVisibleText(text.slice(0, cursor.current));
+    }, delayMs);
+    return () => clearInterval(interval);
+  }, [text, isStreaming, delayMs]);
   return (
     <div className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
       <div
-        className={`rounded-lg px-4 py-2 max-w-xs whitespace-pre-wrap shadow-sm ${
+        className={`rounded-lg px-4 py-2 max-w-lg whitespace-pre-wrap shadow-sm ${
           isUser ? "bg-blue-100 text-blue-900" : "bg-gray-200 text-gray-800"
         }`}
       >
-        {m.content}
+        {isStreaming ? visibleText : text}
       </div>
     </div>
   );
