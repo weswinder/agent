@@ -38,7 +38,7 @@ export const getWeather = tool({
   }),
   execute: async (args) => {
     console.log("getting weather for location", args);
-    const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${args.latitude}&longitude=${args.longitude}&current=temperature_2m,apparent_temperature,relative_humidity_2m,wind_speed_10m,wind_gusts_10m,weather_code`;
+    const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${args.latitude}&longitude=${args.longitude}&current=temperature_2m,apparent_temperature,relative_humidity_2m,wind_speed_10m,wind_gusts_10m,weather_code&wind_speed_unit=mph&temperature_unit=fahrenheit`;
 
     const response = await fetch(weatherUrl);
     const data = (await response.json()) as {
@@ -53,10 +53,10 @@ export const getWeather = tool({
     };
     console.log("got weather for location", data);
     return {
-      temperature: `${(data.current.temperature_2m * 9) / 5 + 32}°F`,
-      feelsLike: `${(data.current.apparent_temperature * 9) / 5 + 32}°F`,
-      windSpeed: `${data.current.wind_speed_10m * 2.23694} mph`,
-      windGust: `${data.current.wind_gusts_10m * 2.23694} mph`,
+      temperature: `${data.current.temperature_2m}°F`,
+      feelsLike: `${data.current.apparent_temperature}°F`,
+      windSpeed: `${data.current.wind_speed_10m} mph`,
+      windGust: `${data.current.wind_gusts_10m} mph`,
       description: nameOfWeatherCode(data.current.weather_code),
     };
   },
