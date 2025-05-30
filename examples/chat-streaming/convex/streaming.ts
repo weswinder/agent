@@ -76,7 +76,6 @@ export const streamStorySynchronously = action({
       { prompt },
       { saveStreamDeltas: { chunking: "line", throttleMs: 1000 } },
     );
-    console.log("post streamText");
     for await (const chunk of result.textStream) {
       console.log(chunk);
     }
