@@ -62,8 +62,8 @@ export const streamStoryAsynchronously = mutation({
 
 // Expose an internal action that streams text
 export const streamStoryInternalAction = storyAgent.asTextAction({
-  stream: { chunking: "word", throttleMs: 100 },
-  // saveStreamDeltas: { chunking: "word", throttleMs: 100 },
+  stream: true,
+  // stream: { chunking: "line", throttleMs: 500 },
 });
 
 // Streaming, but the action doesn't return until the streaming is done.
