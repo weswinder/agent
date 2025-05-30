@@ -25,7 +25,6 @@ import type {
 import type { UIMessage } from "./toUIMessages";
 import { toUIMessages } from "./toUIMessages";
 import { OptimisticLocalStore } from "convex/browser";
-import { api } from "../component/_generated/api";
 
 export { toUIMessages, type UIMessage };
 
