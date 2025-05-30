@@ -5,6 +5,7 @@ import { deserializeMessage, toUIFilePart } from "../mapping";
 import { MessageStatus } from "../validators";
 
 export type UIMessage = AIUIMessage & {
+  key: string;
   order: number;
   stepOrder: number;
   status: "streaming" | MessageStatus;
@@ -28,6 +29,7 @@ export function toUIMessages(
       order: message.order,
       stepOrder: message.stepOrder,
       status: message.streaming ? ("streaming" as const) : message.status,
+      key: `${message.threadId}-${message.order}-${message.stepOrder}`,
     };
     if (coreMessage.role === "system") {
       uiMessages.push({
