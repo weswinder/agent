@@ -1,14 +1,14 @@
-import { useMutation, insertAtTop } from "convex/react";
+import { useMutation } from "convex/react";
 import { Toaster } from "./components/ui/toaster";
 import { api } from "../convex/_generated/api";
 import {
+  optimisticallySendMessage,
   toUIMessages,
   useSmoothText,
   useThreadMessages,
   type UIMessage,
 } from "@convex-dev/agent/react";
-import { useEffect, useRef, useState } from "react";
-import { OptimisticLocalStore } from "convex/browser";
+import { useEffect, useState } from "react";
 
 export default function ChatStreaming() {
   const createThread = useMutation(api.streaming.createThread);
@@ -50,12 +50,14 @@ function Story({ threadId, reset }: { threadId: string; reset: () => void }) {
   );
   const sendMessage = useMutation(
     api.streaming.streamStoryAsynchronously,
-  ).withOptimisticUpdate(optimisticallySendMessage);
+  ).withOptimisticUpdate(
+    optimisticallySendMessage(api.streaming.listThreadMessages),
+  );
   const [prompt, setPrompt] = useState("Tell me a story");
 
   function onSendClicked() {
     if (prompt.trim() === "") return;
-    void sendMessage({ threadId, prompt });
+    void sendMessage({ threadId, prompt }).catch(() => setPrompt(prompt));
     setPrompt("");
   }
 
@@ -108,8 +110,6 @@ function Story({ threadId, reset }: { threadId: string; reset: () => void }) {
   );
 }
 
-// --- Hook: useSmoothText ---
-
 function Message({ message }: { message: UIMessage }) {
   const isUser = message.role === "user";
   const [visibleText] = useSmoothText(message.content);
@@ -124,45 +124,4 @@ function Message({ message }: { message: UIMessage }) {
       </div>
     </div>
   );
-}
-
-// TODO: make this into a helper that takes in the api reference to a thread
-// query and a function that turns the args for a given mutation into
-// { threadId, prompt } and returns the args for the mutation.
-function optimisticallySendMessage(
-  store: OptimisticLocalStore,
-  args: { threadId: string; prompt: string },
-) {
-  const queries = store.getAllQueries(api.streaming.listThreadMessages);
-  let maxOrder = 0;
-  let maxStepOrder = 0;
-  for (const q of queries) {
-    if (q.args?.threadId !== args.threadId) continue;
-    if (q.args.streamArgs) continue;
-    for (const m of q.value?.page ?? []) {
-      maxOrder = Math.max(maxOrder, m.order);
-      maxStepOrder = Math.max(maxStepOrder, m.stepOrder);
-    }
-  }
-  const order = maxOrder + 1;
-  const stepOrder = 0;
-  insertAtTop({
-    paginatedQuery: api.streaming.listThreadMessages,
-    argsToMatch: { threadId: args.threadId, streamArgs: undefined },
-    item: {
-      _creationTime: Date.now(),
-      _id: crypto.randomUUID(),
-      order,
-      stepOrder,
-      status: "pending",
-      threadId: args.threadId,
-      tool: false,
-      message: {
-        role: "user",
-        content: args.prompt,
-      },
-      text: args.prompt,
-    },
-    localQueryStore: store,
-  });
 }

@@ -1,6 +1,7 @@
 import type { TextPart, ToolCallPart, ToolResultPart } from "ai";
 import type { BetterOmit, ErrorMessage, Expand } from "convex-helpers";
 import {
+  insertAtTop,
   type PaginatedQueryArgs,
   usePaginatedQuery,
   type UsePaginatedQueryResult,
@@ -23,6 +24,8 @@ import type {
 } from "../validators";
 import type { UIMessage } from "./toUIMessages";
 import { toUIMessages } from "./toUIMessages";
+import { OptimisticLocalStore } from "convex/browser";
+import { api } from "../component/_generated/api";
 
 export { toUIMessages, type UIMessage };
 
@@ -272,6 +275,48 @@ export function useSmoothText(
   }, [text, isStreaming, charsPerSec]);
 
   return [visibleText, { cursor: smoothState.current.cursor, isStreaming }];
+}
+
+export function optimisticallySendMessage(
+  query: ThreadQuery<unknown, MessageDoc>
+): (
+  store: OptimisticLocalStore,
+  args: { threadId: string; prompt: string }
+) => void {
+  return (store, args) => {
+    const queries = store.getAllQueries(query);
+    let maxOrder = 0;
+    let maxStepOrder = 0;
+    for (const q of queries) {
+      if (q.args?.threadId !== args.threadId) continue;
+      if (q.args.streamArgs) continue;
+      for (const m of q.value?.page ?? []) {
+        maxOrder = Math.max(maxOrder, m.order);
+        maxStepOrder = Math.max(maxStepOrder, m.stepOrder);
+      }
+    }
+    const order = maxOrder + 1;
+    const stepOrder = 0;
+    insertAtTop({
+      paginatedQuery: query,
+      argsToMatch: { threadId: args.threadId, streamArgs: undefined },
+      item: {
+        _creationTime: Date.now(),
+        _id: crypto.randomUUID(),
+        order,
+        stepOrder,
+        status: "pending",
+        threadId: args.threadId,
+        tool: false,
+        message: {
+          role: "user",
+          content: args.prompt,
+        },
+        text: args.prompt,
+      },
+      localQueryStore: store,
+    });
+  };
 }
 
 function mergeDeltas(
