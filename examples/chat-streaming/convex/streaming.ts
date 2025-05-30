@@ -5,41 +5,19 @@ import { openai } from "@ai-sdk/openai";
 import {
   action,
   ActionCtx,
+  internalAction,
   mutation,
   MutationCtx,
   query,
   QueryCtx,
 } from "./_generated/server";
 import { v } from "convex/values";
-import { z } from "zod";
-import { tool } from "ai";
 
 // Define an agent similarly to the AI SDK
 export const storyAgent = new Agent(components.agent, {
   name: "Story Agent",
   chat: openai.chat("gpt-4o-mini"),
   instructions: "You tell stories with twist endings. ~ 200 words.",
-  // tools: {
-  //   makeUpName: tool({
-  //     description: "Make up a name for a user",
-  //     parameters: z.object({
-  //       currentNames: z
-  //         .array(z.string())
-  //         .describe("The names of the users that have been mentioned so far"),
-  //     }),
-  //     execute: async ({ currentNames }) => {
-  //       const names = ["John", "Jane", "Jim", "Jill", "Jack"].filter(
-  //         (name) => !currentNames.includes(name),
-  //       );
-  //       if (names.length === 0) {
-  //         return { name: "another person" };
-  //       }
-  //       const name = names[Math.floor(Math.random() * names.length)];
-  //       return { name };
-  //     },
-  //   }),
-  // },
-  maxSteps: 10,
 });
 
 // Streaming, where generate the prompt message first, then asynchronously
@@ -52,45 +30,18 @@ export const streamStoryAsynchronously = mutation({
       threadId,
       prompt,
     });
-    await ctx.scheduler.runAfter(
-      0,
-      internal.streaming.streamStoryInternalAction,
-      { threadId, promptMessageId: messageId },
-    );
+    await ctx.scheduler.runAfter(0, internal.streaming.streamStory, {
+      threadId,
+      promptMessageId: messageId,
+    });
   },
 });
 
-// Expose an internal action that streams text
-export const streamStoryInternalAction = storyAgent.asTextAction({
-  stream: true,
-  // stream: { chunking: "line", throttleMs: 500 },
-});
-
-// Streaming, but the action doesn't return until the streaming is done.
-export const streamStorySynchronously = action({
-  args: { prompt: v.string(), threadId: v.string() },
-  handler: async (ctx, { prompt, threadId }) => {
-    await authorizeThreadAccess(ctx, threadId);
+export const streamStory = internalAction({
+  args: { promptMessageId: v.string(), threadId: v.string() },
+  handler: async (ctx, { promptMessageId, threadId }) => {
     const { thread } = await storyAgent.continueThread(ctx, { threadId });
-    const result = await thread.streamText(
-      { prompt },
-      { saveStreamDeltas: { chunking: "line", throttleMs: 1000 } },
-    );
-    for await (const chunk of result.textStream) {
-      console.log(chunk);
-    }
-    return result.text;
-  },
-});
-
-// Not streaming, just used for comparison
-export const generateStoryWithoutStreaming = action({
-  args: { prompt: v.string(), threadId: v.string() },
-  handler: async (ctx, { prompt, threadId }) => {
-    await authorizeThreadAccess(ctx, threadId);
-    const { thread } = await storyAgent.continueThread(ctx, { threadId });
-    const result = await thread.generateText({ prompt });
-    return result.text;
+    await thread.streamText({ promptMessageId }, { saveStreamDeltas: true });
   },
 });
 
@@ -102,16 +53,8 @@ export const listThreadMessages = query({
   args: {
     // These arguments are required:
     threadId: v.string(),
-
-    // This is used to paginate the messages.
-    paginationOpts: paginationOptsValidator,
-
-    // Because this takes in streamArgs: vStreamArgs and returns stream data,
-    // this can be used to stream messages.
-    streamArgs: vStreamArgs,
-
-    // But you could pass other arguments too:
-    // foo: v.number(),
+    paginationOpts: paginationOptsValidator, // Used to paginate the messages.
+    streamArgs: vStreamArgs, // Used to stream messages.
   },
   handler: async (ctx, args) => {
     const { threadId, paginationOpts, streamArgs } = args;
@@ -141,21 +84,6 @@ export const listThreadMessages = query({
   },
 });
 
-// This fetches full messages. Streamed messages are not included.
-// export const listRecentMessages = query({
-//   args: { threadId: v.string() },
-//   handler: async (ctx, { threadId }) => {
-//     await authorizeThreadAccess(ctx, threadId);
-//     const { page: messages } = await storyAgent.listMessages(ctx, {
-//       threadId,
-//       order: "desc",
-//       take: 10,
-//     });
-//     // Return them in ascending order (oldest first)
-//     return messages.reverse();
-//   },
-// });
-
 export const createThread = mutation({
   args: {},
   handler: async (ctx) => {
@@ -166,8 +94,10 @@ export const createThread = mutation({
 });
 
 /**
+ * ==============================
  * Functions for demo purposes.
  * In a real app, you'd use real authentication & authorization.
+ * ==============================
  */
 
 async function getUserId(_ctx: QueryCtx | MutationCtx | ActionCtx) {
@@ -185,3 +115,61 @@ async function authorizeThreadAccess(
     throw new Error("Unauthorized");
   }
 }
+
+/**
+ * ==============================
+ * Other ways of doing things:
+ * ==============================
+ */
+
+// Expose an internal action that streams text, to avoid the boilerplate of
+// streamStory above.
+export const streamStoryInternalAction = storyAgent.asTextAction({
+  stream: true,
+  // stream: { chunking: "line", throttleMs: 500 },
+});
+
+// This fetches full messages. Streamed messages are not included.
+export const listRecentMessages = query({
+  args: { threadId: v.string() },
+  handler: async (ctx, { threadId }) => {
+    await authorizeThreadAccess(ctx, threadId);
+    const { page: messages } = await storyAgent.listMessages(ctx, {
+      threadId,
+      paginationOpts: {
+        cursor: null,
+        numItems: 10,
+      },
+    });
+    // Return them in ascending order (oldest first)
+    return messages.reverse();
+  },
+});
+
+// Streaming, but the action doesn't return until the streaming is done.
+export const streamStorySynchronously = action({
+  args: { prompt: v.string(), threadId: v.string() },
+  handler: async (ctx, { prompt, threadId }) => {
+    await authorizeThreadAccess(ctx, threadId);
+    const { thread } = await storyAgent.continueThread(ctx, { threadId });
+    const result = await thread.streamText(
+      { prompt },
+      { saveStreamDeltas: { chunking: "line", throttleMs: 1000 } },
+    );
+    for await (const chunk of result.textStream) {
+      console.log(chunk);
+    }
+    return result.text;
+  },
+});
+
+// Not streaming, just used for comparison
+export const generateStoryWithoutStreaming = action({
+  args: { prompt: v.string(), threadId: v.string() },
+  handler: async (ctx, { prompt, threadId }) => {
+    await authorizeThreadAccess(ctx, threadId);
+    const { thread } = await storyAgent.continueThread(ctx, { threadId });
+    const result = await thread.generateText({ prompt });
+    return result.text;
+  },
+});
