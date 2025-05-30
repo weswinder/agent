@@ -3,6 +3,7 @@ import { Toaster } from "./components/ui/toaster";
 import { api } from "../convex/_generated/api";
 import {
   toUIMessages,
+  useSmoothText,
   useThreadMessages,
   type UIMessage,
 } from "@convex-dev/agent/react";
@@ -64,7 +65,7 @@ function Story({ threadId, reset }: { threadId: string; reset: () => void }) {
         {messages.results?.length > 0 && (
           <div className="flex flex-col gap-4 overflow-y-auto mb-4">
             {toUIMessages(messages.results ?? []).map((m) => (
-              <Message key={m.key} m={m} />
+              <Message key={m.key} message={m} />
             ))}
           </div>
         )}
@@ -107,48 +108,11 @@ function Story({ threadId, reset }: { threadId: string; reset: () => void }) {
   );
 }
 
-function Message({
-  m,
-  charsPerSec = 512,
-}: {
-  m: UIMessage;
-  charsPerSec?: number;
-}) {
-  const isUser = m.role === "user";
-  const text =
-    m.content ||
-    m.parts
-      .filter((p) => p.type === "text")
-      .map((p) => p.text)
-      .join("");
-  const [visibleText, setVisibleText] = useState(text);
-  const smoothState = useRef({ lastUpdated: Date.now(), cursor: text.length });
-  const isStreaming = m.status === "streaming";
-  useEffect(() => {
-    if (!isStreaming && smoothState.current.cursor >= text.length) {
-      setVisibleText(text);
-      return;
-    }
-    function update() {
-      if (smoothState.current.cursor >= text.length) {
-        return;
-      }
-      const now = Date.now();
-      const timeSinceLastUpdate = now - smoothState.current.lastUpdated;
-      const chars = Math.floor((timeSinceLastUpdate * charsPerSec) / 1000);
-      smoothState.current.cursor = Math.min(
-        smoothState.current.cursor + chars,
-        text.length,
-      );
-      smoothState.current.lastUpdated = now;
-      setVisibleText(text.slice(0, smoothState.current.cursor));
-    }
-    update();
-    const interval = setInterval(() => {
-      update();
-    }, 1000 / 60);
-    return () => clearInterval(interval);
-  }, [text, isStreaming, charsPerSec]);
+// --- Hook: useSmoothText ---
+
+function Message({ message }: { message: UIMessage }) {
+  const isUser = message.role === "user";
+  const [visibleText] = useSmoothText(message.content);
   return (
     <div className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
       <div
