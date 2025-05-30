@@ -3,12 +3,15 @@ import { Toaster } from "./components/ui/toaster";
 import { api } from "../convex/_generated/api";
 import { toUIMessages, useThreadMessages } from "@convex-dev/agent/react";
 import { UIMessage } from "ai";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { OptimisticLocalStore } from "convex/browser";
 
 export default function ChatStreaming() {
   const createThread = useMutation(api.streaming.createThread);
   const [threadId, setThreadId] = useState<string | undefined>(undefined);
+  useEffect(() => {
+    if (!threadId) void createThread().then(setThreadId);
+  }, [createThread, threadId]);
   return (
     <>
       <header className="sticky top-0 z-10 bg-white/80 backdrop-blur-sm p-4 flex justify-between items-center border-b">
@@ -26,12 +29,7 @@ export default function ChatStreaming() {
               />
             </>
           ) : (
-            <button
-              className="w-full px-4 py-3 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition font-semibold text-lg"
-              onClick={() => void createThread().then(setThreadId)}
-            >
-              Create a story thread
-            </button>
+            <div className="text-center text-gray-500">Loading...</div>
           )}
         </main>
         <Toaster />
