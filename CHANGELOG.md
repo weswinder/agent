@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.1.2-alpha.0
+## 0.1.2 alpha
 
 - Added text delta streaming with `useThreadMessages` and `useStreamingThreadMessages` React hooks.
   See examples/chat-streaming for example usage.
