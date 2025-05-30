@@ -180,6 +180,13 @@ export type StreamingTextArgs<
   "toolChoice" | "tools" | "model"
 > & {
   /**
+   * If provided, this message will be used as the "prompt" for the LLM call,
+   * instead of the prompt or messages.
+   * This is useful if you want to first save a user message, then use it as
+   * the prompt for the LLM call in another call.
+   */
+  promptMessageId?: string;
+  /**
    * The model to use for the tool calls. This will override the model specified
    * in the Agent constructor.
    */
