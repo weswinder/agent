@@ -83,7 +83,7 @@ type ThreadStreamQuery<
   {
     threadId: string;
     paginationOpts: PaginationOptions;
-    streamArgs: StreamArgs; // required for stream query
+    streamArgs?: StreamArgs; // required for stream query
   } & Args,
   PaginationResult<M> & { streams: StreamSyncReturns }
 >;
@@ -145,10 +145,7 @@ export function useThreadMessages<
       : ({
           ...args,
           paginationOpts: { cursor: null, numItems: 0 },
-          streamArgs: {
-            cursors: [],
-            listOnly: true,
-          },
+          streamArgs: { kind: "list" } as StreamArgs,
         } as FunctionArgs<Query>)
   );
   // TODO: for each stream, set up delta syncing state machine.
@@ -201,10 +198,7 @@ export function useStreamingThreadMessages<
       : ({
           ...args,
           paginationOpts: { cursor: null, numItems: 0 },
-          streamArgs: {
-            cursors: [],
-            listOnly: true,
-          },
+          streamArgs: { kind: "list" } as StreamArgs,
         } as FunctionArgs<Query>);
   const streamList = useQuery(query, listArgs);
   // const cursorQuery = useQuery(query, {

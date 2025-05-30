@@ -100,6 +100,8 @@ export const getFashionAdvice = fashionAgent.asObjectAction({
   }),
 });
 type Outfit = { hat: string; tops: string; bottoms: string; shoes: string };
+const SECOND = 1000;
+const agent = internal.example;
 
 /**
  * Use agent actions in a workflow
@@ -111,18 +113,19 @@ const workflow = new WorkflowManager(components.workflow);
 export const weatherAgentWorkflow = workflow.define({
   args: { location: v.string() },
   handler: async (step, { location }): Promise<Outfit> => {
-    const { threadId } = await step.runMutation(internal.example.createThread, {
+    const { threadId } = await step.runMutation(agent.createThread, {
       userId: "123",
     });
-    const weather = await step.runAction(internal.example.getForecast, {
-      threadId,
-      prompt: `What is the weather in ${location}?`,
-    });
-    const { object: fashionSuggestion } = await step.runAction(
-      internal.example.getFashionAdvice,
-      { threadId, prompt: `What should I wear based on the weather?` },
+    await step.runAction(
+      agent.getForecast,
+      { prompt: `What is the weather in ${location}?`, threadId },
+      { retry: true },
     );
-    console.log({ weather, fashionSuggestion });
+    const { object: fashionSuggestion } = await step.runAction(
+      agent.getFashionAdvice,
+      { prompt: `What should I wear based on the weather?`, threadId },
+      { runAfter: 2 * SECOND },
+    );
     return fashionSuggestion;
   },
 });

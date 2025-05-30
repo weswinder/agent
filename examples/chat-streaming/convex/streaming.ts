@@ -52,10 +52,11 @@ export const streamStoryAsynchronously = mutation({
       threadId,
       prompt,
     });
-    await ctx.scheduler.runAfter(0, internal.chat.streamStoryInternalAction, {
-      threadId,
-      promptMessageId: messageId,
-    });
+    await ctx.scheduler.runAfter(
+      0,
+      internal.streaming.streamStoryInternalAction,
+      { threadId, promptMessageId: messageId },
+    );
   },
 });
 

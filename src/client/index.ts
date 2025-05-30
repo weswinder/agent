@@ -375,9 +375,10 @@ export class Agent<AgentTools extends ToolSet> {
     ctx: RunQueryCtx,
     args: {
       threadId: string;
-      streamArgs: StreamArgs;
+      streamArgs: StreamArgs | undefined;
     }
-  ): Promise<StreamSyncReturns> {
+  ): Promise<StreamSyncReturns | undefined> {
+    if (!args.streamArgs) return undefined;
     if (args.streamArgs.kind === "list") {
       return {
         kind: "list",

@@ -463,14 +463,16 @@ export const vStreamCursor = v.object({
 });
 export type StreamCursor = Infer<typeof vStreamCursor>;
 
-export const vStreamArgs = v.union(
-  v.object({
-    kind: v.literal("list"),
-  }),
-  v.object({
-    kind: v.literal("deltas"),
-    cursors: v.array(vStreamCursor),
-  })
+export const vStreamArgs = v.optional(
+  v.union(
+    v.object({
+      kind: v.literal("list"),
+    }),
+    v.object({
+      kind: v.literal("deltas"),
+      cursors: v.array(vStreamCursor),
+    })
+  )
 );
 export type StreamArgs = Infer<typeof vStreamArgs>;
 
@@ -494,15 +496,17 @@ export const vStreamDelta = v.object({
 });
 export type StreamDelta = Infer<typeof vStreamDelta>;
 
-export const vStreamSyncReturns = v.union(
-  v.object({
-    // TODO: share this with the schema def?
-    kind: v.literal("list"),
-    messages: v.array(vStreamMessage),
-  }),
-  v.object({
-    kind: v.literal("deltas"),
-    deltas: v.array(vStreamDelta),
-  })
+export const vStreamSyncReturns = v.optional(
+  v.union(
+    v.object({
+      // TODO: share this with the schema def?
+      kind: v.literal("list"),
+      messages: v.array(vStreamMessage),
+    }),
+    v.object({
+      kind: v.literal("deltas"),
+      deltas: v.array(vStreamDelta),
+    })
+  )
 );
 export type StreamSyncReturns = Infer<typeof vStreamSyncReturns>;
