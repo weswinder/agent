@@ -1,30 +1,28 @@
+import type { TextPart, ToolCallPart, ToolResultPart } from "ai";
+import type { BetterOmit, ErrorMessage, Expand } from "convex-helpers";
 import {
+  type PaginatedQueryArgs,
+  usePaginatedQuery,
+  type UsePaginatedQueryResult,
+  useQuery,
+} from "convex/react";
+import type {
   FunctionArgs,
   FunctionReference,
   PaginationOptions,
   PaginationResult,
-  Query,
 } from "convex/server";
-import { useState, useMemo } from "react";
-import {
-  StreamArgs,
-  StreamCursor,
-  StreamDelta,
-  StreamMessage,
-} from "../validators";
-import { BetterOmit, ErrorMessage, Expand } from "convex-helpers";
-import { TextStreamPart } from "ai";
-import { ToolSet } from "ai";
-import {
-  useQuery,
-  usePaginatedQuery,
-  UsePaginatedQueryResult,
-  PaginatedQueryArgs,
-} from "convex/react";
-import { toUIMessages } from "./toUIMessages";
-import type { UIMessageOrdered } from "./toUIMessages";
+import { useMemo, useState } from "react";
 import type { MessageDoc } from "../client";
 import type { SyncStreamsReturnValue } from "../client/types";
+import type {
+  StreamArgs,
+  StreamDelta,
+  StreamMessage,
+  TextStreamPart,
+} from "../validators";
+import type { UIMessageOrdered } from "./toUIMessages";
+import { toUIMessages } from "./toUIMessages";
 
 export { toUIMessages, type UIMessageOrdered };
 
@@ -141,11 +139,12 @@ export function useStreamingThreadMessages<
   query: Query,
   args: ThreadMessagesArgs<Query> | "skip"
 ): Array<ThreadMessagesResult<Query>> | undefined {
-  // Invariant: streamChunks[streamId] is sorted by start, and doesn't include
-  // any chunk where it's start !== the last chunk's end.
-  const [streamChunks, setStreamChunks] = useState<
-    Record<string, StreamDelta[]>
-  >({});
+  // Invariant: streamMessages[streamId] is comprised of all deltas up to the
+  // cursor. There can be multiple messages in the same stream, e.g. for tool
+  // calls.
+  const [streams, setStreams] = useState<
+    Array<{ stream: StreamMessage; cursor: number; messages: MessageDoc[] }>
+  >([]);
   // Get all the active streams
   const streamList = useQuery(
     query,
@@ -166,12 +165,12 @@ export function useStreamingThreadMessages<
       throw new Error("Expected list streams");
     }
     return streamList.streams.messages.map(({ streamId }) => {
-      const chunks = streamChunks[streamId];
+      const stream = streams.find((s) => s.stream.streamId === streamId);
       // Because of the invariant, we can just take the last chunk's end.
-      const cursor = chunks?.at(-1)?.end ?? 0;
+      const cursor = stream?.cursor ?? 0;
       return { streamId, cursor };
     });
-  }, [streamList, streamChunks]);
+  }, [streamList, streams]);
   // Get the deltas for all the active streams, if any.
   const cursorQuery = useQuery(
     query,
@@ -182,83 +181,338 @@ export function useStreamingThreadMessages<
           paginationOpts: { cursor: null, numItems: 0 },
           streamArgs: { kind: "deltas", cursors } as StreamArgs,
         } as FunctionArgs<Query>)
-  ) as { streams: SyncStreamsReturnValue } | undefined;
+  ) as
+    | { streams: Extract<SyncStreamsReturnValue, { kind: "deltas" }> }
+    | undefined;
   // Merge any deltas into the streamChunks, keeping it unmodified if unchanged.
-  const nextChunks = useMemo(() => {
-    if (!cursorQuery || !streamList) return streamChunks;
-    if (cursorQuery.streams?.kind !== "deltas") {
+  const [messages, newStreams, changed] = useMemo(() => {
+    if (args === "skip") return [undefined, streams, false];
+    if (!streamList) return [undefined, streams, false];
+    if (cursorQuery && cursorQuery.streams?.kind !== "deltas") {
       throw new Error("Expected deltas streams");
     }
-    return mergeChunks(
+    return mergeDeltas(
+      args.threadId,
       streamList.streams.messages,
-      streamChunks,
-      cursorQuery.streams.deltas
+      streams,
+      cursorQuery?.streams?.deltas ?? []
     );
-  }, [cursorQuery, streamChunks, streamList]);
+  }, [cursorQuery, streams, streamList]);
   // Now assemble the chunks into messages
   if (args === "skip") {
     return undefined;
   }
-  // Merge the deltas into the streamChunks
-  setStreamChunks(nextChunks);
-  return nextChunks;
+  if (changed) {
+    setStreams(newStreams);
+  }
+  return messages as ThreadMessagesResult<Query>[] | undefined;
 }
 
-function mergeChunks(
+function mergeDeltas(
+  threadId: string,
   streamMessages: StreamMessage[],
-  streamChunks: Record<string, StreamDelta[]>,
-  deltas: StreamDelta[]
-): Record<string, StreamDelta[]> {
-  const newChunks: Record<string, StreamDelta[]> = {};
+  existingStreams: Array<{
+    stream: StreamMessage;
+    cursor: number;
+    messages: MessageDoc[];
+  }>,
+  allDeltas: StreamDelta[]
+): [
+  MessageDoc[],
+  Array<{ stream: StreamMessage; cursor: number; messages: MessageDoc[] }>,
+  boolean,
+] {
+  const newStreams: Array<{
+    stream: StreamMessage;
+    cursor: number;
+    messages: MessageDoc[];
+  }> = [];
   // Seed the existing chunks
-  for (const { streamId } of streamMessages) {
-    const chunks = streamChunks[streamId];
-    if (chunks === undefined) {
-      newChunks[streamId] = [];
-    } else {
-      newChunks[streamId] = chunks;
-    }
-  }
   let changed = false;
-  for (const streamId of Object.keys(streamChunks)) {
-    if (!newChunks[streamId]) {
+  for (const streamMessage of streamMessages) {
+    const deltas = allDeltas
+      .filter((d) => d.streamId === streamMessage.streamId)
+      .sort((a, b) => a.start - b.start);
+    const existing = existingStreams.find(
+      (s) => s.stream.streamId === streamMessage.streamId
+    );
+    const [newStream, messageChanged] = applyDeltasToStreamMessages(
+      threadId,
+      streamMessage,
+      existing,
+      deltas
+    );
+    newStreams.push(newStream);
+    if (messageChanged) changed = true;
+  }
+  for (const { stream } of existingStreams) {
+    if (!newStreams.find((s) => s.stream.streamId === stream.streamId)) {
       // There's a stream that's no longer active.
       changed = true;
     }
   }
-  const sorted = deltas.sort((a, b) => a.start - b.start);
-  for (const delta of sorted) {
-    const existing = newChunks[delta.streamId];
-    if (!existing) {
-      console.warn(
-        `Got delta for stream ${delta.streamId} that is no longer active`
-      );
+  const messages = newStreams
+    .sort(
+      (a, b) =>
+        a.stream.order - b.stream.order ||
+        a.stream.stepOrder - b.stream.stepOrder
+    )
+    .map((s) => s.messages)
+    .flat();
+  return [messages, newStreams, changed];
+}
+
+function applyDeltasToStreamMessages(
+  threadId: string,
+  streamMessage: StreamMessage,
+  existing:
+    | { stream: StreamMessage; cursor: number; messages: MessageDoc[] }
+    | undefined,
+  deltas: StreamDelta[]
+): [
+  { stream: StreamMessage; cursor: number; messages: MessageDoc[] },
+  boolean,
+] {
+  let changed = false;
+  const newStream = {
+    stream: streamMessage,
+    cursor: existing?.cursor ?? 0,
+    messages: existing?.messages ?? [],
+  };
+  let parts: TextStreamPart[] = [];
+  for (const delta of deltas) {
+    if (delta.parts.length === 0) {
+      console.warn(`Got delta for stream ${delta.streamId} with no parts`);
       continue;
     }
-    const lastChunk = existing.at(-1);
-    if (lastChunk && lastChunk.end !== delta.start) {
-      if (lastChunk.end >= delta.end) {
+    if (newStream.cursor !== delta.start) {
+      if (newStream.cursor >= delta.end) {
         console.debug(
           `Got duplicate delta for stream ${delta.streamId} at ${delta.start}`
         );
         continue;
-      } else if (lastChunk.end < delta.start) {
+      } else if (newStream.cursor < delta.start) {
         console.warn(
-          `Got delta for stream ${delta.streamId} that has a gap ${lastChunk.end} -> ${delta.start}`
+          `Got delta for stream ${delta.streamId} that has a gap ${newStream.cursor} -> ${delta.start}`
         );
         continue;
       } else {
-        throw new Error(`Got unexpected delta for stream ${delta.streamId}:
-            delta: ${delta.start} -> ${delta.end}
-            last chunk: ${lastChunk.start} -> ${lastChunk.end}
-            `);
+        throw new Error(
+          `Got unexpected delta for stream ${delta.streamId}: delta: ${delta.start} -> ${delta.end} existing cursor: ${newStream.cursor}`
+        );
       }
     }
     changed = true;
-    existing.push(delta);
+    newStream.cursor = delta.end;
+    parts.push(...delta.parts);
   }
-  if (!changed) return streamChunks;
-  return newChunks;
+  if (!changed) {
+    return [existing ?? newStream, false];
+  }
+
+  if (!newStream.messages.at(-1)) {
+    newStream.messages.push(
+      createStreamingMessage(
+        threadId,
+        streamMessage,
+        parts[0]!,
+        newStream.messages.length
+      )
+    );
+    parts = parts.slice(1);
+  }
+  let currentMessage = newStream.messages.at(-1)!;
+  let lastContent = getLastContent(currentMessage);
+  for (const part of parts) {
+    let contentToAdd:
+      | TextPart
+      | ToolCallPart
+      | { type: "reasoning"; text: string }
+      | ToolResultPart
+      | undefined;
+    const isToolRole = part.type === "source" || part.type === "tool-result";
+    if (isToolRole !== (currentMessage.message!.role === "tool")) {
+      currentMessage = createStreamingMessage(
+        threadId,
+        streamMessage,
+        part,
+        newStream.messages.length
+      );
+      lastContent = getLastContent(currentMessage);
+      newStream.messages.push(currentMessage);
+    }
+    switch (part.type) {
+      case "text-delta":
+        currentMessage.text += part.textDelta;
+        if (lastContent?.type === "text") {
+          lastContent.text += part.textDelta;
+        } else {
+          contentToAdd = {
+            type: "text",
+            text: part.textDelta,
+          };
+        }
+        break;
+      case "tool-call-streaming-start":
+        currentMessage.tool = true;
+        contentToAdd = {
+          type: "tool-call",
+          toolCallId: part.toolCallId,
+          toolName: part.toolName,
+          args: "",
+        };
+        break;
+      case "tool-call-delta":
+        {
+          currentMessage.tool = true;
+          if (lastContent?.type !== "tool-call") {
+            throw new Error("Expected last content to be a tool call");
+          }
+          if (typeof lastContent.args !== "string") {
+            throw new Error("Expected args to be a string");
+          }
+          lastContent.args += part.argsTextDelta;
+        }
+        break;
+      case "tool-call":
+        currentMessage.tool = true;
+        contentToAdd = part;
+        break;
+      case "reasoning":
+        if (lastContent?.type === "reasoning") {
+          lastContent.text += part.textDelta;
+        } else {
+          contentToAdd = {
+            type: "reasoning",
+            text: part.textDelta,
+          };
+        }
+        break;
+      case "source":
+        if (!currentMessage.sources) {
+          currentMessage.sources = [];
+        }
+        currentMessage.sources.push(part.source);
+        break;
+      case "tool-result":
+        contentToAdd = part;
+        break;
+      default:
+        console.warn(`Received unexpected part: ${JSON.stringify(part)}`);
+        break;
+    }
+    if (contentToAdd) {
+      if (!currentMessage.message!.content) {
+        currentMessage.message!.content = [];
+      }
+      if (!Array.isArray(currentMessage.message?.content)) {
+        throw new Error("Expected message content to be an array");
+      }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      currentMessage.message.content.push(contentToAdd as any);
+      lastContent = contentToAdd;
+    }
+  }
+  return [newStream, true];
+}
+
+function getLastContent(message: MessageDoc) {
+  if (Array.isArray(message.message?.content)) {
+    return message.message.content.at(-1);
+  }
+  return undefined;
+}
+
+function createStreamingMessage(
+  threadId: string,
+  message: StreamMessage,
+  part: TextStreamPart,
+  index: number
+): MessageDoc {
+  const { streamId, ...rest } = message;
+  const metadata: MessageDoc = {
+    _id: `${streamId}-${index}`,
+    _creationTime: Date.now(),
+    status: "pending",
+    threadId,
+    tool: false,
+    ...rest,
+  };
+  switch (part.type) {
+    case "text-delta":
+      return {
+        ...metadata,
+        message: {
+          role: "assistant",
+          content: [{ type: "text", text: part.textDelta }],
+        },
+        text: part.textDelta,
+      };
+    case "tool-call-streaming-start":
+      return {
+        ...metadata,
+        tool: true,
+        message: {
+          role: "assistant",
+          content: [
+            {
+              type: "tool-call",
+              toolName: part.toolName,
+              toolCallId: part.toolCallId,
+              args: "", // when it's a string, it's a partial call
+            },
+          ],
+        },
+      };
+    case "reasoning":
+      return {
+        ...metadata,
+        message: {
+          role: "assistant",
+          content: [{ type: "reasoning", text: part.textDelta }],
+        },
+        reasoning: part.textDelta,
+      };
+    case "source":
+      console.warn("Received source part first??");
+      return {
+        ...metadata,
+        tool: true,
+        message: { role: "tool", content: [] },
+        sources: [part.source],
+      };
+    case "tool-call":
+      return {
+        ...metadata,
+        tool: true,
+        message: { role: "assistant", content: [part] },
+      };
+    case "tool-call-delta":
+      console.warn("Received tool call delta part first??");
+      return {
+        ...metadata,
+        tool: true,
+        message: {
+          role: "assistant",
+          content: [
+            {
+              type: "tool-call",
+              toolCallId: part.toolCallId,
+              toolName: part.toolName,
+              args: part.argsTextDelta,
+            },
+          ],
+        },
+      };
+    case "tool-result":
+      return {
+        ...metadata,
+        tool: true,
+        message: { role: "tool", content: [part] },
+      };
+    default:
+      throw new Error(`Unexpected part type: ${JSON.stringify(part)}`);
+  }
 }
 
 type ThreadQuery<
@@ -303,91 +557,6 @@ type ThreadMessagesResult<Query extends ThreadQuery<unknown, MessageDoc>> =
   Query extends ThreadQuery<unknown, infer M> ? M : never;
 
 // TODO: pass in the messages we need to watch? that way it can be consistent..
-
-// function createUIMessageFromPart(
-//   part: StreamDelta,
-//   metadata: {
-//     id: string;
-//     createdAt: Date;
-//   }
-// ): UIMessageOrdered{
-//   switch (part.type) {
-//     case "text-delta":
-//       return {
-//         ...metadata,
-//         role: "assistant",
-//         content: part.textDelta,
-//         parts: [{ type: "text", text: part.textDelta }],
-//       };
-//     case "tool-call-streaming-start":
-//       return {
-//         ...metadata,
-//         role: "assistant",
-//         content: "",
-//         parts: [
-//           {
-//             type: "tool-invocation",
-//             toolInvocation: {
-//               toolCallId: part.toolCallId,
-//               toolName: part.toolName,
-//               args: {},
-//               state: "partial-call",
-//             },
-//           },
-//         ],
-//       };
-//     case "reasoning":
-//       return {
-//         ...metadata,
-//         role: "assistant",
-//         content: "",
-//         parts: [{ type: "reasoning", reasoning: part.textDelta, details: [] }],
-//       };
-//     case "source":
-//       console.warn("Received source part first??");
-//       return {
-//         ...metadata,
-//         role: "assistant",
-//         content: "",
-//         parts: [{ type: "source", source: part.source }],
-//       };
-//     case "tool-call":
-//       console.warn("Received tool call part first??");
-//       return {
-//         ...metadata,
-//         role: "assistant",
-//         content: "",
-//         parts: [
-//           {
-//             type: "tool-invocation",
-//             toolInvocation: {
-//               state: "call",
-//               args: part.args,
-//               toolCallId: part.toolCallId,
-//               toolName: part.toolName,
-//             },
-//           },
-//         ],
-//       };
-//     case "tool-call-delta":
-//       console.warn("Received tool call delta part first??");
-//       return {
-//         ...metadata,
-//         role: "assistant",
-//         content: "",
-//         parts: [{ type: "tool-invocation", toolInvocation: part.toolCall }],
-//       };
-//     default:
-//       console.error(`Unexpected first part type: ${part.type}`);
-//       return {
-//         ...metadata,
-//         role: "assistant",
-//         content: "",
-//         parts: [],
-//         annotations: [part as JSONValue],
-//       };
-//   }
-// }
 
 // export function streamMessagesToUIMessages(
 //   messages: StreamsChunk[],
