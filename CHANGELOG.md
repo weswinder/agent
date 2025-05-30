@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.1.2-alpha.0
+
+- Added text delta streaming with `useThreadMessages` and `useStreamingThreadMessages` React hooks.
+  See examples/chat-streaming for example usage.
+- Allow listing threads without an associated userId in the playground.
+- make stepOrder always increasing, for more predictable sorting of failed + non-failed messages.
+- A reference to the agent is now passed to tool calls using the `createTool` utility.
+- In more places, we aren't storing the AI SDK `id` unless explicitly passed in, and favoring the built-in Convex ID instead.
+- The examples/ folder will become a better resource with more specific examples.
+  For now, there's an index page when running the examples, that points to the text streaming and weather demos.
+- There's now `listMessages` `saveMessage`, and `asSaveMessagesMutation` on the Agent.
+  `listMessages` is compliant with the normal pagination API.
+
+### Breaking
+
+- `components.agent.messages.listMessagesByThreadId` is now `asc`ending by default!
+  It'll have a type error to help you out.
+  While you're at it, you can use the new `.listMessages` on the agent itself!
+- `addStep` now returns the messages it created instead of a step.
+  This is not likely to be called by clients directly. It's mostly used internally.
+- `toUIMessages` has been moved to the `@convex-dev/agent/react` import entrypoint.
+
 ## 0.1.1
 
 - The file api has been improved to allow for upserting files more correctly.
