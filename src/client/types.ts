@@ -31,6 +31,8 @@ import type {
   CallSettings,
   ProviderMetadata,
   ProviderOptions,
+  StreamDelta,
+  StreamMessage,
   Usage,
 } from "../validators.js";
 import type { Mounts } from "../component/_generated/api.js";
@@ -426,6 +428,11 @@ export type Options = {
    */
   storageOptions?: StorageOptions;
 };
+
+export type SyncStreamsReturnValue =
+  | { kind: "list"; messages: StreamMessage[] }
+  | { kind: "deltas"; deltas: StreamDelta[] }
+  | undefined;
 
 /* Type utils follow */
 export type RunQueryCtx = {

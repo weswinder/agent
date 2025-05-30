@@ -487,6 +487,7 @@ export const vStreamMessage = v.object({
   provider: v.optional(v.string()),
   providerOptions: v.optional(vProviderOptions), // Sent to model
 });
+export type StreamMessage = Infer<typeof vStreamMessage>;
 
 export const vStreamDelta = v.object({
   streamId: v.string(),
@@ -495,18 +496,3 @@ export const vStreamDelta = v.object({
   parts: v.array(vTextStreamPart),
 });
 export type StreamDelta = Infer<typeof vStreamDelta>;
-
-export const vStreamSyncReturns = v.optional(
-  v.union(
-    v.object({
-      // TODO: share this with the schema def?
-      kind: v.literal("list"),
-      messages: v.array(vStreamMessage),
-    }),
-    v.object({
-      kind: v.literal("deltas"),
-      deltas: v.array(vStreamDelta),
-    })
-  )
-);
-export type StreamSyncReturns = Infer<typeof vStreamSyncReturns>;

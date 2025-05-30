@@ -3,9 +3,15 @@ import {
   FunctionReference,
   PaginationOptions,
   PaginationResult,
+  Query,
 } from "convex/server";
 import { useState, useMemo } from "react";
-import { StreamArgs, StreamCursor, StreamSyncReturns } from "../validators";
+import {
+  StreamArgs,
+  StreamCursor,
+  StreamDelta,
+  StreamMessage,
+} from "../validators";
 import { BetterOmit, ErrorMessage, Expand } from "convex-helpers";
 import { TextStreamPart } from "ai";
 import { ToolSet } from "ai";
@@ -17,7 +23,8 @@ import {
 } from "convex/react";
 import { toUIMessages } from "./toUIMessages";
 import type { UIMessageOrdered } from "./toUIMessages";
-import { MessageDoc } from "../client";
+import type { MessageDoc } from "../client";
+import type { SyncStreamsReturnValue } from "../client/types";
 
 export { toUIMessages, type UIMessageOrdered };
 
@@ -134,59 +141,125 @@ export function useStreamingThreadMessages<
   query: Query,
   args: ThreadMessagesArgs<Query> | "skip"
 ): Array<ThreadMessagesResult<Query>> | undefined {
-  const [messages, setMessages] = useState<StreamsChunk[] | undefined>(
-    undefined
-  );
-  const listArgs =
+  // Invariant: streamChunks[streamId] is sorted by start, and doesn't include
+  // any chunk where it's start !== the last chunk's end.
+  const [streamChunks, setStreamChunks] = useState<
+    Record<string, StreamDelta[]>
+  >({});
+  // Get all the active streams
+  const streamList = useQuery(
+    query,
     args === "skip"
       ? args
       : ({
           ...args,
           paginationOpts: { cursor: null, numItems: 0 },
           streamArgs: { kind: "list" } as StreamArgs,
-        } as FunctionArgs<Query>);
-  const streamList = useQuery(query, listArgs);
-  // const cursorQuery = useQuery(query, {
-  //   kind: "deltas",
-  //   cursors: messages?.map((m) => m.cursor) ?? [],
-  // } satisfies StreamArgs);
-  // TODO: state machine doing delta syncing
-  return undefined;
+        } as FunctionArgs<Query>)
+  ) as
+    | { streams: Extract<SyncStreamsReturnValue, { kind: "list" }> }
+    | undefined;
+  // Get the cursors for all the active streams
+  const cursors = useMemo(() => {
+    if (!streamList?.streams) return [];
+    if (streamList.streams.kind !== "list") {
+      throw new Error("Expected list streams");
+    }
+    return streamList.streams.messages.map(({ streamId }) => {
+      const chunks = streamChunks[streamId];
+      // Because of the invariant, we can just take the last chunk's end.
+      const cursor = chunks?.at(-1)?.end ?? 0;
+      return { streamId, cursor };
+    });
+  }, [streamList, streamChunks]);
+  // Get the deltas for all the active streams, if any.
+  const cursorQuery = useQuery(
+    query,
+    args === "skip" || !streamList
+      ? ("skip" as const)
+      : ({
+          ...args,
+          paginationOpts: { cursor: null, numItems: 0 },
+          streamArgs: { kind: "deltas", cursors } as StreamArgs,
+        } as FunctionArgs<Query>)
+  ) as { streams: SyncStreamsReturnValue } | undefined;
+  // Merge any deltas into the streamChunks, keeping it unmodified if unchanged.
+  const nextChunks = useMemo(() => {
+    if (!cursorQuery || !streamList) return streamChunks;
+    if (cursorQuery.streams?.kind !== "deltas") {
+      throw new Error("Expected deltas streams");
+    }
+    return mergeChunks(
+      streamList.streams.messages,
+      streamChunks,
+      cursorQuery.streams.deltas
+    );
+  }, [cursorQuery, streamChunks, streamList]);
+  // Now assemble the chunks into messages
+  if (args === "skip") {
+    return undefined;
+  }
+  // Merge the deltas into the streamChunks
+  setStreamChunks(nextChunks);
+  return nextChunks;
 }
 
-type MessagesPage = {
-  // refers to the message "order"
-  start: number; // inclusive
-  end: number; // exclusive
-  messages: StreamDelta[];
-};
-
-type StreamDelta = Extract<
-  TextStreamPart<ToolSet>,
-  {
-    type:
-      | "text-delta"
-      | "reasoning"
-      | "source"
-      | "tool-call"
-      | "tool-call-streaming-start"
-      | "tool-call-delta"
-      | "tool-result";
+function mergeChunks(
+  streamMessages: StreamMessage[],
+  streamChunks: Record<string, StreamDelta[]>,
+  deltas: StreamDelta[]
+): Record<string, StreamDelta[]> {
+  const newChunks: Record<string, StreamDelta[]> = {};
+  // Seed the existing chunks
+  for (const { streamId } of streamMessages) {
+    const chunks = streamChunks[streamId];
+    if (chunks === undefined) {
+      newChunks[streamId] = [];
+    } else {
+      newChunks[streamId] = chunks;
+    }
   }
->;
-
-type StreamsChunk = StreamCursor & {
-  order: number;
-  stepOrder: number;
-  // the range represented by this chunk
-  continueCursor: number; // exclusive
-  deltas: StreamDelta[];
-  isDone: boolean;
-};
-
-export type ThreadQueryReturns<M extends MessageDoc> = {
-  streamChunks?: StreamsChunk[];
-} & PaginationResult<M>;
+  let changed = false;
+  for (const streamId of Object.keys(streamChunks)) {
+    if (!newChunks[streamId]) {
+      // There's a stream that's no longer active.
+      changed = true;
+    }
+  }
+  const sorted = deltas.sort((a, b) => a.start - b.start);
+  for (const delta of sorted) {
+    const existing = newChunks[delta.streamId];
+    if (!existing) {
+      console.warn(
+        `Got delta for stream ${delta.streamId} that is no longer active`
+      );
+      continue;
+    }
+    const lastChunk = existing.at(-1);
+    if (lastChunk && lastChunk.end !== delta.start) {
+      if (lastChunk.end >= delta.end) {
+        console.debug(
+          `Got duplicate delta for stream ${delta.streamId} at ${delta.start}`
+        );
+        continue;
+      } else if (lastChunk.end < delta.start) {
+        console.warn(
+          `Got delta for stream ${delta.streamId} that has a gap ${lastChunk.end} -> ${delta.start}`
+        );
+        continue;
+      } else {
+        throw new Error(`Got unexpected delta for stream ${delta.streamId}:
+            delta: ${delta.start} -> ${delta.end}
+            last chunk: ${lastChunk.start} -> ${lastChunk.end}
+            `);
+      }
+    }
+    changed = true;
+    existing.push(delta);
+  }
+  if (!changed) return streamChunks;
+  return newChunks;
+}
 
 type ThreadQuery<
   Args = unknown,
@@ -204,7 +277,7 @@ type ThreadQuery<
      */
     streamArgs?: StreamArgs;
   } & Args,
-  PaginationResult<M> & { streams?: StreamSyncReturns }
+  PaginationResult<M> & { streams?: SyncStreamsReturnValue }
 >;
 
 type ThreadStreamQuery<
@@ -218,7 +291,7 @@ type ThreadStreamQuery<
     paginationOpts: PaginationOptions;
     streamArgs?: StreamArgs; // required for stream query
   } & Args,
-  PaginationResult<M> & { streams: StreamSyncReturns }
+  PaginationResult<M> & { streams: SyncStreamsReturnValue }
 >;
 
 type ThreadMessagesArgs<Query extends ThreadQuery<unknown, MessageDoc>> =
@@ -229,80 +302,7 @@ type ThreadMessagesArgs<Query extends ThreadQuery<unknown, MessageDoc>> =
 type ThreadMessagesResult<Query extends ThreadQuery<unknown, MessageDoc>> =
   Query extends ThreadQuery<unknown, infer M> ? M : never;
 
-function chunksToMessages(chunks: StreamsChunk[] | undefined): MessageDoc[] {
-  // TODO:
-  return [];
-}
-
 // TODO: pass in the messages we need to watch? that way it can be consistent..
-// export function useStreamMessagesQuery<Query extends StreamQuery>(
-//   query: Query,
-//   args: StreamArgs,
-// ): Array<UIMessageOrdered> | undefined {
-//   const [messages, setMessages] = useState<StreamsChunk[] | undefined>(
-//     undefined
-//   );
-//   const originalArgs = args[0] === "skip" ? args : args[0] ?? {};
-//   const argsWithStreamArgs = useMemo(
-//     () =>
-//       args[0] === "skip" || !messages
-//         ? args
-//         : ({
-//             ...originalArgs,
-//             streamArgs: messages.map(chunkCursor),
-//           } as FunctionArgs<Query>),
-//     [messages]
-//   );
-//   const results = useQuery(
-//     query,
-//     ...([argsWithStreamArgs] as OptionalRestArgs<Query>)
-//   );
-//   // const [isDone, setIsDone] = useState(false);
-//   useEffect(() => {
-//     if (!results) return;
-//     const newMessages = results.messages.map(chunkCursor);
-//     let matches = messages && newMessages.length === messages.length;
-//     if (matches) {
-//       for (let i = 0; i < newMessages.length; i++) {
-//         const newMessage = newMessages[i];
-//         const oldMessage = messages![i];
-//         if (
-//           !Object.is(newMessage.cursor, oldMessage.cursor) &&
-//           (newMessage.cursor !== oldMessage.cursor ||
-//             newMessage.key !== oldMessage.key)
-//         ) {
-//           matches = false;
-//           break;
-//         }
-//       }
-//     }
-//     if (!matches) {
-//       setMessages(
-//         results.messages.map((result) => {
-//           const existingMessage = messages?.find((m) => m.key === result.key);
-//           if (existingMessage && existingMessage.cursor === result.cursor) {
-//             return existingMessage;
-//           }
-//           const existingDeltas = existingMessage?.deltas ?? [];
-//           return {
-//             key: result.key,
-//             cursor: result.cursor,
-//             deltas: [...existingDeltas, ...result.deltas],
-//           };
-//         })
-//       );
-//     }
-//   }, [results]);
-//   const keyOrder = useMemo(() => {
-//     return results?.messages.map((m) => m.key) ?? [];
-//   }, [results]);
-//   const uiMessages = useMemo(() => {
-//     return messages
-//       ? streamMessagesToUIMessages(messages, keyOrder)
-//       : undefined;
-//   }, [messages, JSON.stringify(keyOrder)]);
-//   return uiMessages;
-// }
 
 // function createUIMessageFromPart(
 //   part: StreamDelta,
@@ -504,26 +504,12 @@ function chunksToMessages(chunks: StreamsChunk[] | undefined): MessageDoc[] {
 //   return keyOrder.map((key) => uiMessagesByMessageId[key]).flat();
 // }
 
-// function chunkCursor({ start, end, key }: StreamsChunk): Cursor {
-//   return { start, end, key };
-// }
-
 if (typeof window === "undefined") {
   throw new Error("this is frontend code, but it's running somewhere else!");
 }
-// type StreamQuery<Args = unknown> = FunctionReference<
-//   "query",
-//   "public",
-//   { threadId: string; streamArgs: StreamArgs } & Args,
-//   ThreadQueryReturns<MessageDoc>
-// >;
-
-// export type StreamPartialArgs<Query extends StreamQuery> =
-//   | BetterOmit<FunctionArgs<Query>, "streamArgs">
-//   | "skip";
 
 /**
- * @deprecated use useStreamMessagesQuery instead
+ * @deprecated use useThreadMessages or useStreamingThreadMessages instead
  * Use this hook to stream text from a server action, using the
  * toTextStreamResponse or equivalent HTTP streaming endpoint returning text.
  * @param url The URL of the server action to stream text from.

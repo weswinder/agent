@@ -18,6 +18,7 @@ import {
   vUserMessage,
 } from "./validators";
 import { vUserContent } from "./validators";
+import type { TextStreamPart } from "./validators";
 import {
   AssistantContent,
   CoreAssistantMessage,
@@ -28,8 +29,10 @@ import {
   FilePart,
   ImagePart,
   TextPart,
+  TextStreamPart as AITextStreamPart,
   ToolCallPart,
   ToolContent,
+  ToolSet,
   UserContent,
 } from "ai";
 import { SerializeUrlsAndUint8Arrays } from "./mapping";
@@ -106,5 +109,20 @@ expectTypeOf<ContextOptions>().toExtend<Infer<typeof vContextOptions>>();
 
 expectTypeOf<Infer<typeof vStorageOptions>>().toExtend<StorageOptions>();
 expectTypeOf<StorageOptions>().toExtend<Infer<typeof vStorageOptions>>();
+
+type StreamPart = Extract<
+  AITextStreamPart<ToolSet>,
+  {
+    type:
+      | "text-delta"
+      | "reasoning"
+      | "source"
+      | "tool-call"
+      | "tool-call-streaming-start"
+      | "tool-call-delta"
+      | "tool-result";
+  }
+>;
+expectTypeOf<StreamPart>().toExtend<TextStreamPart>();
 
 test("noop", () => { });

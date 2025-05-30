@@ -39,11 +39,10 @@ import {
 } from "../shared.js";
 import {
   type MessageWithMetadata as InnerMessageWithMetadata,
-  MessageStatus,
+  type MessageStatus,
   type ProviderMetadata,
   type SearchOptions,
-  StreamArgs,
-  StreamSyncReturns,
+  type StreamArgs,
   type Usage,
   vMessageWithMetadata,
   vSafeObjectArgs,
@@ -53,22 +52,23 @@ import type {
   AgentComponent,
   ContextOptions,
   GenerationOutputMetadata,
-  StorageOptions,
-  Thread,
-  UsageHandler,
   OpaqueIds,
+  Options,
+  OurObjectArgs,
+  OurStreamObjectArgs,
   RunActionCtx,
   RunMutationCtx,
   RunQueryCtx,
-  TextArgs,
-  Options,
+  StorageOptions,
   StreamingTextArgs,
-  OurObjectArgs,
-  OurStreamObjectArgs,
+  SyncStreamsReturnValue,
+  TextArgs,
+  Thread,
+  UsageHandler,
 } from "./types.js";
 
 import type { MessageDoc, ThreadDoc } from "../component/schema.js";
-import { wrapTools, createTool } from "./createTool.js";
+import { createTool, wrapTools } from "./createTool.js";
 import {
   DeltaStreamer,
   mergeTransforms,
@@ -76,31 +76,32 @@ import {
 } from "./streaming.js";
 
 export { vMessageDoc, vThreadDoc } from "../component/schema.js";
-export { extractText, isTool, createTool };
+export {
+  vAssistantMessage,
+  vContextOptions,
+  vMessage,
+  vPaginationResult,
+  vProviderMetadata,
+  vStorageOptions,
+  vStreamArgs,
+  vSystemMessage,
+  vToolMessage,
+  vUsage,
+  vUserMessage,
+} from "../validators.js";
+export { createTool, extractText, isTool };
 export type {
-  Usage,
-  ProviderMetadata,
-  MessageDoc,
-  ThreadDoc,
   AgentComponent,
   ContextOptions,
+  MessageDoc,
+  ProviderMetadata,
   StorageOptions,
-  UsageHandler,
+  SyncStreamsReturnValue,
   Thread,
+  ThreadDoc,
+  Usage,
+  UsageHandler,
 };
-export {
-  vPaginationResult,
-  vContextOptions,
-  vUsage,
-  vProviderMetadata,
-  vUserMessage,
-  vAssistantMessage,
-  vToolMessage,
-  vStorageOptions,
-  vSystemMessage,
-  vMessage,
-  vStreamArgs,
-} from "../validators.js";
 
 export class Agent<AgentTools extends ToolSet> {
   constructor(
@@ -377,7 +378,7 @@ export class Agent<AgentTools extends ToolSet> {
       threadId: string;
       streamArgs: StreamArgs | undefined;
     }
-  ): Promise<StreamSyncReturns | undefined> {
+  ): Promise<SyncStreamsReturnValue | undefined> {
     if (!args.streamArgs) return undefined;
     if (args.streamArgs.kind === "list") {
       return {
