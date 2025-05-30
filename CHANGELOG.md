@@ -1,9 +1,13 @@
 # Changelog
 
-## 0.1.2 alpha
+## 0.1.2
 
 - Added text delta streaming with `useThreadMessages` and `useStreamingThreadMessages` React hooks.
   See examples/chat-streaming for example usage.
+- Also includes a `useSmoothText` hook and `optimisticallySendMessage`
+  to get smooth streaming UI and immediate feedback when a user sends a msg.
+- Adds a UIMessage type that is an AI SDK UIMessage with some extra fields
+  for convenience, e.g. a stable key, order/stepOrder, streaming status.
 - Allow listing threads without an associated userId in the playground.
 - make stepOrder always increasing, for more predictable sorting of failed + non-failed messages.
 - A reference to the agent is now passed to tool calls using the `createTool` utility.
