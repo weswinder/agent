@@ -21,6 +21,110 @@ import { MessageDoc } from "../client";
 
 export { toUIMessages, type UIMessageOrdered };
 
+
+// export function useThreadUIMessages<Query extends ThreadStreamQuery>(
+//   query: Query,
+//   args: ThreadUIMessagesArgs<Query>,
+//   options: {
+//     initialNumItems?: number;
+//     stream: true;
+//   }
+// ): UsePaginatedQueryResult<
+//   UIMessageOrdered & { order: number; stepOrder: number }
+// >;
+// export function useThreadUIMessages<Query extends ThreadQuery>(
+//   query: Query,
+//   args: ThreadUIMessagesArgs<Query>,
+//   options: {
+//     initialNumItems?: number;
+//     stream?: false;
+//   }
+// ): UsePaginatedQueryResult<
+//   UIMessageOrdered & { order: number; stepOrder: number }
+// >;
+export function useThreadMessages<
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  Query extends ThreadQuery<any, any>,
+>(
+  query: Query,
+  args: ThreadMessagesArgs<Query> | "skip",
+  options: {
+    initialNumItems: number;
+    stream?: Query extends ThreadStreamQuery
+      ? boolean
+      : ErrorMessage<"To enable streaming, your query must take in streamArgs">;
+  }
+): UsePaginatedQueryResult<
+  ThreadMessagesResult<Query> & { streaming?: boolean }
+> {
+  // These are full messages
+  const paginated = usePaginatedQuery(
+    query,
+    args as PaginatedQueryArgs<Query> | "skip",
+    { initialNumItems: options.initialNumItems }
+  );
+
+  // These are streaming messages that will not include full messages.
+  const streamMessages = useStreamingThreadMessages(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    query as ThreadStreamQuery<any, any>,
+    !options.stream ? "skip" : args
+  );
+
+  const merged = useMemo(() => {
+    const streamListMessages =
+      streamMessages?.map((m) => ({
+        ...m,
+        streaming: true,
+      })) ?? [];
+    return {
+      ...paginated,
+      results: paginated.results
+        .map((m) => ({ ...m, streaming: false }))
+        .concat(streamListMessages)
+        .sort((a, b) =>
+          a.order === b.order ? a.stepOrder - b.stepOrder : a.order - b.order
+        )
+        // They shouldn't overlap, but check for duplicates just in case.
+        .filter(
+          (m, i, arr) =>
+            !arr[i - 1] ||
+            m.order !== arr[i - 1].order ||
+            m.stepOrder !== arr[i - 1].stepOrder
+        ),
+    };
+  }, [paginated, streamMessages]);
+
+  return merged as ThreadMessagesResult<Query>;
+}
+
+export function useStreamingThreadMessages<
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  Query extends ThreadStreamQuery<any, any>,
+>(
+  query: Query,
+  args: ThreadMessagesArgs<Query> | "skip"
+): Array<ThreadMessagesResult<Query>> | undefined {
+  const [messages, setMessages] = useState<StreamsChunk[] | undefined>(
+    undefined
+  );
+  const listArgs =
+    args === "skip"
+      ? args
+      : ({
+          ...args,
+          paginationOpts: { cursor: null, numItems: 0 },
+          streamArgs: { kind: "list" } as StreamArgs,
+        } as FunctionArgs<Query>);
+  const streamList = useQuery(query, listArgs);
+  // const cursorQuery = useQuery(query, {
+  //   kind: "deltas",
+  //   cursors: messages?.map((m) => m.cursor) ?? [],
+  // } satisfies StreamArgs);
+  // TODO: state machine doing delta syncing
+  return undefined;
+}
+
 type MessagesPage = {
   // refers to the message "order"
   start: number; // inclusive
@@ -95,119 +199,6 @@ type ThreadMessagesArgs<Query extends ThreadQuery<unknown, MessageDoc>> =
 
 type ThreadMessagesResult<Query extends ThreadQuery<unknown, MessageDoc>> =
   Query extends ThreadQuery<unknown, infer M> ? M : never;
-
-// export function useThreadUIMessages<Query extends ThreadStreamQuery>(
-//   query: Query,
-//   args: ThreadUIMessagesArgs<Query>,
-//   options: {
-//     initialNumItems?: number;
-//     stream: true;
-//   }
-// ): UsePaginatedQueryResult<
-//   UIMessageOrdered & { order: number; stepOrder: number }
-// >;
-// export function useThreadUIMessages<Query extends ThreadQuery>(
-//   query: Query,
-//   args: ThreadUIMessagesArgs<Query>,
-//   options: {
-//     initialNumItems?: number;
-//     stream?: false;
-//   }
-// ): UsePaginatedQueryResult<
-//   UIMessageOrdered & { order: number; stepOrder: number }
-// >;
-export function useThreadMessages<
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  Query extends ThreadQuery<any, any>,
->(
-  query: Query,
-  args: ThreadMessagesArgs<Query> | "skip",
-  options: {
-    initialNumItems: number;
-    stream?: Query extends ThreadStreamQuery
-      ? boolean
-      : ErrorMessage<"To enable streaming, your query must take in streamArgs">;
-  }
-): UsePaginatedQueryResult<
-  ThreadMessagesResult<Query> & { streaming?: boolean }
-> {
-  const messages = usePaginatedQuery(
-    query,
-    args as PaginatedQueryArgs<Query> | "skip",
-    { initialNumItems: options.initialNumItems }
-  );
-
-  const streamMessages = useStreamingThreadMessages(
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    query as ThreadStreamQuery<any, any>,
-    !options.stream || args === "skip"
-      ? "skip"
-      : ({
-          ...args,
-          paginationOpts: { cursor: null, numItems: 0 },
-          streamArgs: { kind: "list" } as StreamArgs,
-        } as FunctionArgs<Query>)
-  );
-  // TODO: for each stream, set up delta syncing state machine.
-
-  const merged = useMemo(() => {
-    const streamListMessages =
-      streamMessages?.map((m) => ({
-        ...m,
-        streaming: true,
-      })) ?? [];
-    return {
-      ...messages,
-      results: messages.results
-        .map((m) => ({
-          ...m,
-          streaming: false,
-        }))
-        .concat(
-          streamListMessages.filter(
-            // TODO: make this more efficient if necessary?
-            (m) =>
-              !messages.results.some(
-                (m2: MessageDoc) =>
-                  m2.order === m.order && m2.stepOrder === m.stepOrder
-              )
-          )
-        )
-        .sort((a, b) =>
-          a.order === b.order ? a.stepOrder - b.stepOrder : a.order - b.order
-        ),
-    };
-  }, [messages]);
-
-  return merged as ThreadMessagesResult<Query>;
-}
-
-export function useStreamingThreadMessages<
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  Query extends ThreadStreamQuery<any, any>,
->(
-  query: Query,
-  args: ThreadMessagesArgs<Query> | "skip"
-): Array<ThreadMessagesResult<Query>> | undefined {
-  const [messages, setMessages] = useState<StreamsChunk[] | undefined>(
-    undefined
-  );
-  const listArgs =
-    args === "skip"
-      ? args
-      : ({
-          ...args,
-          paginationOpts: { cursor: null, numItems: 0 },
-          streamArgs: { kind: "list" } as StreamArgs,
-        } as FunctionArgs<Query>);
-  const streamList = useQuery(query, listArgs);
-  // const cursorQuery = useQuery(query, {
-  //   kind: "deltas",
-  //   cursors: messages?.map((m) => m.cursor) ?? [],
-  // } satisfies StreamArgs);
-  // TODO: state machine doing delta syncing
-  return undefined;
-}
 
 function chunksToMessages(chunks: StreamsChunk[] | undefined): MessageDoc[] {
   // TODO:
