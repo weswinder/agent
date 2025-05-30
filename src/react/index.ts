@@ -132,6 +132,18 @@ export function useThreadMessages<
   return merged as ThreadMessagesResult<Query>;
 }
 
+/**
+ * A hook that fetches streaming messages from a thread.
+ * This ONLY returns streaming messages. To get both, use `useThreadMessages`.
+ *
+ * @param query The query to use to fetch messages.
+ * It must take as arguments `{ threadId, paginationOpts, streamArgs }` and
+ * return a `streams` object returned from `agent.syncStreams`.
+ * @param args The arguments to pass to the query other than `paginationOpts`
+ * and `streamArgs`. So `{ threadId }` at minimum, plus any other arguments that
+ * you want to pass to the query.
+ * @returns The streaming messages.
+ */
 export function useStreamingThreadMessages<
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   Query extends ThreadStreamQuery<any, any>,
