@@ -41,7 +41,11 @@ export const streamStory = internalAction({
   args: { promptMessageId: v.string(), threadId: v.string() },
   handler: async (ctx, { promptMessageId, threadId }) => {
     const { thread } = await storyAgent.continueThread(ctx, { threadId });
-    await thread.streamText({ promptMessageId }, { saveStreamDeltas: true });
+    const result = await thread.streamText(
+      { promptMessageId },
+      { saveStreamDeltas: true },
+    );
+    await result.consumeStream();
   },
 });
 
