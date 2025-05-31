@@ -10,12 +10,43 @@ import {
 } from "@convex-dev/agent/react";
 import { useEffect, useState } from "react";
 
+function getThreadIdFromHash() {
+  return window.location.hash.replace(/^#/, "") || undefined;
+}
+
 export default function ChatStreaming() {
   const createThread = useMutation(api.streaming.createThread);
-  const [threadId, setThreadId] = useState<string | undefined>(undefined);
+  const [threadId, setThreadId] = useState<string | undefined>(
+    typeof window !== "undefined" ? getThreadIdFromHash() : undefined,
+  );
+
+  // Listen for hash changes
   useEffect(() => {
-    if (!threadId) void createThread().then(setThreadId);
+    function onHashChange() {
+      setThreadId(getThreadIdFromHash());
+    }
+    window.addEventListener("hashchange", onHashChange);
+    return () => window.removeEventListener("hashchange", onHashChange);
+  }, []);
+
+  // On mount or when threadId changes, if no threadId, create one and set hash
+  useEffect(() => {
+    if (!threadId) {
+      void createThread().then((newId) => {
+        window.location.hash = newId;
+        setThreadId(newId);
+      });
+    }
   }, [createThread, threadId]);
+
+  // Reset handler: create a new thread and update hash
+  const handleReset = () => {
+    void createThread().then((newId) => {
+      window.location.hash = newId;
+      setThreadId(newId);
+    });
+  };
+
   return (
     <>
       <header className="sticky top-0 z-10 bg-white/80 backdrop-blur-sm p-4 flex justify-between items-center border-b">
@@ -27,10 +58,7 @@ export default function ChatStreaming() {
         <main className="flex-1 flex items-center justify-center p-8">
           {threadId ? (
             <>
-              <Story
-                threadId={threadId}
-                reset={() => void createThread().then(setThreadId)}
-              />
+              <Story threadId={threadId} reset={handleReset} />
             </>
           ) : (
             <div className="text-center text-gray-500">Loading...</div>
@@ -100,6 +128,7 @@ function Story({ threadId, reset }: { threadId: string; reset: () => void }) {
             <button
               className="px-4 py-2 rounded-lg bg-red-100 text-red-700 hover:bg-red-200 transition font-medium self-end"
               onClick={() => reset()}
+              type="button"
             >
               Reset
             </button>
