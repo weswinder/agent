@@ -51,10 +51,9 @@ export const listDeltas = query({
         );
       totalDeltas += streamDeltas.length;
       deltas.push(
-        ...streamDeltas.map((d) => ({
-          streamId: d.streamId.toString(),
-          ...pick(d, ["start", "end", "parts"]),
-        }))
+        ...streamDeltas.map((d) =>
+          pick(d, ["streamId", "start", "end", "parts"])
+        )
       );
       if (totalDeltas >= MAX_DELTAS_PER_REQUEST) {
         break;
