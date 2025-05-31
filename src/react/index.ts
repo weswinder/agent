@@ -269,7 +269,7 @@ export function useSmoothText(
     update();
     const interval = setInterval(() => {
       update();
-    }, 1000 / 60);
+    }, 50);
     return () => clearInterval(interval);
   }, [text, isStreaming, charsPerSec]);
 
