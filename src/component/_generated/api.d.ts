@@ -1375,9 +1375,9 @@ export type Mounts = {
         beforeMessageId?: string;
         limit: number;
         messageRange?: { after: number; before: number };
+        searchAllMessagesForUserId?: string;
         text?: string;
         threadId?: string;
-        userId?: string;
         vector?: Array<number>;
         vectorModel?: string;
         vectorScoreThreshold?: number;
@@ -1529,9 +1529,9 @@ export type Mounts = {
       {
         beforeMessageId?: string;
         limit: number;
+        searchAllMessagesForUserId?: string;
         text: string;
         threadId?: string;
-        userId?: string;
       },
       Array<{
         _creationTime: number;

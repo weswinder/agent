@@ -12,6 +12,7 @@ import {
 import schema from "../schema";
 import { mergedStream } from "convex-helpers/server/stream";
 import { stream } from "convex-helpers/server/stream";
+import { Id } from "../_generated/dataModel";
 
 export const paginate = query({
   args: {
@@ -124,7 +125,8 @@ export function searchVectors(
     model: string;
     table: string;
     userId?: string;
-    threadId?: string;
+    threadId?: Id<"threads">;
+    searchAllMessagesForUserId?: string;
     limit?: number;
   }
 ) {
@@ -133,8 +135,12 @@ export function searchVectors(
     vector,
     // TODO: to support more tables, add more "OR" clauses for each.
     filter: (q) =>
-      args.userId
-        ? q.eq("model_table_userId", [args.model, args.table, args.userId])
+      args.searchAllMessagesForUserId
+        ? q.eq("model_table_userId", [
+            args.model,
+            args.table,
+            args.searchAllMessagesForUserId,
+          ])
         : q.eq("model_table_threadId", [
             args.model,
             args.table,

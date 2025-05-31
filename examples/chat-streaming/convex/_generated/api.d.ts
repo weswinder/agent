@@ -1533,9 +1533,9 @@ export declare const components: {
           beforeMessageId?: string;
           limit: number;
           messageRange?: { after: number; before: number };
+          searchAllMessagesForUserId?: string;
           text?: string;
           threadId?: string;
-          userId?: string;
           vector?: Array<number>;
           vectorModel?: string;
           vectorScoreThreshold?: number;
@@ -1687,9 +1687,9 @@ export declare const components: {
         {
           beforeMessageId?: string;
           limit: number;
+          searchAllMessagesForUserId?: string;
           text: string;
           threadId?: string;
-          userId?: string;
         },
         Array<{
           _creationTime: number;

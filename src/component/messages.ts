@@ -454,19 +454,22 @@ export const getThreadMessages = query({
 
 export const searchMessages = action({
   args: {
-    userId: v.optional(v.string()),
     threadId: v.optional(v.id("threads")),
+    searchAllMessagesForUserId: v.optional(v.string()),
     beforeMessageId: v.optional(v.id("messages")),
     ...vSearchOptions.fields,
   },
   returns: v.array(vMessageDoc),
   handler: async (ctx, args): Promise<MessageDoc[]> => {
-    assert(args.userId || args.threadId, "Specify userId or threadId");
+    assert(
+      args.searchAllMessagesForUserId || args.threadId,
+      "Specify userId or threadId"
+    );
     const limit = args.limit;
     let textSearchMessages: MessageDoc[] | undefined;
     if (args.text) {
       textSearchMessages = await ctx.runQuery(api.messages.textSearch, {
-        userId: args.userId,
+        searchAllMessagesForUserId: args.searchAllMessagesForUserId,
         threadId: args.threadId,
         text: args.text,
         limit,
@@ -483,7 +486,7 @@ export const searchMessages = action({
           dimension,
           model: args.vectorModel ?? "unknown",
           table: "messages",
-          userId: args.userId,
+          searchAllMessagesForUserId: args.searchAllMessagesForUserId,
           threadId: args.threadId,
           limit,
         })
@@ -503,7 +506,7 @@ export const searchMessages = action({
       const messages: MessageDoc[] = await ctx.runQuery(
         internal.messages._fetchSearchMessages,
         {
-          userId: args.userId,
+          searchAllMessagesForUserId: args.searchAllMessagesForUserId,
           threadId: args.threadId,
           vectorIds,
           textSearchMessages: textSearchMessages?.filter(
@@ -522,9 +525,9 @@ export const searchMessages = action({
 
 export const _fetchSearchMessages = internalQuery({
   args: {
-    userId: v.optional(v.string()),
     threadId: v.optional(v.id("threads")),
     vectorIds: v.array(vVectorId),
+    searchAllMessagesForUserId: v.optional(v.string()),
     textSearchMessages: v.optional(v.array(vMessageDoc)),
     messageRange: v.object({ before: v.number(), after: v.number() }),
     beforeMessageId: v.optional(v.id("messages")),
@@ -534,8 +537,11 @@ export const _fetchSearchMessages = internalQuery({
   handler: async (ctx, args): Promise<MessageDoc[]> => {
     const beforeMessage =
       args.beforeMessageId && (await ctx.db.get(args.beforeMessageId));
-    const { userId, threadId } = args;
-    assert(userId || threadId, "Specify userId or threadId to search");
+    const { searchAllMessagesForUserId, threadId } = args;
+    assert(
+      searchAllMessagesForUserId || threadId,
+      "Specify searchAllMessagesForUserId or threadId to search"
+    );
     let messages: MessageDoc[] = (
       await Promise.all(
         args.vectorIds.map((embeddingId) =>
@@ -543,9 +549,9 @@ export const _fetchSearchMessages = internalQuery({
             .query("messages")
             .withIndex("embeddingId", (q) => q.eq("embeddingId", embeddingId))
             .filter((q) =>
-              userId
-                ? q.eq(q.field("userId"), userId)
-                : q.eq(q.field("threadId"), threadId)
+              searchAllMessagesForUserId
+                ? q.eq(q.field("userId"), searchAllMessagesForUserId)
+                : q.eq(q.field("threadId"), threadId!)
             )
             // Don't include pending. Failed messages hopefully are deleted but may as well be safe.
             .filter((q) => q.eq(q.field("status"), "success"))
@@ -632,21 +638,26 @@ export const _fetchSearchMessages = internalQuery({
 export const textSearch = query({
   args: {
     threadId: v.optional(v.id("threads")),
-    userId: v.optional(v.string()),
+    searchAllMessagesForUserId: v.optional(v.string()),
     text: v.string(),
     limit: v.number(),
     beforeMessageId: v.optional(v.id("messages")),
   },
   handler: async (ctx, args) => {
-    assert(args.userId || args.threadId, "Specify userId or threadId");
+    assert(
+      args.searchAllMessagesForUserId || args.threadId,
+      "Specify userId or threadId"
+    );
     const beforeMessage =
       args.beforeMessageId && (await ctx.db.get(args.beforeMessageId));
     const order = beforeMessage?.order;
     const messages = await ctx.db
       .query("messages")
       .withSearchIndex("text_search", (q) =>
-        args.userId
-          ? q.search("text", args.text).eq("userId", args.userId)
+        args.searchAllMessagesForUserId
+          ? q
+              .search("text", args.text)
+              .eq("userId", args.searchAllMessagesForUserId)
           : q.search("text", args.text).eq("threadId", args.threadId!)
       )
       // Just in case tool messages slip through

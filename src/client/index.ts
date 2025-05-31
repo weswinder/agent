@@ -464,7 +464,15 @@ export class Agent<AgentTools extends ToolSet> {
       const searchMessages = await ctx.runAction(
         this.component.messages.searchMessages,
         {
-          userId: opts?.searchOtherThreads ? args.userId : undefined,
+          searchAllMessagesForUserId: opts?.searchOtherThreads
+            ? args.userId ??
+              (args.threadId &&
+                (
+                  await ctx.runQuery(this.component.threads.getThread, {
+                    threadId: args.threadId,
+                  })
+                )?.userId)
+            : undefined,
           threadId: args.threadId,
           beforeMessageId: args.upToAndIncludingMessageId,
           ...(await this._searchOptionsWithDefaults(opts, messagesToSearch)),
@@ -752,7 +760,7 @@ export class Agent<AgentTools extends ToolSet> {
   >(
     ctx: RunActionCtx,
     {
-      userId,
+      userId: argsUserId,
       threadId,
       usageHandler,
       tools: threadTools,
@@ -773,11 +781,12 @@ export class Agent<AgentTools extends ToolSet> {
     GenerateTextResult<TOOLS extends undefined ? AgentTools : TOOLS, OUTPUT> &
       GenerationOutputMetadata
   > {
-    const { args: aiArgs, messageId } = await this._saveMessagesAndFetchContext(
-      ctx,
-      args,
-      { userId, threadId, ...options }
-    );
+    const context = await this._saveMessagesAndFetchContext(ctx, args, {
+      userId: argsUserId,
+      threadId,
+      ...options,
+    });
+    const { args: aiArgs, messageId, userId } = context;
     const toolCtx = { ...ctx, userId, threadId, messageId, agent: this };
     const tools = wrapTools(
       toolCtx,
@@ -848,7 +857,7 @@ export class Agent<AgentTools extends ToolSet> {
   >(
     ctx: RunActionCtx,
     {
-      userId,
+      userId: argsUserId,
       threadId,
       usageHandler,
       /**
@@ -891,11 +900,11 @@ export class Agent<AgentTools extends ToolSet> {
       GenerationOutputMetadata
   > {
     const context = await this._saveMessagesAndFetchContext(ctx, args, {
-      userId,
+      userId: argsUserId,
       threadId,
       ...options,
     });
-    const { args: aiArgs, messageId, order, stepOrder } = context;
+    const { args: aiArgs, messageId, order, stepOrder, userId } = context;
     const toolCtx = { ...ctx, userId, threadId, messageId, agent: this };
     const tools = wrapTools(
       toolCtx,
@@ -993,7 +1002,7 @@ export class Agent<AgentTools extends ToolSet> {
     ctx: RunActionCtx | RunMutationCtx,
     args: T,
     {
-      userId,
+      userId: argsUserId,
       threadId,
       contextOptions,
       storageOptions,
@@ -1003,6 +1012,7 @@ export class Agent<AgentTools extends ToolSet> {
     } & Options
   ): Promise<{
     args: T & { model: LanguageModelV1 };
+    userId: string | undefined;
     messageId: string | undefined;
     order: number | undefined;
     stepOrder: number | undefined;
@@ -1013,6 +1023,11 @@ export class Agent<AgentTools extends ToolSet> {
     const messages = args.promptMessageId
       ? []
       : promptOrMessagesToCoreMessages(args);
+    const userId =
+      argsUserId ??
+      (threadId &&
+        (await ctx.runQuery(this.component.threads.getThread, { threadId }))
+          ?.userId);
     assert(
       !args.promptMessageId || !(args.prompt || args.messages),
       "you can't specify a prompt or message if you specify a promptMessageId"
@@ -1063,6 +1078,7 @@ export class Agent<AgentTools extends ToolSet> {
           ...messages,
         ],
       } as T & { model: LanguageModelV1 },
+      userId,
       messageId,
       order,
       stepOrder,
@@ -1079,7 +1095,7 @@ export class Agent<AgentTools extends ToolSet> {
   async generateObject<T>(
     ctx: RunActionCtx,
     {
-      userId,
+      userId: argsUserId,
       threadId,
       usageHandler,
     }: { userId?: string; threadId?: string; usageHandler?: UsageHandler },
@@ -1093,11 +1109,12 @@ export class Agent<AgentTools extends ToolSet> {
      */
     options?: Options
   ): Promise<GenerateObjectResult<T> & GenerationOutputMetadata> {
-    const { args: aiArgs, messageId } = await this._saveMessagesAndFetchContext(
-      ctx,
-      args,
-      { userId, threadId, ...options }
-    );
+    const context = await this._saveMessagesAndFetchContext(ctx, args, {
+      userId: argsUserId,
+      threadId,
+      ...options,
+    });
+    const { args: aiArgs, messageId, userId } = context;
     const trackUsage = usageHandler ?? this.options.usageHandler;
     const saveOutputMessages =
       options?.storageOptions?.saveOutputMessages ??
@@ -1150,7 +1167,7 @@ export class Agent<AgentTools extends ToolSet> {
   async streamObject<T>(
     ctx: RunActionCtx,
     {
-      userId,
+      userId: argsUserId,
       threadId,
       usageHandler,
     }: { userId?: string; threadId?: string; usageHandler?: UsageHandler },
@@ -1167,11 +1184,12 @@ export class Agent<AgentTools extends ToolSet> {
     StreamObjectResult<DeepPartial<T>, T, never> & GenerationOutputMetadata
   > {
     // TODO: unify all this shared code between all the generate* and stream* functions
-    const { args: aiArgs, messageId } = await this._saveMessagesAndFetchContext(
-      ctx,
-      args,
-      { userId, threadId, ...options }
-    );
+    const context = await this._saveMessagesAndFetchContext(ctx, args, {
+      userId: argsUserId,
+      threadId,
+      ...options,
+    });
+    const { args: aiArgs, messageId, userId } = context;
     const trackUsage = usageHandler ?? this.options.usageHandler;
     const saveOutputMessages =
       options?.storageOptions?.saveOutputMessages ??

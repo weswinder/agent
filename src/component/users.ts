@@ -5,6 +5,7 @@ import { internal } from "./_generated/api.js";
 import {
   action,
   internalMutation,
+  internalQuery,
   mutation,
   MutationCtx,
   query,
@@ -168,3 +169,14 @@ async function deletePageForUserId(
     isDone: false,
   };
 }
+
+export const getThreadUserId = internalQuery({
+  args: {
+    threadId: v.id("threads"),
+  },
+  returns: v.union(v.string(), v.null()),
+  handler: async (ctx, args) => {
+    const thread = await ctx.db.get(args.threadId);
+    return thread?.userId ?? null;
+  },
+});
