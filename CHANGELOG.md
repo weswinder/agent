@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.4 alpha
+
+- Automatically pull in the thread's userId when no userId is specified.
+
+### Breaking
+
+- The searchMessage and textSearch functions now take the more explicit
+  parameter `searchAllMessagesForUserId` instead of `userId`.
+
 ## 0.1.3
 
 - Allows you to pass `promptMessageId` to `agent.streamText`.
