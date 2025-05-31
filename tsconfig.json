@@ -3,9 +3,10 @@
     "allowJs": true,
     "checkJs": true,
     "strict": true,
+    "jsx": "react-jsx",
 
     "target": "ESNext",
-    "lib": ["ES2021", "dom"],
+    "lib": ["ES2021", "dom", "dom.iterable"],
     "forceConsistentCasingInFileNames": true,
     "allowSyntheticDefaultImports": true,
     "module": "ESNext",

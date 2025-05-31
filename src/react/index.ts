@@ -102,8 +102,10 @@ export function useThreadMessages<
 
   // These are streaming messages that will not include full messages.
   const streamMessages = useStreamingThreadMessages(
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    query as ThreadStreamQuery<any, any>,
+    query as ThreadStreamQuery<
+      ThreadMessagesArgs<Query>,
+      ThreadMessagesResult<Query>
+    >,
     !options.stream ? "skip" : args
   );
 
@@ -199,21 +201,22 @@ export function useStreamingThreadMessages<
     | { streams: Extract<SyncStreamsReturnValue, { kind: "deltas" }> }
     | undefined;
   // Merge any deltas into the streamChunks, keeping it unmodified if unchanged.
+  const threadId = args === "skip" ? undefined : args.threadId;
   const [messages, newStreams, changed] = useMemo(() => {
-    if (args === "skip") return [undefined, streams, false];
+    if (!threadId) return [undefined, streams, false];
     if (!streamList) return [undefined, streams, false];
     if (cursorQuery && cursorQuery.streams?.kind !== "deltas") {
       throw new Error("Expected deltas streams");
     }
     return mergeDeltas(
-      args.threadId,
+      threadId,
       streamList.streams.messages,
       streams,
       cursorQuery?.streams?.deltas ?? []
     );
-  }, [cursorQuery, streams, streamList]);
+  }, [threadId, cursorQuery, streams, streamList]);
   // Now assemble the chunks into messages
-  if (args === "skip") {
+  if (!threadId) {
     return undefined;
   }
   if (changed) {
@@ -849,7 +852,7 @@ export function useStreamingText(
         setLoading(false);
       }
     },
-    [threadId, token]
+    [threadId, token, url]
   );
   return [{ text, loading, error }, readStream] as const;
 }
