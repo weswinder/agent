@@ -130,7 +130,7 @@ async function authorizeThreadAccess(
 // streamStory above.
 export const streamStoryInternalAction = storyAgent.asTextAction({
   stream: true,
-  // stream: { chunking: "line", throttleMs: 500 },
+  // stream: { chunking: "word", throttleMs: 200 },
 });
 
 // This fetches full messages. Streamed messages are not included.
@@ -147,6 +147,16 @@ export const listRecentMessages = query({
     });
     // Return them in ascending order (oldest first)
     return messages.reverse();
+  },
+});
+
+// This fetches only streaming messages.
+export const listStreamingMessages = query({
+  args: { threadId: v.string(), streamArgs: vStreamArgs },
+  handler: async (ctx, { threadId, streamArgs }) => {
+    await authorizeThreadAccess(ctx, threadId);
+    const streams = await storyAgent.syncStreams(ctx, { threadId, streamArgs });
+    return { streams };
   },
 });
 
