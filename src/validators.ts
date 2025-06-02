@@ -54,6 +54,7 @@ export const vImagePart = v.object({
 export const vFilePart = v.object({
   type: v.literal("file"),
   data: v.union(v.string(), v.bytes()),
+  filename: v.optional(v.string()),
   mimeType: v.string(),
   providerOptions,
 });
