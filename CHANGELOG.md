@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.5 alpha
+
+- Build the project so it's compatible with composite and verbatim module syntax
+
 ## 0.1.4
 
 - Automatically pulls in the thread's userId when no userId is specified.
