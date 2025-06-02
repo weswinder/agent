@@ -1,21 +1,21 @@
 import { assert, omit, pick } from "convex-helpers";
 import { paginator } from "convex-helpers/server/pagination";
 import { partial } from "convex-helpers/validators";
-import { ObjectType } from "convex/values";
+import { paginationOptsValidator } from "convex/server";
+import type { ObjectType } from "convex/values";
+import { type ThreadDoc, vThreadDoc } from "../client/index.js";
 import { vPaginationResult } from "../validators.js";
 import { api, internal } from "./_generated/api.js";
-import { Doc } from "./_generated/dataModel.js";
+import type { Doc } from "./_generated/dataModel.js";
 import {
   action,
   internalMutation,
   mutation,
-  MutationCtx,
+  type MutationCtx,
   query,
 } from "./_generated/server.js";
-import { schema, v } from "./schema.js";
-import { paginationOptsValidator } from "convex/server";
 import { deleteMessage } from "./messages.js";
-import { ThreadDoc, vThreadDoc } from "../client/index.js";
+import { schema, v } from "./schema.js";
 
 function publicThreadOrNull(thread: Doc<"threads"> | null): ThreadDoc | null {
   if (thread === null) {

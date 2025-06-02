@@ -14,10 +14,11 @@ import { assert } from "convex-helpers";
 import {
   internalActionGeneric,
   internalMutationGeneric,
-  PaginationOptions,
-  PaginationResult,
+  type PaginationOptions,
+  type PaginationResult,
 } from "convex/server";
 import { v } from "convex/values";
+import type { MessageDoc, ThreadDoc } from "../component/schema.js";
 import {
   validateVectorDimension,
   type VectorDimension,
@@ -48,6 +49,12 @@ import {
   vSafeObjectArgs,
   vTextArgs,
 } from "../validators.js";
+import { createTool, wrapTools } from "./createTool.js";
+import {
+  DeltaStreamer,
+  mergeTransforms,
+  type StreamingOptions,
+} from "./streaming.js";
 import type {
   AgentComponent,
   ContextOptions,
@@ -66,14 +73,6 @@ import type {
   Thread,
   UsageHandler,
 } from "./types.js";
-
-import type { MessageDoc, ThreadDoc } from "../component/schema.js";
-import { createTool, wrapTools } from "./createTool.js";
-import {
-  DeltaStreamer,
-  mergeTransforms,
-  StreamingOptions,
-} from "./streaming.js";
 
 export { vMessageDoc, vThreadDoc } from "../component/schema.js";
 export {

@@ -1,10 +1,8 @@
+import type { Schema, Tool, ToolExecutionOptions, ToolSet } from "ai";
 import { tool } from "ai";
-import { Schema, Tool } from "ai";
-import { ToolExecutionOptions } from "ai";
-import { ToolSet } from "ai";
 import { z } from "zod";
-import { RunActionCtx } from "./types.js";
-import { Agent } from "./index.js";
+import type { Agent } from "./index.js";
+import type { RunActionCtx } from "./types.js";
 
 export type ToolCtx<TOOLS extends ToolSet = ToolSet> = RunActionCtx & {
   agent: Agent<TOOLS>;

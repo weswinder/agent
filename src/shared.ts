@@ -1,5 +1,5 @@
-import { CoreMessage } from "ai";
-import { Message } from "./validators";
+import type { CoreMessage } from "ai";
+import type { Message } from "./validators";
 
 export const DEFAULT_RECENT_MESSAGES = 100;
 

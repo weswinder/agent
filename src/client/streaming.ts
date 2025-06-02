@@ -1,7 +1,16 @@
-import { ChunkDetector, smoothStream, StreamTextTransform, ToolSet } from "ai";
-import { ProviderOptions, StreamDelta, TextStreamPart } from "../validators";
+import {
+  type ChunkDetector,
+  smoothStream,
+  type StreamTextTransform,
+  type ToolSet,
+} from "ai";
+import type {
+  ProviderOptions,
+  StreamDelta,
+  TextStreamPart,
+} from "../validators";
 import type { AgentComponent, MessageDoc } from "./index";
-import { RunActionCtx } from "./types";
+import type { RunActionCtx } from "./types";
 
 export type StreamingOptions = {
   /**

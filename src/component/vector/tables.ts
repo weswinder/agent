@@ -2,20 +2,20 @@ import { omit } from "convex-helpers";
 import { literals } from "convex-helpers/validators";
 import {
   defineTable,
-  GenericTableSearchIndexes,
-  SchemaDefinition,
-  TableDefinition,
+  type GenericTableSearchIndexes,
+  type SchemaDefinition,
+  type TableDefinition,
 } from "convex/server";
 import {
-  GenericId,
-  Infer,
-  ObjectType,
+  type GenericId,
+  type Infer,
+  type ObjectType,
   v,
-  VId,
-  VObject,
-  VUnion,
+  type VId,
+  type VObject,
+  type VUnion,
 } from "convex/values";
-import { QueryCtx } from "../_generated/server";
+import type { QueryCtx } from "../_generated/server";
 
 // We only generate embeddings for non-tool, non-system messages
 const embeddings = {

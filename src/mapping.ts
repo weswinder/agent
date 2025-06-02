@@ -1,19 +1,19 @@
+import type { FileUIPart } from "@ai-sdk/ui-utils";
 import {
   convertToCoreMessages,
   coreMessageSchema,
-  GenerateObjectResult,
+  type Message as AIMessage,
   type AssistantContent,
   type CoreMessage,
   type DataContent,
+  type GenerateObjectResult,
   type StepResult,
   type ToolContent,
   type ToolSet,
-  type Message as AIMessage,
   type UserContent,
 } from "ai";
-import type { FileUIPart } from "@ai-sdk/ui-utils";
 import { assert } from "convex-helpers";
-import {
+import type {
   MessageWithMetadata,
   Step,
   StepWithMessagesWithMetadata,

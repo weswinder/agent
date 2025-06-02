@@ -1,5 +1,24 @@
-import { Infer } from "convex/values";
+import type {
+  TextStreamPart as AITextStreamPart,
+  AssistantContent,
+  CoreAssistantMessage,
+  CoreMessage,
+  CoreSystemMessage,
+  CoreToolMessage,
+  CoreUserMessage,
+  FilePart,
+  ImagePart,
+  TextPart,
+  ToolCallPart,
+  ToolContent,
+  ToolSet,
+  UserContent,
+} from "ai";
+import type { Infer } from "convex/values";
 import { expectTypeOf, test } from "vitest";
+import type { ContextOptions, StorageOptions } from "./client";
+import type { SerializeUrlsAndUint8Arrays } from "./mapping";
+import type { TextStreamPart } from "./validators";
 import {
   vAssistantContent,
   vAssistantMessage,
@@ -15,28 +34,9 @@ import {
   vToolCallPart,
   vToolContent,
   vToolMessage,
+  vUserContent,
   vUserMessage,
 } from "./validators";
-import { vUserContent } from "./validators";
-import type { TextStreamPart } from "./validators";
-import {
-  AssistantContent,
-  CoreAssistantMessage,
-  CoreMessage,
-  CoreSystemMessage,
-  CoreToolMessage,
-  CoreUserMessage,
-  FilePart,
-  ImagePart,
-  TextPart,
-  TextStreamPart as AITextStreamPart,
-  ToolCallPart,
-  ToolContent,
-  ToolSet,
-  UserContent,
-} from "ai";
-import { SerializeUrlsAndUint8Arrays } from "./mapping";
-import { ContextOptions, StorageOptions } from "./client";
 
 // type assertion
 type OurUserContent = SerializeUrlsAndUint8Arrays<UserContent>;
@@ -125,4 +125,4 @@ type StreamPart = Extract<
 >;
 expectTypeOf<StreamPart>().toExtend<TextStreamPart>();
 
-test("noop", () => { });
+test("noop", () => {});

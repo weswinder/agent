@@ -22,7 +22,7 @@ AI Agent framework built on Convex.
 
 [Read the associated Stack post here](https://stack.convex.dev/ai-agents).
 
-Play with the [examples](./examples) by cloning this repo and running:
+Play with the [examples](./examples/) by cloning this repo and running:
 ```sh
 npm run example
 ```

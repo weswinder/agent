@@ -1,7 +1,7 @@
 import { paginator } from "convex-helpers/server/pagination";
-import { mutation, MutationCtx, query } from "./_generated/server.js";
+import type { Id } from "./_generated/dataModel.js";
+import { mutation, type MutationCtx, query } from "./_generated/server.js";
 import { schema, v } from "./schema.js";
-import { Id } from "./_generated/dataModel.js";
 
 export const addFile = mutation({
   args: {

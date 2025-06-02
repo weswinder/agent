@@ -1,12 +1,12 @@
 /// <reference types="vite/client" />
 
-import { describe, expect, test } from "vitest";
 import { convexTest } from "convex-test";
-import schema from "./schema.js";
+import { describe, expect, test } from "vitest";
 import { api } from "./_generated/api.js";
-import { modules } from "./setup.test.js";
-import { Id } from "./_generated/dataModel.js";
+import type { Id } from "./_generated/dataModel.js";
 import { getMaxMessage } from "./messages.js";
+import schema from "./schema.js";
+import { modules } from "./setup.test.js";
 
 describe("agent", () => {
   test("getMaxMessage works for threads", async () => {

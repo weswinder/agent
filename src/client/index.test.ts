@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { filterOutOrphanedToolMessages, MessageDoc } from ".";
+import { filterOutOrphanedToolMessages, type MessageDoc } from ".";
 
 describe("filterOutOrphanedToolMessages", () => {
   const call1: MessageDoc = {

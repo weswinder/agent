@@ -1,5 +1,5 @@
 import { defineSchema, defineTable } from "convex/server";
-import { Infer, v } from "convex/values";
+import { type Infer, v } from "convex/values";
 import {
   vThreadStatus,
   vMessage,

@@ -1,6 +1,7 @@
 import { assert, omit } from "convex-helpers";
 import { mergedStream, stream } from "convex-helpers/server/stream";
-import { ObjectType } from "convex/values";
+import { paginationOptsValidator } from "convex/server";
+import type { ObjectType } from "convex/values";
 import {
   DEFAULT_MESSAGE_RANGE,
   DEFAULT_RECENT_MESSAGES,
@@ -8,38 +9,37 @@ import {
   isTool,
 } from "../shared.js";
 import {
-  vPaginationResult,
   vMessageEmbeddings,
   vMessageStatus,
   vMessageWithMetadata,
+  vPaginationResult,
   vSearchOptions,
   vStepWithMessages,
 } from "../validators.js";
 import { api, internal } from "./_generated/api.js";
-import { Doc, Id } from "./_generated/dataModel.js";
+import type { Doc, Id } from "./_generated/dataModel.js";
 import {
   action,
   internalQuery,
   mutation,
-  MutationCtx,
+  type MutationCtx,
   query,
-  QueryCtx,
+  type QueryCtx,
 } from "./_generated/server.js";
-import { schema, v } from "./schema.js";
-import { insertVector, searchVectors } from "./vector/index.js";
+import type { MessageDoc } from "./schema.js";
+import { schema, v, vMessageDoc } from "./schema.js";
 import {
-  VectorDimension,
-  VectorDimensions,
-  VectorTableId,
-  vVectorId,
-} from "./vector/tables.js";
-import {
-  listThreadsByUserId as _listThreadsByUserId,
   getThread as _getThread,
+  listThreadsByUserId as _listThreadsByUserId,
   updateThread as _updateThread,
 } from "./threads.js";
-import { paginationOptsValidator } from "convex/server";
-import { MessageDoc, vMessageDoc } from "./schema.js";
+import { insertVector, searchVectors } from "./vector/index.js";
+import {
+  type VectorDimension,
+  VectorDimensions,
+  type VectorTableId,
+  vVectorId,
+} from "./vector/tables.js";
 
 /** @deprecated Use *.threads.listMessagesByThreadId instead. */
 export const listThreadsByUserId = _listThreadsByUserId;

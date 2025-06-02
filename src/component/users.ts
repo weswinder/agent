@@ -1,21 +1,21 @@
 import { paginator } from "convex-helpers/server/pagination";
+import { stream } from "convex-helpers/server/stream";
 import { nullable } from "convex-helpers/validators";
-import { ObjectType } from "convex/values";
+import { paginationOptsValidator } from "convex/server";
+import type { ObjectType } from "convex/values";
+import { vPaginationResult } from "../validators.js";
 import { internal } from "./_generated/api.js";
+import type { Id } from "./_generated/dataModel.js";
 import {
   action,
   internalMutation,
   internalQuery,
   mutation,
-  MutationCtx,
+  type MutationCtx,
   query,
 } from "./_generated/server.js";
-import { schema, v } from "./schema.js";
 import { deleteMessage } from "./messages.js";
-import { paginationOptsValidator } from "convex/server";
-import { stream } from "convex-helpers/server/stream";
-import { vPaginationResult } from "../validators.js";
-import { Id } from "./_generated/dataModel.js";
+import { schema, v } from "./schema.js";
 
 // Note: it only searches for users with threads
 export const listUsersWithThreads = query({
