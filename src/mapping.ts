@@ -181,7 +181,7 @@ export function serializeContent(content: Content): SerializedContent {
         case "image":
           return { ...part, image: serializeDataOrUrl(part.image) };
         case "file":
-          return { ...part, file: serializeDataOrUrl(part.data) };
+          return { ...part, data: serializeDataOrUrl(part.data) };
         default:
           return part;
       }
@@ -199,7 +199,7 @@ export function deserializeContent(content: SerializedContent): Content {
       case "image":
         return { ...part, image: deserializeUrl(part.image) };
       case "file":
-        return { ...part, file: deserializeUrl(part.data) };
+        return { ...part, data: deserializeUrl(part.data) };
       default:
         return part;
     }
