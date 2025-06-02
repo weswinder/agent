@@ -13,6 +13,9 @@ You have a function that both allows paginating over messages, as well as taking
 in a `streamArgs` object and returning the `streams` result from `syncStreams`.
 
 ```ts
+import { paginationOptsValidator } from "convex/server";
+import { vStreamArgs } from "@convex-dev/agent/react";
+
  export const listThreadMessages = query({
    args: {
      threadId: v.string(),
@@ -37,11 +40,14 @@ See [ChatStreaming.tsx](./src/ChatStreaming.tsx) for the client-side code.
 The crux is to use the `useThreadMessages` hook, and pass in `stream: true`:
 
 ```ts
-const messages = useThreadMessages(
-  api.streaming.listThreadMessages,
-  { threadId },
-  { initialNumItems: 10, stream: true },
-);
+import { useThreadMessages } from "@convex-dev/agent/react";
+
+// in the component
+  const messages = useThreadMessages(
+    api.streaming.listThreadMessages,
+    { threadId },
+    { initialNumItems: 10, stream: true },
+  );
 ```
 
 ### Text smoothing
@@ -49,7 +55,10 @@ const messages = useThreadMessages(
 The `useSmoothText` hook is a simple hook that smooths the text as it is streamed.
 
 ```ts
-const [visibleText] = useSmoothText(message.content);
+import { useSmoothText } from "@convex-dev/agent/react";
+
+// in the component
+  const [visibleText] = useSmoothText(message.content);
 ```
 
 See [ChatStreaming.tsx](./src/ChatStreaming.tsx) for an example.
@@ -70,19 +79,19 @@ const sendMessage = useMutation(api.streaming.streamStoryAsynchronously)
   .withOptimisticUpdate(optimisticallySendMessage(api.streaming.listThreadMessages));
 ```
 
-If your arguments don't include { threadId, prompt } then you can use it as a
+If your arguments don't include `{ threadId, prompt }` then you can use it as a
 helper function in your optimistic update:
 
 ```ts
+import { optimisticallySendMessage } from "@convex-dev/agent/react";
+
 const sendMessage = useMutation(
   api.chatStreaming.streamStoryAsynchronously,
 ).withOptimisticUpdate(
   (store, args) => {
-    const prompt = // change your args into the user prompt.
-    const threadId = // get the threadId from your args / context
     optimisticallySendMessage(api.chatStreaming.listThreadMessages)(store, {
-      threadId,
-      prompt,
+      threadId: /* get the threadId from your args / context */,
+      prompt: /* change your args into the user prompt. */,
     })
   }
 );
