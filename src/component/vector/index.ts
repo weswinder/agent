@@ -97,12 +97,23 @@ export const deleteBatchForThread = mutation({
 export const insertBatch = mutation({
   args: {
     vectorDimension: vVectorDimension,
-    vectors: v.array(vEmbeddingsWithoutDenormalizedFields),
+    vectors: v.array(
+      v.object({
+        ...vEmbeddingsWithoutDenormalizedFields.fields,
+        messageId: v.optional(v.id("messages")),
+      })
+    ),
   },
-  returns: v.null(),
+  returns: v.array(vVectorId),
   handler: async (ctx, args) => {
-    await Promise.all(
-      args.vectors.map((v) => insertVector(ctx, args.vectorDimension, v))
+    return Promise.all(
+      args.vectors.map(async ({ messageId, ...v }) => {
+        const embeddingId = await insertVector(ctx, args.vectorDimension, v);
+        if (messageId) {
+          await ctx.db.patch(messageId, { embeddingId });
+        }
+        return embeddingId;
+      })
     );
   },
 });

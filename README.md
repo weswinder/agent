@@ -317,6 +317,47 @@ Specifying tools at each layer will overwrite the defaults.
 The tools will be `args.tools ?? thread.tools ?? agent.options.tools`.
 This allows you to create tools in a context that is convenient.
 
+### Saving messages then generate asynchronously
+
+You can save messages in a mutation, then do the generation asynchronously.
+This is recommended for a few reasons:
+1. You can set up optimistic UI updates on mutations that are transactional, so
+  the message will be shown optimistically until the message is saved and
+  present in your message query.
+
+To do this, you need to first save the message, then pass the `messageId` as
+`promptMessageId` to generate / stream text.
+
+Note: embeddings are usually generated automatically when you save messages from
+an action. However, if you're saving messages in a mutation, where calling
+an LLM is not possible, you can generate them asynchronously as well.
+
+```ts
+export const sendMessage = mutation({
+  args: { threadId: v.id("threads"), prompt: v.string() },
+  handler: async (ctx, { threadId, prompt }) => {
+    const userId = await getUserId(ctx);
+    const { messageId } = await agent.saveMessage(ctx, {
+      threadId, userId, prompt,
+      skipEmbeddings: true,
+    });
+    await ctx.scheduler.runAfter(0, internal.example.myAsyncAction, {
+      threadId, promptMessageId: messageId,
+    });
+  }
+});
+
+export const myAsyncAction = internalAction({
+  args: { threadId: v.string(), promptMessageId: v.string() },
+  handler: async (ctx, { threadId, promptMessageId }) => {
+    // Generate embeddings for the prompt message
+    await supportAgent.generateAndSaveEmbeddings(ctx, { messageIds: [promptMessageId] });
+    const { thread } = await supportAgent.continueThread(ctx, { threadId });
+    await thread.generateText({ promptMessageId });
+  },
+});
+```
+
 ### Fetching thread history
 
 Fetch the full messages directly. These will include things like usage, etc.
@@ -526,7 +567,7 @@ const messages = await ctx.runQuery(components.agent.vector.index.updateBatch, {
 Delete embeddings
 
 ```ts
-const messages = await ctx.runQuery(components.agent.vector.index.deleteBatch, {
+await ctx.runMutation(components.agent.vector.index.deleteBatch, {
   ids: [embeddingId1, embeddingId2],
 });
 ```
@@ -534,11 +575,19 @@ const messages = await ctx.runQuery(components.agent.vector.index.deleteBatch, {
 Insert embeddings
 
 ```ts
-const messages = await ctx.runQuery(
+const ids = await ctx.runMutation(
   components.agent.vector.index.insertBatch, {
     vectorDimension: 1536,
     vectors: [
-      { model: "gpt-4o-mini", table: "messages", userId: "123", threadId: "123", vector: embedding, },
+      {
+        model: "gpt-4o-mini",
+        table: "messages",
+        userId: "123",
+        threadId: "123",
+        vector: embedding,
+        // Optional, if you want to update the message with the embeddingId
+        messageId: messageId,
+      },
     ],
   }
 );

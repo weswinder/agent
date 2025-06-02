@@ -536,18 +536,105 @@ export class Agent<AgentTools extends ToolSet> {
     return embeddings;
   }
 
+  /**
+   * Generate embeddings for a set of messages, and save them to the database.
+   * It will not generate or save embeddings for messages that already have an
+   * embedding.
+   * @param ctx The ctx parameter to an action.
+   * @param args The messageIds to generate embeddings for.
+   */
+  async generateAndSaveEmbeddings(
+    ctx: RunActionCtx,
+    args: {
+      messageIds: string[];
+    }
+  ) {
+    const messages = (
+      await ctx.runQuery(this.component.messages.getMessagesByIds, {
+        messageIds: args.messageIds,
+      })
+    ).filter((m): m is NonNullable<typeof m> => m !== null);
+    if (messages.length !== args.messageIds.length) {
+      throw new Error(
+        "Some messages were not found: " +
+          args.messageIds
+            .filter((id) => !messages.some((m) => m?._id === id))
+            .join(", ")
+      );
+    }
+    if (messages.some((m) => !m.message)) {
+      throw new Error(
+        "Some messages don't have a message: " +
+          args.messageIds
+            .map((id, i) => (!messages[i].message ? id : undefined))
+            .filter((id): id is string => id !== undefined)
+            .join(", ")
+      );
+    }
+    const messagesMissingEmbeddings = messages.filter((m) => !m.embeddingId);
+    if (messagesMissingEmbeddings.length === 0) {
+      return;
+    }
+    const embeddings = await this.generateEmbeddings(
+      messagesMissingEmbeddings.map((m) => m!.message!)
+    );
+    if (!embeddings) {
+      if (!this.options.textEmbedding) {
+        throw new Error(
+          "No embeddings were generated for the messages. You must pass a textEmbedding model to the agent constructor."
+        );
+      }
+      throw new Error(
+        "No embeddings were generated for these messages: " +
+          messagesMissingEmbeddings.map((m) => m!._id).join(", ")
+      );
+    }
+    await ctx.runMutation(this.component.vector.index.insertBatch, {
+      vectorDimension: embeddings.dimension,
+      vectors: messagesMissingEmbeddings
+        .map((m, i) => ({
+          messageId: m!._id,
+          model: embeddings.model,
+          table: "messages",
+          userId: m.userId,
+          threadId: m.threadId,
+          vector: embeddings.vectors[i],
+        }))
+        .filter(
+          (v): v is Extract<typeof v, { vector: number[] }> => v.vector !== null
+        ),
+    });
+  }
+
   async saveMessage(
     ctx: RunMutationCtx,
     args: {
       threadId: string;
       userId?: string;
+      /**
+       * Metadata to save with the messages. Each element corresponds to the
+       * message at the same index.
+       */
       metadata?: Omit<MessageWithMetadata, "message">;
+      /**
+       * If true, it will not generate embeddings for the message.
+       * Useful if you're saving messages in a mutation where you can't run `fetch`.
+       * You can generate them asynchronously by using the scheduler to run an
+       * action later that calls `agent.generateAndSaveEmbeddings`.
+       */
+      skipEmbeddings?: boolean;
     } & (
       | {
           prompt?: undefined;
+          /**
+           * The message to save.
+           */
           message: CoreMessage;
         }
       | {
+          /*
+           * The prompt to save with the message.
+           */
           prompt: string;
           message?: undefined;
         }
@@ -561,6 +648,7 @@ export class Agent<AgentTools extends ToolSet> {
           ? [{ role: "user", content: args.prompt }]
           : [args.message],
       metadata: args.metadata ? [args.metadata] : undefined,
+      skipEmbeddings: args.skipEmbeddings,
     });
     return { messageId: lastMessageId };
   }
@@ -601,12 +689,36 @@ export class Agent<AgentTools extends ToolSet> {
        * Defaults to false.
        */
       failPendingSteps?: boolean;
+      /**
+       * Skip generating embeddings for the messages. Useful if you're
+       * saving messages in a mutation where you can't run `fetch`.
+       * You can generate them asynchronously by using the scheduler to run an
+       * action later that calls `agent.generateAndSaveEmbeddings`.
+       */
+      skipEmbeddings?: boolean;
     }
   ): Promise<{
     lastMessageId: string;
     messages: MessageDoc[];
   }> {
-    const embeddings = await this.generateEmbeddings(args.messages);
+    let embeddings:
+      | {
+          vectors: (number[] | null)[];
+          dimension: VectorDimension;
+          model: string;
+        }
+      | undefined;
+    if (args.skipEmbeddings || !("runAction" in ctx)) {
+      embeddings = undefined;
+      if (!args.skipEmbeddings && this.options.textEmbedding) {
+        throw new Error(
+          "You're trying to save messages and generate embeddings, but you're in a mutation. Pass `skipEmbeddings: true` to skip generating embeddings in the mutation. " +
+            "You can generate them asynchronously by using the scheduler to run an action later that calls `agent.generateAndSaveEmbeddings`."
+        );
+      }
+    } else {
+      embeddings = await this.generateEmbeddings(args.messages);
+    }
     const result = await ctx.runMutation(this.component.messages.addMessages, {
       threadId: args.threadId,
       userId: args.userId,

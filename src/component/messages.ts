@@ -443,6 +443,16 @@ export const listMessagesByThreadId = query({
   returns: vPaginationResult(vMessageDoc),
 });
 
+export const getMessagesByIds = query({
+  args: {
+    messageIds: v.array(v.id("messages")),
+  },
+  handler: async (ctx, args) => {
+    return await Promise.all(args.messageIds.map((id) => ctx.db.get(id)));
+  },
+  returns: v.array(v.union(v.null(), vMessageDoc)),
+});
+
 /** @deprecated Use listMessagesByThreadId instead. */
 export const getThreadMessages = query({
   args: { deprecated: v.literal("Use listMessagesByThreadId instead") },
