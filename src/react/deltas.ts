@@ -139,6 +139,7 @@ export function applyDeltasToStreamMessage(
       );
       lastContent = getLastContent(currentMessage);
       newStream.messages.push(currentMessage);
+      continue;
     }
     switch (part.type) {
       case "text-delta":
