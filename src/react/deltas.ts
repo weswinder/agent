@@ -28,9 +28,9 @@ export function mergeDeltas(
   // Seed the existing chunks
   let changed = false;
   for (const streamMessage of streamMessages) {
-    const deltas = allDeltas
-      .filter((d) => d.streamId === streamMessage.streamId)
-      .sort((a, b) => a.start - b.start);
+    const deltas = allDeltas.filter(
+      (d) => d.streamId === streamMessage.streamId
+    );
     const existing = existingStreams.find(
       (s) => s.stream.streamId === streamMessage.streamId
     );
@@ -79,7 +79,7 @@ export function applyDeltasToStreamMessage(
     messages: existing?.messages ?? [],
   };
   let parts: TextStreamPart[] = [];
-  for (const delta of deltas) {
+  for (const delta of deltas.sort((a, b) => a.start - b.start)) {
     if (delta.parts.length === 0) {
       console.warn(`Got delta for stream ${delta.streamId} with no parts`);
       continue;
