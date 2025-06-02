@@ -15,7 +15,7 @@ function getThreadIdFromHash() {
 }
 
 export default function ChatStreaming() {
-  const createThread = useMutation(api.streaming.createThread);
+  const createThread = useMutation(api.chatStreaming.createThread);
   const [threadId, setThreadId] = useState<string | undefined>(
     typeof window !== "undefined" ? getThreadIdFromHash() : undefined,
   );
@@ -72,14 +72,14 @@ export default function ChatStreaming() {
 
 function Story({ threadId, reset }: { threadId: string; reset: () => void }) {
   const messages = useThreadMessages(
-    api.streaming.listThreadMessages,
+    api.chatStreaming.listThreadMessages,
     { threadId },
     { initialNumItems: 10, stream: true },
   );
   const sendMessage = useMutation(
-    api.streaming.streamStoryAsynchronously,
+    api.chatStreaming.streamStoryAsynchronously,
   ).withOptimisticUpdate(
-    optimisticallySendMessage(api.streaming.listThreadMessages),
+    optimisticallySendMessage(api.chatStreaming.listThreadMessages),
   );
   const [prompt, setPrompt] = useState("Tell me a story");
 

@@ -30,7 +30,7 @@ export const streamStoryAsynchronously = mutation({
       threadId,
       prompt,
     });
-    await ctx.scheduler.runAfter(0, internal.streaming.streamStory, {
+    await ctx.scheduler.runAfter(0, internal.chatStreaming.streamStory, {
       threadId,
       promptMessageId: messageId,
     });
@@ -43,7 +43,7 @@ export const streamStory = internalAction({
     const { thread } = await storyAgent.continueThread(ctx, { threadId });
     const result = await thread.streamText(
       { promptMessageId },
-      { saveStreamDeltas: true },
+      { saveStreamDeltas: { chunking: /[\W\s]/, throttleMs: 100 } },
     );
     await result.consumeStream();
   },

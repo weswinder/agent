@@ -15,7 +15,7 @@ import type {
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { MessageDoc } from "../client";
 import type { SyncStreamsReturnValue } from "../client/types";
-import type { StreamArgs, StreamMessage } from "../validators";
+import type { StreamArgs } from "../validators";
 import type { UIMessage } from "./toUIMessages";
 import { toUIMessages } from "./toUIMessages";
 import { OptimisticLocalStore } from "convex/browser";

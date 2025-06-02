@@ -1,6 +1,6 @@
 import { definePlaygroundAPI } from "@convex-dev/agent-playground";
 import { components } from "./_generated/api";
-import { storyAgent } from "./streaming";
+import { storyAgent } from "./chatStreaming";
 
 /**
  * Here we expose the API so the frontend can access it.

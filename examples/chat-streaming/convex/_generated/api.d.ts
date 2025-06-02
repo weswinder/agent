@@ -8,8 +8,8 @@
  * @module
  */
 
+import type * as chatStreaming from "../chatStreaming.js";
 import type * as playground from "../playground.js";
-import type * as streaming from "../streaming.js";
 
 import type {
   ApiFromModules,
@@ -26,8 +26,8 @@ import type {
  * ```
  */
 declare const fullApi: ApiFromModules<{
+  chatStreaming: typeof chatStreaming;
   playground: typeof playground;
-  streaming: typeof streaming;
 }>;
 declare const fullApiWithMounts: typeof fullApi;
 
