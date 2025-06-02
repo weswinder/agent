@@ -154,7 +154,7 @@ export function useStreamingThreadMessages<
   // cursor. There can be multiple messages in the same stream, e.g. for tool
   // calls.
   const [streams, setStreams] = useState<
-    Array<{ stream: StreamMessage; cursor: number; messages: MessageDoc[] }>
+    Array<{ streamId: string; cursor: number; messages: MessageDoc[] }>
   >([]);
   // Get all the active streams
   const streamList = useQuery(
@@ -176,8 +176,7 @@ export function useStreamingThreadMessages<
       throw new Error("Expected list streams");
     }
     return streamList.streams.messages.map(({ streamId }) => {
-      const stream = streams.find((s) => s.stream.streamId === streamId);
-      // Because of the invariant, we can just take the last chunk's end.
+      const stream = streams.find((s) => s.streamId === streamId);
       const cursor = stream?.cursor ?? 0;
       return { streamId, cursor };
     });
@@ -198,8 +197,8 @@ export function useStreamingThreadMessages<
   // Merge any deltas into the streamChunks, keeping it unmodified if unchanged.
   const threadId = args === "skip" ? undefined : args.threadId;
   const [messages, newStreams, changed] = useMemo(() => {
-    if (!threadId) return [undefined, streams, false];
-    if (!streamList) return [undefined, streams, false];
+    if (!threadId) return [undefined, [], false];
+    if (!streamList) return [undefined, [], false];
     if (cursorQuery && cursorQuery.streams?.kind !== "deltas") {
       throw new Error("Expected deltas streams");
     }

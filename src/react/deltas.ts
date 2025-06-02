@@ -1,6 +1,11 @@
 import type { TextPart, ToolCallPart, ToolResultPart } from "ai";
 import type { MessageDoc } from "../client";
-import type { StreamDelta, StreamMessage, TextStreamPart } from "../validators";
+import type {
+  Message,
+  StreamDelta,
+  StreamMessage,
+  TextStreamPart,
+} from "../validators";
 import type { UIMessage } from "./toUIMessages";
 import { toUIMessages } from "./toUIMessages";
 
@@ -10,18 +15,18 @@ export function mergeDeltas(
   threadId: string,
   streamMessages: StreamMessage[],
   existingStreams: Array<{
-    stream: StreamMessage;
+    streamId: string;
     cursor: number;
     messages: MessageDoc[];
   }>,
   allDeltas: StreamDelta[]
 ): [
   MessageDoc[],
-  Array<{ stream: StreamMessage; cursor: number; messages: MessageDoc[] }>,
+  Array<{ streamId: string; cursor: number; messages: MessageDoc[] }>,
   boolean,
 ] {
   const newStreams: Array<{
-    stream: StreamMessage;
+    streamId: string;
     cursor: number;
     messages: MessageDoc[];
   }> = [];
@@ -32,7 +37,7 @@ export function mergeDeltas(
       (d) => d.streamId === streamMessage.streamId
     );
     const existing = existingStreams.find(
-      (s) => s.stream.streamId === streamMessage.streamId
+      (s) => s.streamId === streamMessage.streamId
     );
     const [newStream, messageChanged] = applyDeltasToStreamMessage(
       threadId,
@@ -43,20 +48,16 @@ export function mergeDeltas(
     newStreams.push(newStream);
     if (messageChanged) changed = true;
   }
-  for (const { stream } of existingStreams) {
-    if (!newStreams.find((s) => s.stream.streamId === stream.streamId)) {
+  for (const { streamId } of existingStreams) {
+    if (!newStreams.find((s) => s.streamId === streamId)) {
       // There's a stream that's no longer active.
       changed = true;
     }
   }
   const messages = newStreams
-    .sort(
-      (a, b) =>
-        a.stream.order - b.stream.order ||
-        a.stream.stepOrder - b.stream.stepOrder
-    )
     .map((s) => s.messages)
-    .flat();
+    .flat()
+    .sort((a, b) => a.order - b.order || a.stepOrder - b.stepOrder);
   return [messages, newStreams, changed];
 }
 
@@ -65,62 +66,71 @@ export function applyDeltasToStreamMessage(
   threadId: string,
   streamMessage: StreamMessage,
   existing:
-    | { stream: StreamMessage; cursor: number; messages: MessageDoc[] }
+    | { streamId: string; cursor: number; messages: MessageDoc[] }
     | undefined,
   deltas: StreamDelta[]
-): [
-  { stream: StreamMessage; cursor: number; messages: MessageDoc[] },
-  boolean,
-] {
+): [{ streamId: string; cursor: number; messages: MessageDoc[] }, boolean] {
   let changed = false;
-  const newStream = {
-    stream: streamMessage,
-    cursor: existing?.cursor ?? 0,
-    messages: existing?.messages ?? [],
-  };
+  let cursor = existing?.cursor ?? 0;
   let parts: TextStreamPart[] = [];
   for (const delta of deltas.sort((a, b) => a.start - b.start)) {
     if (delta.parts.length === 0) {
-      console.warn(`Got delta for stream ${delta.streamId} with no parts`);
+      console.warn(`Got delta with no parts: ${JSON.stringify(delta)}`);
       continue;
     }
-    if (newStream.cursor !== delta.start) {
-      if (newStream.cursor >= delta.end) {
+    if (cursor !== delta.start) {
+      if (cursor >= delta.end) {
         console.debug(
           `Got duplicate delta for stream ${delta.streamId} at ${delta.start}`
         );
         continue;
-      } else if (newStream.cursor < delta.start) {
+      } else if (cursor < delta.start) {
         console.warn(
-          `Got delta for stream ${delta.streamId} that has a gap ${newStream.cursor} -> ${delta.start}`
+          `Got delta for stream ${delta.streamId} that has a gap ${cursor} -> ${delta.start}`
         );
         continue;
       } else {
         throw new Error(
-          `Got unexpected delta for stream ${delta.streamId}: delta: ${delta.start} -> ${delta.end} existing cursor: ${newStream.cursor}`
+          `Got unexpected delta for stream ${delta.streamId}: delta: ${delta.start} -> ${delta.end} existing cursor: ${cursor}`
         );
       }
     }
     changed = true;
-    newStream.cursor = delta.end;
+    cursor = delta.end;
     parts.push(...delta.parts);
   }
   if (!changed) {
-    return [existing ?? newStream, false];
+    return [
+      existing ?? { streamId: streamMessage.streamId, cursor, messages: [] },
+      false,
+    ];
   }
 
-  if (!newStream.messages.at(-1)) {
-    newStream.messages.push(
-      createStreamingMessage(
-        threadId,
-        streamMessage,
-        parts[0]!,
-        newStream.messages.length
-      )
+  const existingMessages = existing?.messages ?? [];
+
+  let currentMessage: MessageDoc;
+  if (existingMessages.length > 0) {
+    // replace the last message with a new one
+    const lastMessage = existingMessages.at(-1)!;
+    currentMessage = {
+      ...lastMessage,
+      message: cloneMessageAndContent(lastMessage.message),
+    };
+  } else {
+    const newMessage = createStreamingMessage(
+      threadId,
+      streamMessage,
+      parts[0]!,
+      existingMessages.length
     );
     parts = parts.slice(1);
+    currentMessage = newMessage;
   }
-  let currentMessage = newStream.messages.at(-1)!;
+  const newStream = {
+    streamId: streamMessage.streamId,
+    cursor,
+    messages: [...existingMessages.slice(0, -1), currentMessage],
+  };
   let lastContent = getLastContent(currentMessage);
   for (const part of parts) {
     let contentToAdd:
@@ -214,6 +224,20 @@ export function applyDeltasToStreamMessage(
     }
   }
   return [newStream, true];
+}
+
+function cloneMessageAndContent(
+  message: Message | undefined
+): Message | undefined {
+  return (
+    message &&
+    ({
+      ...message,
+      content: Array.isArray(message.content)
+        ? [...message.content]
+        : message.content,
+    } as typeof message)
+  );
 }
 
 function getLastContent(message: MessageDoc) {
