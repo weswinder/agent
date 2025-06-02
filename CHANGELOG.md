@@ -2,16 +2,18 @@
 
 ## 0.1.4
 
-- Automatically pull in the thread's userId when no userId is specified.
-- Fix bugs around duplicate content when streaming / using toUIMessages.
-- useSmoothText is now even smoother with a stream rate that auto-adjusts.
-- Default streaming chunks to sentence instead of word.
+- Automatically pulls in the thread's userId when no userId is specified.
+- Fixes bugs around duplicate content when streaming / using toUIMessages.
+- `useSmoothText` is now even smoother with a stream rate that auto-adjusts.
+- Defaults streaming chunks to sentence instead of word.
 
 ### Breaking
 
-- The userId associated with the thread will automatically be associated with
-  messages and tool calls, if no userId is passed at thread continuation or callsite.
-- The searchMessage and textSearch functions now take the more explicit
+- The `userId` associated with the thread will automatically be associated with
+  messages and tool calls, if no userId is passed at thread continuation or call-site.
+  This is likely what you want, but in case you didn't, consider not setting a default
+  userId for the thread and passing it in only when continuing the thread.
+- The `searchMessage` and `textSearch` functions now take the more explicit
   parameter `searchAllMessagesForUserId` instead of `userId`.
 
 ## 0.1.3
