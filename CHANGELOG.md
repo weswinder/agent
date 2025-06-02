@@ -4,6 +4,7 @@
 
 - Support generating embeddings asynchronously to save messages in mutations.
 - Build the project so it's compatible with composite and verbatim module syntax
+- Fix handling of file messages
 
 ## 0.1.4
 
