@@ -2,6 +2,7 @@
 
 ## 0.1.5 alpha
 
+- Support generating embeddings asynchronously to save messages in mutations.
 - Build the project so it's compatible with composite and verbatim module syntax
 
 ## 0.1.4
