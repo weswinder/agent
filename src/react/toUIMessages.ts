@@ -64,7 +64,7 @@ export function toUIMessages(
         assistantMessage = {
           ...common,
           role: "assistant",
-          content: message.text ?? "",
+          content: "",
           parts: [],
         };
         uiMessages.push(assistantMessage);
@@ -152,7 +152,11 @@ export function toUIMessages(
         }
       }
     }
-    if (!message.tool) {
+    if (
+      !message.tool &&
+      assistantMessage &&
+      assistantMessage.parts.length > 0
+    ) {
       // Reset it so the next set of tool calls will create a new assistant message
       assistantMessage = undefined;
     }
