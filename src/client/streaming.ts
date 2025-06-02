@@ -9,7 +9,7 @@ export type StreamingOptions = {
    * Note: this is not a guarantee that every delta will be exactly one line.
    * E.g. if "line" is specified, it won't save any deltas until it encounters
    * a newline character.
-   * Defaults to "word".
+   * Defaults to a regex that chunks by punctuation followed by whitespace.
    */
   chunking?: "word" | "line" | RegExp | ChunkDetector;
   /**
@@ -19,7 +19,8 @@ export type StreamingOptions = {
   throttleMs?: number;
 };
 export const DEFAULT_STREAMING_OPTIONS = {
-  chunking: "line",
+  // This chunks by sentences / clauses. Punctuation followed by whitespace.
+  chunking: /[\p{P}\s]/u,
   throttleMs: 250,
 } satisfies StreamingOptions;
 

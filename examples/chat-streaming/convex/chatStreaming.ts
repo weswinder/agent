@@ -43,7 +43,7 @@ export const streamStory = internalAction({
     const { thread } = await storyAgent.continueThread(ctx, { threadId });
     const result = await thread.streamText(
       { promptMessageId },
-      { saveStreamDeltas: { chunking: /[\W\s]/, throttleMs: 100 } },
+      { saveStreamDeltas: true },
     );
     await result.consumeStream();
   },
