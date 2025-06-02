@@ -39,11 +39,12 @@ const supportAgent = new Agent(components.agent, {
 });
 
 // Use the agent from within a normal action:
-export const createThread = action({
+export const createThreadAndPrompt = action({
   args: { prompt: v.string() },
   handler: async (ctx, { prompt }) => {
+    const userId = await getUserId(ctx);
     // Start a new thread for the user.
-    const { threadId, thread } = await supportAgent.createThread(ctx);
+    const { threadId, thread } = await supportAgent.createThread(ctx, { userId});
     // Creates a user message with the prompt, and an assistant reply message.
     const result = await thread.generateText({ prompt });
     return { threadId, text: result.text };
@@ -59,26 +60,6 @@ export const continueThread = action({
     // This includes previous message history from the thread automatically.
     const result = await thread.generateText({ prompt });
     return result.text;
-  },
-});
-
-// Or use it within a workflow, specific to a user:
-export const { generateText: getSupport } = supportAgent.asActions({ maxSteps: 10 });
-
-const workflow = new WorkflowManager(components.workflow);
-
-export const supportAgentWorkflow = workflow.define({
-  args: { prompt: v.string(), userId: v.string(), threadId: v.string() },
-  handler: async (step, { prompt, userId, threadId }) => {
-    const suggestion = await step.runAction(internal.example.getSupport, {
-      threadId, userId, prompt,
-    });
-    const polished = await step.runAction(internal.example.adaptSuggestionForUser, {
-      userId, suggestion,
-    });
-    await step.runMutation(internal.example.sendUserMessage, {
-      userId, message: polished.message,
-    });
   },
 });
 ```
@@ -175,13 +156,13 @@ You can also search the user's history for relevant messages in this thread.
 
 ```ts
 // Use the agent from within a normal action:
-export const createThread = action({
-  args: { prompt: v.string(), userId: v.string() },
-  handler: async (ctx, { prompt, userId }): Promise<{ threadId: string; initialResponse: string }> => {
+export const createThread = mutation({
+  args: {},
+  handler: async (ctx): Promise<{ threadId: string }> => {
+    const userId = await getUserId(ctx);
     // Start a new thread for the user.
-+   const { threadId, thread } = await supportAgent.createThread(ctx, { userId });
-    const result = await thread.generateText({ prompt });
-    return { threadId, initialResponse: result.text };
+    const { threadId } = await supportAgent.createThread(ctx, { userId });
+    return { threadId };
   },
 });
 ```
@@ -196,6 +177,7 @@ to include in the prompt context.
 export const continueThread = action({
   args: { prompt: v.string(), threadId: v.string() },
   handler: async (ctx, { prompt, threadId }): Promise<string> => {
+    await authorizeThreadAccess(ctx, threadId);
     // This includes previous message history from the thread automatically.
 +   const { thread } = await supportAgent.continueThread(ctx, { threadId });
     const result = await thread.generateText({ prompt });
@@ -210,7 +192,10 @@ The arguments to `generateText` are the same as the AI SDK, except you don't
 have to provide a model. By default it will use the agent's chat model.
 
 ```ts
-const { thread } = await supportAgent.createThread(ctx, { userId });
+const { thread } = await supportAgent.createThread(ctx);
+// OR
+const { thread } = await supportAgent.continueThread(ctx, { threadId });
+
 const result = await thread.generateText({ prompt });
 ```
 
@@ -339,11 +324,15 @@ Fetch the full messages directly. These will include things like usage, etc.
 ```ts
 import type { MessageDoc } from "@convex-dev/agent";
 
-const messages: MessageDoc[] = await ctx.runQuery(
-  components.agent.messages.listMessagesByThreadId, {
-    threadId,
-    order: "desc",
-    paginationOpts: { cursor: null, numItems: 10 }
+export const getMessages = query({
+  args: { threadId: v.id("threads") },
+  handler: async (ctx, { threadId }): Promise<MessageDoc[]> => {
+    const messages = await agent.listMessages(ctx, {
+      threadId,
+      paginationOpts: { cursor: null, numItems: 10 }
+    });
+    return messages.page;
+  },
 });
 ```
 

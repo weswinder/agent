@@ -7,7 +7,7 @@ the full message in a React hook.
 
 ## Server setup
 
-See [`listThreadMessages` in streaming.ts](./convex/streaming.ts) for the server-side code.
+See [`listThreadMessages` in chatStreaming.ts](./convex/chatStreaming.ts) for the server-side code.
 
 You have a function that both allows paginating over messages, as well as taking
 in a `streamArgs` object and returning the `streams` result from `syncStreams`.
@@ -53,12 +53,14 @@ const [visibleText] = useSmoothText(message.content);
 ```
 
 See [ChatStreaming.tsx](./src/ChatStreaming.tsx) for an example.
+You can configure the initial characters per second. It will adapt over time to
+match the average speed of the text coming in.
 
 ### Optimistic updates for sending messages
 
-The `optimisticallySendMessage` function is a simple function that
-optimistically shows a message in the message list until the mutation has
-completed on the server.
+The `optimisticallySendMessage` function is a helper function for sending a
+message, so you can optimistically show a message in the message list until the
+mutation has completed on the server.
 
 Pass in the query that you're using to list messages, and it will insert the
 ephemeral message at the top of the list.
@@ -68,10 +70,27 @@ const sendMessage = useMutation(api.streaming.streamStoryAsynchronously)
   .withOptimisticUpdate(optimisticallySendMessage(api.streaming.listThreadMessages));
 ```
 
+If your arguments don't include { threadId, prompt } then you can use it as a
+helper function in your optimistic update:
+
+```ts
+const sendMessage = useMutation(
+  api.chatStreaming.streamStoryAsynchronously,
+).withOptimisticUpdate(
+  (store, args) => {
+    const prompt = // change your args into the user prompt.
+    const threadId = // get the threadId from your args / context
+    optimisticallySendMessage(api.chatStreaming.listThreadMessages)(store, {
+      threadId,
+      prompt,
+    })
+  }
+);
+```
+
 ## Running the example
 
 ```sh
-npm run i
 npm run setup
 cd examples/chat-streaming
 npm i
