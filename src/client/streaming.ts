@@ -19,7 +19,7 @@ export type StreamingOptions = {
   throttleMs?: number;
 };
 export const DEFAULT_STREAMING_OPTIONS = {
-  chunking: "word",
+  chunking: "line",
   throttleMs: 250,
 } satisfies StreamingOptions;
 
