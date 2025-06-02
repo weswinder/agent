@@ -1,26 +1,27 @@
-import type { BetterOmit, ErrorMessage, Expand } from "convex-helpers";
+import type { ErrorMessage } from "convex-helpers";
 import {
-  insertAtTop,
   type PaginatedQueryArgs,
   usePaginatedQuery,
   type UsePaginatedQueryResult,
   useQuery,
 } from "convex/react";
-import type {
-  FunctionArgs,
-  FunctionReference,
-  PaginationOptions,
-  PaginationResult,
-} from "convex/server";
-import { useEffect, useMemo, useRef, useState } from "react";
+import type { FunctionArgs } from "convex/server";
+import { useMemo, useState } from "react";
 import type { MessageDoc } from "../client";
 import type { SyncStreamsReturnValue } from "../client/types";
 import type { StreamArgs } from "../validators";
 import type { UIMessage } from "./toUIMessages";
 import { toUIMessages } from "./toUIMessages";
-import { OptimisticLocalStore } from "convex/browser";
 import { mergeDeltas } from "./deltas";
+import type {
+  ThreadQuery,
+  ThreadStreamQuery,
+  ThreadMessagesArgs,
+  ThreadMessagesResult,
+} from "./types";
 
+export { optimisticallySendMessage } from "./optimisticallySendMessage";
+export { useSmoothText } from "./useSmoothText";
 export { toUIMessages, type UIMessage };
 
 /**
@@ -218,260 +219,6 @@ export function useStreamingThreadMessages<
   }
   return messages as ThreadMessagesResult<Query>[] | undefined;
 }
-
-/**
- * A hook that smoothly displays text as it is streamed.
- *
- * @param text The text to display. Pass in the full text each time.
- * @param charsPerSec The number of characters to display per second.
- * @returns A tuple of the visible text and the state of the smooth text,
- * including the current cursor position and whether it's still streaming.
- * This allows you to decide if it's too far behind and you want to adjust
- * the charsPerSec or just prefer the full text.
- */
-export function useSmoothText(
-  text: string,
-  {
-    charsPerSec = 512,
-  }: {
-    /**
-     * The number of characters to display per second.
-     */
-    charsPerSec?: number;
-  } = {}
-): [string, { cursor: number; isStreaming: boolean }] {
-  const [visibleText, setVisibleText] = useState(text);
-  const smoothState = useRef({ lastUpdated: Date.now(), cursor: text.length });
-
-  const isStreaming = smoothState.current.cursor < text.length;
-
-  useEffect(() => {
-    if (!isStreaming) {
-      return;
-    }
-    function update() {
-      if (smoothState.current.cursor >= text.length) {
-        return;
-      }
-      const now = Date.now();
-      const timeSinceLastUpdate = now - smoothState.current.lastUpdated;
-      const chars = Math.floor((timeSinceLastUpdate * charsPerSec) / 1000);
-      smoothState.current.cursor = Math.min(
-        smoothState.current.cursor + chars,
-        text.length
-      );
-      smoothState.current.lastUpdated = now;
-      setVisibleText(text.slice(0, smoothState.current.cursor));
-    }
-    update();
-    const interval = setInterval(() => {
-      update();
-    }, 50);
-    return () => clearInterval(interval);
-  }, [text, isStreaming, charsPerSec]);
-
-  return [visibleText, { cursor: smoothState.current.cursor, isStreaming }];
-}
-
-export function optimisticallySendMessage(
-  query: ThreadQuery<unknown, MessageDoc>
-): (
-  store: OptimisticLocalStore,
-  args: { threadId: string; prompt: string }
-) => void {
-  return (store, args) => {
-    const queries = store.getAllQueries(query);
-    let maxOrder = 0;
-    let maxStepOrder = 0;
-    for (const q of queries) {
-      if (q.args?.threadId !== args.threadId) continue;
-      if (q.args.streamArgs) continue;
-      for (const m of q.value?.page ?? []) {
-        maxOrder = Math.max(maxOrder, m.order);
-        maxStepOrder = Math.max(maxStepOrder, m.stepOrder);
-      }
-    }
-    const order = maxOrder + 1;
-    const stepOrder = 0;
-    insertAtTop({
-      paginatedQuery: query,
-      argsToMatch: { threadId: args.threadId, streamArgs: undefined },
-      item: {
-        _creationTime: Date.now(),
-        _id: crypto.randomUUID(),
-        order,
-        stepOrder,
-        status: "pending",
-        threadId: args.threadId,
-        tool: false,
-        message: {
-          role: "user",
-          content: args.prompt,
-        },
-        text: args.prompt,
-      },
-      localQueryStore: store,
-    });
-  };
-}
-
-type ThreadQuery<
-  Args = unknown,
-  M extends MessageDoc = MessageDoc,
-> = FunctionReference<
-  "query",
-  "public",
-  {
-    threadId: string;
-    paginationOpts: PaginationOptions;
-    // TODO: will this allow passing a function that doesn't have this param?
-    /**
-     * If { stream: true } is passed, it will also query for stream deltas.
-     * In order for this to work, the query must take as an argument streamArgs.
-     */
-    streamArgs?: StreamArgs;
-  } & Args,
-  PaginationResult<M> & { streams?: SyncStreamsReturnValue }
->;
-
-type ThreadStreamQuery<
-  Args = Record<string, unknown>,
-  M extends MessageDoc = MessageDoc,
-> = FunctionReference<
-  "query",
-  "public",
-  {
-    threadId: string;
-    paginationOpts: PaginationOptions;
-    streamArgs?: StreamArgs; // required for stream query
-  } & Args,
-  PaginationResult<M> & { streams: SyncStreamsReturnValue }
->;
-
-type ThreadMessagesArgs<Query extends ThreadQuery<unknown, MessageDoc>> =
-  Query extends ThreadQuery<unknown, MessageDoc>
-    ? Expand<BetterOmit<FunctionArgs<Query>, "paginationOpts" | "streamArgs">>
-    : never;
-
-type ThreadMessagesResult<Query extends ThreadQuery<unknown, MessageDoc>> =
-  Query extends ThreadQuery<unknown, infer M> ? M : never;
-
-// TODO: pass in the messages we need to watch? that way it can be consistent..
-
-// export function streamMessagesToUIMessages(
-//   messages: StreamsChunk[],
-//   keyOrder: string[]
-// ): UIMessageOrdered[] {
-//   const uiMessagesByMessageId: Record<string, UIMessageOrdered[]> = {};
-//   for (const message of messages) {
-//     if (message.deltas.length === 0) {
-//       continue;
-//     }
-//     if (!uiMessagesByMessageId[message.key]) {
-//       uiMessagesByMessageId[message.key] = [];
-//     }
-//     if (uiMessagesByMessageId[message.key].length === 0) {
-//       uiMessagesByMessageId[message.key] = [
-//         createUIMessageFromPart(message.deltas[0], {
-//           id: message.key,
-//           createdAt: new Date(),
-//         }),
-//       ];
-//     }
-//     const currentMessage = uiMessagesByMessageId[message.key].at(-1)!;
-//     const lastPart = currentMessage.parts.at(-1);
-//     for (const delta of message.deltas) {
-//       switch (delta.type) {
-//         case "text-delta":
-//           currentMessage.content += delta.textDelta;
-//           if (lastPart?.type === "text") {
-//             lastPart.text += delta.textDelta;
-//           } else {
-//             currentMessage.parts.push({
-//               type: "text",
-//               text: delta.textDelta,
-//             });
-//           }
-//           break;
-//         case "tool-call-delta": {
-//           let lastToolInvocation: ToolInvocationUIPart | undefined;
-//           for (let i = currentMessage.parts.length - 1; i >= 0; i--) {
-//             const part = currentMessage.parts[i];
-//             if (
-//               part.type === "tool-invocation" &&
-//               part.toolInvocation.state === "partial-call"
-//             ) {
-//               lastToolInvocation = part;
-//               break;
-//             }
-//           }
-//           if (lastToolInvocation) {
-//             lastToolInvocation.toolInvocation = {
-//               ...lastToolInvocation.toolInvocation,
-//               state: "call",
-//             };
-//             break;
-//           }
-//           console.error(
-//             `Received a tool call delta without a previous tool invocation: ${JSON.stringify(currentMessage.parts)}, creating one anyways...`
-//           );
-//         }
-//         // fallthrough
-//         case "tool-call-streaming-start":
-//           currentMessage.parts.push({
-//             type: "tool-invocation",
-//             toolInvocation: {
-//               toolCallId: delta.toolCallId,
-//               toolName: delta.toolName,
-//               args: {},
-//               state: "partial-call",
-//               step:
-//                 currentMessage.parts.filter(
-//                   (part) => part.type === "tool-invocation"
-//                 ).length + 1,
-//             },
-//           });
-//           break;
-//         case "tool-call":
-//           currentMessage.parts.push({
-//             type: "tool-invocation",
-//             toolInvocation: {
-//               toolCallId: delta.toolCallId,
-//               toolName: delta.toolName,
-//               args: delta.args,
-//               state: "call",
-//               step:
-//                 currentMessage.parts.filter(
-//                   (part) => part.type === "tool-invocation"
-//                 ).length + 1,
-//             },
-//           });
-//           break;
-//         case "reasoning":
-//           if (lastPart?.type === "reasoning") {
-//             lastPart.reasoning += delta.textDelta;
-//           } else {
-//             currentMessage.parts.push({
-//               type: "reasoning",
-//               reasoning: delta.textDelta,
-//               details: [],
-//             });
-//           }
-//           break;
-//         case "source":
-//           currentMessage.parts.push({
-//             type: "source",
-//             source: delta.source,
-//           });
-//           break;
-//         default:
-//           console.warn(`Received unexpected part: ${JSON.stringify(delta)}`);
-//           break;
-//       }
-//     }
-//   }
-//   return keyOrder.map((key) => uiMessagesByMessageId[key]).flat();
-// }
 
 if (typeof window === "undefined") {
   throw new Error("this is frontend code, but it's running somewhere else!");
