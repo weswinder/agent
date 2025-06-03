@@ -7,8 +7,7 @@
     "dev": "run-p dev:backend dev:frontend",
     "dev:backend": "convex dev --live-component-sources --typecheck-components",
     "dev:frontend": "vite",
-    "predev": "npm run setup && npm i && npx convex dev --once",
-    "setup": "cd ../ && npm i && npm run build",
+    "predev": "npx convex dev --once",
     "logs": "convex logs",
     "lint": "tsc -p convex && eslint convex"
   },

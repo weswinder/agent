@@ -1,22 +1,20 @@
 import type {
   CoreMessage,
   DeepPartial,
+  generateObject,
   GenerateObjectResult,
+  generateText,
   GenerateTextResult,
   JSONValue,
+  LanguageModelV1,
   RepairTextFunction,
+  streamObject,
   StreamObjectResult,
+  streamText,
   StreamTextResult,
   TelemetrySettings,
   ToolChoice,
   ToolSet,
-} from "ai";
-import type {
-  generateObject,
-  generateText,
-  LanguageModelV1,
-  streamObject,
-  streamText,
 } from "ai";
 import type {
   Expand,
@@ -28,6 +26,9 @@ import type {
   WithoutSystemFields,
 } from "convex/server";
 import type { GenericId } from "convex/values";
+import type { Schema } from "zod";
+import type { Mounts } from "../component/_generated/api.js";
+import type { ThreadDoc } from "../component/schema.js";
 import type {
   CallSettings,
   ProviderMetadata,
@@ -36,10 +37,7 @@ import type {
   StreamMessage,
   Usage,
 } from "../validators.js";
-import type { Mounts } from "../component/_generated/api.js";
-import type { Schema } from "zod";
 import type { StreamingOptions } from "./streaming.js";
-import type { ThreadDoc } from "../component/schema.js";
 
 /**
  * Options to configure what messages are fetched as context,

@@ -5,9 +5,9 @@ import type {
   PaginationOptions,
   PaginationResult,
 } from "convex/server";
-import type { MessageDoc } from "../client";
-import type { SyncStreamsReturnValue } from "../client/types";
-import type { StreamArgs } from "../validators";
+import type { MessageDoc } from "../client/index.js";
+import type { SyncStreamsReturnValue } from "../client/types.js";
+import type { StreamArgs } from "../validators.js";
 
 export type ThreadQuery<
   Args = unknown,

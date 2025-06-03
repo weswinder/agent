@@ -19,7 +19,7 @@ import {
 } from "@convex-dev/agent";
 import type { ToolSet } from "ai";
 import { v } from "convex/values";
-import { DEFAULT_CONTEXT_OPTIONS } from "./types/defaults";
+import { DEFAULT_CONTEXT_OPTIONS } from "./types/defaults.js";
 
 export type PlaygroundAPI = ApiFromModules<{
   playground: ReturnType<typeof definePlaygroundAPI>;
