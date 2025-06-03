@@ -24,7 +24,7 @@ AI Agent framework built on Convex.
 
 Play with the [examples](./examples/) by cloning this repo and running:
 ```sh
-npm run example
+npm run dev
 ```
 
 ## Example usage:
