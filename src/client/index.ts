@@ -1156,7 +1156,11 @@ export class Agent<AgentTools extends ToolSet> {
     // Lazily generate embeddings for the prompt message, if it doesn't have
     // embeddings yet. This can happen if the message was saved in a mutation
     // where the LLM is not available.
-    if (args.promptMessageId && !contextMessages.at(-1)?.embeddingId) {
+    if (
+      args.promptMessageId &&
+      !contextMessages.at(-1)?.embeddingId &&
+      this.options.textEmbedding
+    ) {
       await this.generateAndSaveEmbeddings(ctx, {
         messageIds: [args.promptMessageId],
       });
