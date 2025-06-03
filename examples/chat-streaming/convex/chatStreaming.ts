@@ -1,7 +1,7 @@
 import { paginationOptsValidator } from "convex/server";
 import { Agent, vStreamArgs } from "@convex-dev/agent";
 import { components, internal } from "./_generated/api";
-import { openai } from "@ai-sdk/openai";
+import { chat, textEmbedding } from "../../../example/examplesModels";
 import {
   action,
   ActionCtx,
@@ -16,8 +16,8 @@ import { v } from "convex/values";
 // Define an agent similarly to the AI SDK
 export const storyAgent = new Agent(components.agent, {
   name: "Story Agent",
-  chat: openai.chat("gpt-4o-mini"),
-  textEmbedding: openai.textEmbeddingModel("text-embedding-3-small"),
+  chat: chat,
+  textEmbedding: textEmbedding,
   instructions: "You tell stories with twist endings. ~ 200 words.",
 });
 
