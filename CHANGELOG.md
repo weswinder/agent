@@ -2,9 +2,18 @@
 
 ## 0.1.5 alpha
 
+- APIs to get and update thread metadata on the agent / thread objects.
 - Support generating embeddings asynchronously to save messages in mutations.
+- Allow embedding generation to be done lazily by default.
 - Build the project so it's compatible with composite and verbatim module syntax
-- Fix handling of file messages
+- `useSmoothText` is even smoother
+- Fix handling of file messages to include `filename` and `data` field instead of `file`.
+- Fix bundling of api.d.ts to fix the `AgentComponent` type being `any`.
+- More examples in the examples/ directory, that you can access from the root example
+- Improve scripts for running the examples. See README.
+- Starting to unify model definitions for examples so you only have to change it
+  in one place to e.g. use grok.
+- Better import hygiene for folks using `verbatimModuleSyntax`.
 
 ## 0.1.4
 
