@@ -164,6 +164,7 @@ export declare const components: {
                           }
                         | {
                             data: string | ArrayBuffer;
+                            filename?: string;
                             mimeType: string;
                             providerOptions?: Record<
                               string,
@@ -189,6 +190,7 @@ export declare const components: {
                           }
                         | {
                             data: string | ArrayBuffer;
+                            filename?: string;
                             mimeType: string;
                             providerOptions?: Record<
                               string,
@@ -332,6 +334,7 @@ export declare const components: {
                           }
                         | {
                             data: string | ArrayBuffer;
+                            filename?: string;
                             mimeType: string;
                             providerOptions?: Record<
                               string,
@@ -357,6 +360,7 @@ export declare const components: {
                           }
                         | {
                             data: string | ArrayBuffer;
+                            filename?: string;
                             mimeType: string;
                             providerOptions?: Record<
                               string,
@@ -500,6 +504,7 @@ export declare const components: {
                           }
                         | {
                             data: string | ArrayBuffer;
+                            filename?: string;
                             mimeType: string;
                             providerOptions?: Record<
                               string,
@@ -525,6 +530,7 @@ export declare const components: {
                           }
                         | {
                             data: string | ArrayBuffer;
+                            filename?: string;
                             mimeType: string;
                             providerOptions?: Record<
                               string,
@@ -688,6 +694,7 @@ export declare const components: {
                             }
                           | {
                               data: string | ArrayBuffer;
+                              filename?: string;
                               mimeType: string;
                               providerOptions?: Record<
                                 string,
@@ -713,6 +720,7 @@ export declare const components: {
                             }
                           | {
                               data: string | ArrayBuffer;
+                              filename?: string;
                               mimeType: string;
                               providerOptions?: Record<
                                 string,
@@ -863,6 +871,7 @@ export declare const components: {
                                 }
                               | {
                                   data: string | ArrayBuffer;
+                                  filename?: string;
                                   mimeType: string;
                                   providerOptions?: Record<
                                     string,
@@ -888,6 +897,7 @@ export declare const components: {
                                 }
                               | {
                                   data: string | ArrayBuffer;
+                                  filename?: string;
                                   mimeType: string;
                                   providerOptions?: Record<
                                     string,
@@ -1039,6 +1049,7 @@ export declare const components: {
                         }
                       | {
                           data: string | ArrayBuffer;
+                          filename?: string;
                           mimeType: string;
                           providerOptions?: Record<string, Record<string, any>>;
                           type: "file";
@@ -1058,6 +1069,7 @@ export declare const components: {
                         }
                       | {
                           data: string | ArrayBuffer;
+                          filename?: string;
                           mimeType: string;
                           providerOptions?: Record<string, Record<string, any>>;
                           type: "file";
@@ -1190,6 +1202,7 @@ export declare const components: {
                         }
                       | {
                           data: string | ArrayBuffer;
+                          filename?: string;
                           mimeType: string;
                           providerOptions?: Record<string, Record<string, any>>;
                           type: "file";
@@ -1209,6 +1222,7 @@ export declare const components: {
                         }
                       | {
                           data: string | ArrayBuffer;
+                          filename?: string;
                           mimeType: string;
                           providerOptions?: Record<string, Record<string, any>>;
                           type: "file";
@@ -1344,6 +1358,7 @@ export declare const components: {
                           }
                         | {
                             data: string | ArrayBuffer;
+                            filename?: string;
                             mimeType: string;
                             providerOptions?: Record<
                               string,
@@ -1369,6 +1384,7 @@ export declare const components: {
                           }
                         | {
                             data: string | ArrayBuffer;
+                            filename?: string;
                             mimeType: string;
                             providerOptions?: Record<
                               string,
@@ -1538,6 +1554,7 @@ export declare const components: {
                           }
                         | {
                             data: string | ArrayBuffer;
+                            filename?: string;
                             mimeType: string;
                             providerOptions?: Record<
                               string,
@@ -1563,6 +1580,7 @@ export declare const components: {
                           }
                         | {
                             data: string | ArrayBuffer;
+                            filename?: string;
                             mimeType: string;
                             providerOptions?: Record<
                               string,
@@ -1724,6 +1742,7 @@ export declare const components: {
                         }
                       | {
                           data: string | ArrayBuffer;
+                          filename?: string;
                           mimeType: string;
                           providerOptions?: Record<string, Record<string, any>>;
                           type: "file";
@@ -1743,6 +1762,7 @@ export declare const components: {
                         }
                       | {
                           data: string | ArrayBuffer;
+                          filename?: string;
                           mimeType: string;
                           providerOptions?: Record<string, Record<string, any>>;
                           type: "file";
@@ -1875,6 +1895,7 @@ export declare const components: {
                         }
                       | {
                           data: string | ArrayBuffer;
+                          filename?: string;
                           mimeType: string;
                           providerOptions?: Record<string, Record<string, any>>;
                           type: "file";
@@ -1894,6 +1915,7 @@ export declare const components: {
                         }
                       | {
                           data: string | ArrayBuffer;
+                          filename?: string;
                           mimeType: string;
                           providerOptions?: Record<string, Record<string, any>>;
                           type: "file";
