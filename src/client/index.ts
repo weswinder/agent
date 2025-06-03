@@ -711,9 +711,11 @@ export class Agent<AgentTools extends ToolSet> {
     if (args.skipEmbeddings || !("runAction" in ctx)) {
       embeddings = undefined;
       if (!args.skipEmbeddings && this.options.textEmbedding) {
-        throw new Error(
-          "You're trying to save messages and generate embeddings, but you're in a mutation. Pass `skipEmbeddings: true` to skip generating embeddings in the mutation. " +
-            "You can generate them asynchronously by using the scheduler to run an action later that calls `agent.generateAndSaveEmbeddings`."
+        console.warn(
+          "You're trying to save messages and generate embeddings, but you're in a mutation. " +
+            "Pass `skipEmbeddings: true` to skip generating embeddings in the mutation and skip this warning. " +
+            "They will be generated lazily when you generate or stream text / objects. " +
+            "You can explicitly generate them asynchronously by using the scheduler to run an action later that calls `agent.generateAndSaveEmbeddings`."
         );
       }
     } else {
@@ -1110,7 +1112,7 @@ export class Agent<AgentTools extends ToolSet> {
       maxRetries?: number;
     },
   >(
-    ctx: RunActionCtx | RunMutationCtx,
+    ctx: RunActionCtx,
     args: T,
     {
       userId: argsUserId,
@@ -1151,6 +1153,14 @@ export class Agent<AgentTools extends ToolSet> {
       messages,
       contextOptions,
     });
+    // Lazily generate embeddings for the prompt message, if it doesn't have
+    // embeddings yet. This can happen if the message was saved in a mutation
+    // where the LLM is not available.
+    if (args.promptMessageId && !contextMessages.at(-1)?.embeddingId) {
+      await this.generateAndSaveEmbeddings(ctx, {
+        messageIds: [args.promptMessageId],
+      });
+    }
     let messageId = args.promptMessageId;
     let order = args.promptMessageId
       ? contextMessages.at(-1)?.order

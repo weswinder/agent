@@ -17,7 +17,7 @@ import { v } from "convex/values";
 export const storyAgent = new Agent(components.agent, {
   name: "Story Agent",
   chat: openai.chat("gpt-4o-mini"),
-  textEmbedding: openai.textEmbedding("text-embedding-3-small"),
+  textEmbedding: openai.textEmbeddingModel("text-embedding-3-small"),
   instructions: "You tell stories with twist endings. ~ 200 words.",
 });
 
@@ -30,6 +30,8 @@ export const streamStoryAsynchronously = mutation({
     const { messageId } = await storyAgent.saveMessage(ctx, {
       threadId,
       prompt,
+      // we're in a mutation, so skip embeddings for now. They'll be generated
+      // lazily when streaming text.
       skipEmbeddings: true,
     });
     await ctx.scheduler.runAfter(0, internal.chatStreaming.streamStory, {
@@ -42,9 +44,6 @@ export const streamStoryAsynchronously = mutation({
 export const streamStory = internalAction({
   args: { promptMessageId: v.string(), threadId: v.string() },
   handler: async (ctx, { promptMessageId, threadId }) => {
-    await storyAgent.generateAndSaveEmbeddings(ctx, {
-      messageIds: [promptMessageId],
-    });
     const { thread } = await storyAgent.continueThread(ctx, { threadId });
     const result = await thread.streamText(
       { promptMessageId },
