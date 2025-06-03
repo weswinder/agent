@@ -143,6 +143,7 @@ export type Mounts = {
                         }
                       | {
                           data: string | ArrayBuffer;
+                          filename?: string;
                           mimeType: string;
                           providerOptions?: Record<string, Record<string, any>>;
                           type: "file";
@@ -162,6 +163,7 @@ export type Mounts = {
                         }
                       | {
                           data: string | ArrayBuffer;
+                          filename?: string;
                           mimeType: string;
                           providerOptions?: Record<string, Record<string, any>>;
                           type: "file";
@@ -283,6 +285,7 @@ export type Mounts = {
                         }
                       | {
                           data: string | ArrayBuffer;
+                          filename?: string;
                           mimeType: string;
                           providerOptions?: Record<string, Record<string, any>>;
                           type: "file";
@@ -302,6 +305,7 @@ export type Mounts = {
                         }
                       | {
                           data: string | ArrayBuffer;
+                          filename?: string;
                           mimeType: string;
                           providerOptions?: Record<string, Record<string, any>>;
                           type: "file";
@@ -423,6 +427,7 @@ export type Mounts = {
                         }
                       | {
                           data: string | ArrayBuffer;
+                          filename?: string;
                           mimeType: string;
                           providerOptions?: Record<string, Record<string, any>>;
                           type: "file";
@@ -442,6 +447,7 @@ export type Mounts = {
                         }
                       | {
                           data: string | ArrayBuffer;
+                          filename?: string;
                           mimeType: string;
                           providerOptions?: Record<string, Record<string, any>>;
                           type: "file";
@@ -589,6 +595,7 @@ export type Mounts = {
                           }
                         | {
                             data: string | ArrayBuffer;
+                            filename?: string;
                             mimeType: string;
                             providerOptions?: Record<
                               string,
@@ -614,6 +621,7 @@ export type Mounts = {
                           }
                         | {
                             data: string | ArrayBuffer;
+                            filename?: string;
                             mimeType: string;
                             providerOptions?: Record<
                               string,
@@ -761,6 +769,7 @@ export type Mounts = {
                               }
                             | {
                                 data: string | ArrayBuffer;
+                                filename?: string;
                                 mimeType: string;
                                 providerOptions?: Record<
                                   string,
@@ -786,6 +795,7 @@ export type Mounts = {
                               }
                             | {
                                 data: string | ArrayBuffer;
+                                filename?: string;
                                 mimeType: string;
                                 providerOptions?: Record<
                                   string,
@@ -937,6 +947,7 @@ export type Mounts = {
                       }
                     | {
                         data: string | ArrayBuffer;
+                        filename?: string;
                         mimeType: string;
                         providerOptions?: Record<string, Record<string, any>>;
                         type: "file";
@@ -956,6 +967,7 @@ export type Mounts = {
                       }
                     | {
                         data: string | ArrayBuffer;
+                        filename?: string;
                         mimeType: string;
                         providerOptions?: Record<string, Record<string, any>>;
                         type: "file";
@@ -1088,6 +1100,7 @@ export type Mounts = {
                       }
                     | {
                         data: string | ArrayBuffer;
+                        filename?: string;
                         mimeType: string;
                         providerOptions?: Record<string, Record<string, any>>;
                         type: "file";
@@ -1107,6 +1120,7 @@ export type Mounts = {
                       }
                     | {
                         data: string | ArrayBuffer;
+                        filename?: string;
                         mimeType: string;
                         providerOptions?: Record<string, Record<string, any>>;
                         type: "file";
@@ -1236,6 +1250,7 @@ export type Mounts = {
                         }
                       | {
                           data: string | ArrayBuffer;
+                          filename?: string;
                           mimeType: string;
                           providerOptions?: Record<string, Record<string, any>>;
                           type: "file";
@@ -1255,6 +1270,7 @@ export type Mounts = {
                         }
                       | {
                           data: string | ArrayBuffer;
+                          filename?: string;
                           mimeType: string;
                           providerOptions?: Record<string, Record<string, any>>;
                           type: "file";
@@ -1402,6 +1418,7 @@ export type Mounts = {
                         }
                       | {
                           data: string | ArrayBuffer;
+                          filename?: string;
                           mimeType: string;
                           providerOptions?: Record<string, Record<string, any>>;
                           type: "file";
@@ -1421,6 +1438,7 @@ export type Mounts = {
                         }
                       | {
                           data: string | ArrayBuffer;
+                          filename?: string;
                           mimeType: string;
                           providerOptions?: Record<string, Record<string, any>>;
                           type: "file";
@@ -1566,6 +1584,7 @@ export type Mounts = {
                       }
                     | {
                         data: string | ArrayBuffer;
+                        filename?: string;
                         mimeType: string;
                         providerOptions?: Record<string, Record<string, any>>;
                         type: "file";
@@ -1585,6 +1604,7 @@ export type Mounts = {
                       }
                     | {
                         data: string | ArrayBuffer;
+                        filename?: string;
                         mimeType: string;
                         providerOptions?: Record<string, Record<string, any>>;
                         type: "file";
@@ -1717,6 +1737,7 @@ export type Mounts = {
                       }
                     | {
                         data: string | ArrayBuffer;
+                        filename?: string;
                         mimeType: string;
                         providerOptions?: Record<string, Record<string, any>>;
                         type: "file";
@@ -1736,6 +1757,7 @@ export type Mounts = {
                       }
                     | {
                         data: string | ArrayBuffer;
+                        filename?: string;
                         mimeType: string;
                         providerOptions?: Record<string, Record<string, any>>;
                         type: "file";
