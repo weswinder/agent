@@ -7,7 +7,7 @@ import { useParams } from "react-router-dom";
 
 const API_KEY_STORAGE_KEY = "playground_api_key";
 const API_PATH_STORAGE_KEY = "playground_api_path";
-const CLI_COMMAND = `npx convex run --component agent apiKeys:issue '{name: "..."}'`;
+const CLI_COMMAND = `npx convex run --component agent apiKeys:issue '{name:"..."}'`;
 const PLAYGROUND_CODE = `
 import { definePlaygroundAPI } from "@convex-dev/agent/playground";
 import { components } from "./_generated/api";

@@ -52,8 +52,10 @@ export const {
 From in your project's repo, issue yourself an API key:
 
 ```sh
-npx convex run --component agent apiKeys:issue '{name: "my key"}'
+npx convex run --component agent apiKeys:issue '{name:"..."}'
 ```
+Note: to generate multiple keys, give a different name to each key.
+To revoke and reissue a key, pass the same name.
 
 Then run the playground:
 

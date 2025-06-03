@@ -301,7 +301,7 @@ export const {
                       className="h-6 w-6 p-0 hover:bg-gray-200"
                       onClick={() =>
                         copyToClipboard(
-                          `npx convex run --component agent apiKeys:issue '{name: "my key"}'`
+                          `npx convex run --component agent apiKeys:issue`
                         )
                       }
                     >
@@ -311,10 +311,7 @@ export const {
                 </div>
                 <div className="p-4">
                   <pre className="text-sm text-gray-800">
-                    <code>
-                      npx convex run --component agent apiKeys:issue '
-                      {`{name: "my key"}`}'
-                    </code>
+                    <code>npx convex run --component agent apiKeys:issue</code>
                   </pre>
                 </div>
               </div>
