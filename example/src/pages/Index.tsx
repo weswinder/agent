@@ -3,13 +3,6 @@ import { Link } from "react-router-dom";
 export function Index() {
   return (
     <>
-      <header className="sticky top-0 z-10 bg-white/80 backdrop-blur-sm p-4 flex justify-between items-center border-b">
-        <nav className="flex gap-4 items-center">
-          <h1 className="text-xl font-semibold accent-text">
-            Convex Agent Component
-          </h1>
-        </nav>
-      </header>
       <div className="max-w-2xl mx-auto space-y-8">
         <h1 className="text-3xl font-bold mb-4">Agent Example Index</h1>
         <p className="mb-6 text-lg">
@@ -22,6 +15,18 @@ export function Index() {
           directory and run just that example directly.
         </p>
         <ul className="space-y-4">
+          <li className="border rounded p-4 hover:shadow transition">
+            <Link
+              to="/chat-basic"
+              className="text-xl font-semibold text-indigo-700 hover:underline"
+            >
+              Basic Chat
+            </Link>
+            <p className="mt-2 text-gray-700">
+              A simple chat with an AI agent. No tool calls, no streaming. Just
+              enough to see it in action.
+            </p>
+          </li>
           <li className="border rounded p-4 hover:shadow transition">
             <Link
               to="/chat-streaming"
