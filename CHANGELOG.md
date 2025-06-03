@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.1.5 alpha
+## 0.1.5
 
 - APIs to get and update thread metadata on the agent / thread objects.
 - Support generating embeddings asynchronously to save messages in mutations.
