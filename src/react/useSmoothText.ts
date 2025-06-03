@@ -47,6 +47,10 @@ export function useSmoothText(
       (2 * latestCharsPerMs + smoothState.current.charsPerMs) / 3,
       smoothState.current.charsPerMs * 2
     );
+    smoothState.current.tick = Math.max(
+      smoothState.current.tick,
+      Date.now() - 2 * MS_PER_FRAME
+    );
 
     function update() {
       if (smoothState.current.cursor >= text.length) {
