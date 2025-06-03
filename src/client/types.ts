@@ -25,6 +25,7 @@ import type {
   GenericDataModel,
   GenericMutationCtx,
   GenericQueryCtx,
+  WithoutSystemFields,
 } from "convex/server";
 import type { GenericId } from "convex/values";
 import type {
@@ -38,6 +39,7 @@ import type {
 import type { Mounts } from "../component/_generated/api.js";
 import type { Schema } from "zod";
 import type { StreamingOptions } from "./streaming.js";
+import type { ThreadDoc } from "../component/schema.js";
 
 /**
  * Options to configure what messages are fetched as context,
@@ -311,6 +313,16 @@ export interface Thread<DefaultTools extends ToolSet> {
    * The target threadId, from the startThread or continueThread initializers.
    */
   threadId: string;
+  /**
+   * Get the metadata for the thread.
+   */
+  getMetadata: () => Promise<ThreadDoc>;
+  /**
+   * Update the metadata for the thread.
+   */
+  updateMetadata: (
+    patch: Partial<WithoutSystemFields<ThreadDoc>>
+  ) => Promise<ThreadDoc>;
   /**
    * This behaves like {@link generateText} from the "ai" package except that
    * it add context based on the userId and threadId and saves the input and

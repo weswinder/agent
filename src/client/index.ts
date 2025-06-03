@@ -16,6 +16,7 @@ import {
   internalMutationGeneric,
   type PaginationOptions,
   type PaginationResult,
+  type WithoutSystemFields,
 } from "convex/server";
 import { v } from "convex/values";
 import type { MessageDoc, ThreadDoc } from "../component/schema.js";
@@ -323,12 +324,57 @@ export class Agent<AgentTools extends ToolSet> {
     return {
       thread: {
         threadId: args.threadId,
+        getMetadata: this.getThreadMetadata.bind(this, ctx, {
+          threadId: args.threadId,
+        }),
+        updateMetadata: (patch: Partial<WithoutSystemFields<ThreadDoc>>) =>
+          ctx.runMutation(this.component.threads.updateThread, {
+            threadId: args.threadId,
+            patch,
+          }),
         generateText: this.generateText.bind(this, ctx, args),
         streamText: this.streamText.bind(this, ctx, args),
         generateObject: this.generateObject.bind(this, ctx, args),
         streamObject: this.streamObject.bind(this, ctx, args),
       } as Thread<ThreadTools extends undefined ? AgentTools : ThreadTools>,
     };
+  }
+
+  /**
+   * Get the metadata for a thread.
+   * @param ctx A ctx object from a query, mutation, or action.
+   * @param args.threadId The thread to get the metadata for.
+   * @returns The metadata for the thread.
+   */
+  async getThreadMetadata(
+    ctx: RunQueryCtx,
+    args: { threadId: string }
+  ): Promise<ThreadDoc> {
+    const thread = await ctx.runQuery(this.component.threads.getThread, {
+      threadId: args.threadId,
+    });
+    if (!thread) {
+      throw new Error("Thread not found");
+    }
+    return thread;
+  }
+
+  /**
+   * Update the metadata for a thread.
+   * @param ctx A ctx object from a mutation or action.
+   * @param args.threadId The thread to update the metadata for.
+   * @param args.patch The patch to apply to the thread.
+   * @returns The updated thread metadata.
+   */
+  async updateThreadMetadata(
+    ctx: RunMutationCtx,
+    args: { threadId: string; patch: Partial<WithoutSystemFields<ThreadDoc>> }
+  ): Promise<ThreadDoc> {
+    const thread = await ctx.runMutation(
+      this.component.threads.updateThread,
+      args
+    );
+    return thread;
   }
 
   /**
