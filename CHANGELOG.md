@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.6 alpha
+
+- Fix: re-export `ToolCtx` in `@convex-dev/agent/react`
+
 ## 0.1.5
 
 - APIs to get and update thread metadata on the agent / thread objects.
