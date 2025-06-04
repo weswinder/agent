@@ -89,6 +89,7 @@ export {
   vUsage,
   vUserMessage,
 } from "../validators.js";
+export type { ToolCtx } from "./createTool.js";
 export { createTool, extractText, isTool };
 export type {
   AgentComponent,
