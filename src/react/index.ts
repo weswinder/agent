@@ -1,3 +1,4 @@
+"use client";
 import type { ErrorMessage } from "convex-helpers";
 import {
   type PaginatedQueryArgs,
@@ -218,10 +219,6 @@ export function useStreamingThreadMessages<
     setStreams(newStreams);
   }
   return messages as ThreadMessagesResult<Query>[] | undefined;
-}
-
-if (typeof window === "undefined") {
-  throw new Error("this is frontend code, but it's running somewhere else!");
 }
 
 /**
