@@ -2,6 +2,7 @@
 
 ## 0.1.6 alpha
 
+- Allow using useSmoothText in Next.js
 - Fix: re-export `ToolCtx` in `@convex-dev/agent/react`
 
 ## 0.1.5
