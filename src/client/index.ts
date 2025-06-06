@@ -952,9 +952,7 @@ export class Agent<AgentTools extends ToolSet> {
       toolCtx,
       args.tools ?? threadTools ?? this.options.tools
     ) as TOOLS extends undefined ? AgentTools : TOOLS;
-    const saveOutputMessages =
-      options?.storageOptions?.saveOutputMessages ??
-      this.options.storageOptions?.saveOutputMessages;
+    const saveOutputMessages = this._shouldSaveOutputMessages(options?.storageOptions);
     const trackUsage = usageHandler ?? this.options.usageHandler;
     try {
       const result = (await generateText({
@@ -963,7 +961,7 @@ export class Agent<AgentTools extends ToolSet> {
         ...aiArgs,
         tools,
         onStepFinish: async (step) => {
-          if (threadId && messageId && saveOutputMessages !== false) {
+          if (threadId && messageId && saveOutputMessages) {
             await this.saveStep(ctx, {
               userId,
               threadId,
@@ -1070,11 +1068,9 @@ export class Agent<AgentTools extends ToolSet> {
       toolCtx,
       args.tools ?? threadTools ?? this.options.tools
     ) as TOOLS extends undefined ? AgentTools : TOOLS;
-    const storageOptions = {
-      ...this.options.storageOptions,
-      ...options?.storageOptions,
-    };
-    const saveOutputMessages = storageOptions.saveOutputMessages;
+    const saveOutputMessages = this._shouldSaveOutputMessages(
+      options?.storageOptions
+    );
     const trackUsage = usageHandler ?? this.options.usageHandler;
     const streamer =
       threadId && options?.saveStreamDeltas
@@ -1106,7 +1102,7 @@ export class Agent<AgentTools extends ToolSet> {
       },
       onError: async (error) => {
         console.error("onError", error);
-        if (threadId && messageId && saveOutputMessages !== false) {
+        if (threadId && messageId && saveOutputMessages) {
           await ctx.runMutation(this.component.messages.rollbackMessage, {
             messageId,
             error: (error.error as Error).message,
@@ -1222,9 +1218,10 @@ export class Agent<AgentTools extends ToolSet> {
     if (
       threadId &&
       messages.length &&
+      storageOptions?.saveMessages !== "none" &&
       storageOptions?.saveAnyInputMessages !== false
     ) {
-      const saveAll = storageOptions?.saveAllInputMessages;
+      const saveAll = storageOptions?.saveMessages === "all";
       const coreMessages = saveAll ? messages : messages.slice(-1);
       const saved = await this.saveMessages(ctx, {
         threadId,
@@ -1288,16 +1285,16 @@ export class Agent<AgentTools extends ToolSet> {
     });
     const { args: aiArgs, messageId, userId } = context;
     const trackUsage = usageHandler ?? this.options.usageHandler;
-    const saveOutputMessages =
-      options?.storageOptions?.saveOutputMessages ??
-      this.options.storageOptions?.saveOutputMessages;
+    const saveOutputMessages = this._shouldSaveOutputMessages(
+      options?.storageOptions
+    );
     try {
       const result = (await generateObject(
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         aiArgs as any
       )) as GenerateObjectResult<T> & GenerationOutputMetadata;
 
-      if (threadId && messageId && saveOutputMessages !== false) {
+      if (threadId && messageId && saveOutputMessages) {
         await this.saveObject(ctx, {
           threadId,
           promptMessageId: messageId,
@@ -1363,9 +1360,9 @@ export class Agent<AgentTools extends ToolSet> {
     });
     const { args: aiArgs, messageId, userId } = context;
     const trackUsage = usageHandler ?? this.options.usageHandler;
-    const saveOutputMessages =
-      options?.storageOptions?.saveOutputMessages ??
-      this.options.storageOptions?.saveOutputMessages;
+    const saveOutputMessages = this._shouldSaveOutputMessages(
+      options?.storageOptions
+    );
     const stream = streamObject<T>({
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       ...(aiArgs as any),
@@ -1374,7 +1371,7 @@ export class Agent<AgentTools extends ToolSet> {
         return args.onError?.(error);
       },
       onFinish: async (result) => {
-        if (threadId && messageId && saveOutputMessages !== false) {
+        if (threadId && messageId && saveOutputMessages) {
           await this.saveObject(ctx, {
             userId,
             threadId,
@@ -1412,6 +1409,11 @@ export class Agent<AgentTools extends ToolSet> {
       GenerationOutputMetadata;
     stream.messageId = messageId;
     return stream;
+  }
+
+  _shouldSaveOutputMessages(storageOpts?: StorageOptions): boolean {
+    const opts = storageOpts ?? this.options.storageOptions;
+    return opts?.saveOutputMessages !== false && opts?.saveMessages !== "none";
   }
 
   /**

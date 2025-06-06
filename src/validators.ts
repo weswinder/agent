@@ -4,6 +4,7 @@ import {
   type ObjectType,
   type Validator,
   type Value,
+  type VObject,
 } from "convex/values";
 import { vVectorDimension } from "./component/vector/tables.js";
 
@@ -353,10 +354,34 @@ export const vContextOptions = v.object({
 });
 
 export const vStorageOptions = v.object({
+  saveMessages: v.optional(
+    v.union(v.literal("all"), v.literal("none"), v.literal("promptAndOutput"))
+  ),
+});
+
+const vStorageOptionsIncludingDeprecated = v.object({
+  ...vStorageOptions.fields,
   saveAllInputMessages: v.optional(v.boolean()),
   saveAnyInputMessages: v.optional(v.boolean()),
   saveOutputMessages: v.optional(v.boolean()),
-});
+}) as VObject<
+  {
+    saveMessages?: "all" | "none" | "promptAndOutput";
+    /**
+     * @deprecated Use saveMessages instead.
+     */
+    saveAllInputMessages?: boolean;
+    /**
+     * @deprecated Use saveMessages instead.
+     */
+    saveAnyInputMessages?: boolean;
+    /**
+     * @deprecated Use saveMessages instead.
+     */
+    saveOutputMessages?: boolean;
+  },
+  typeof vStorageOptions.fields
+>;
 
 const vPromptFields = {
   system: v.optional(v.string()),
@@ -382,7 +407,7 @@ const vCommonArgs = {
   userId: v.optional(v.string()),
   threadId: v.optional(v.string()),
   contextOptions: v.optional(vContextOptions),
-  storageOptions: v.optional(vStorageOptions),
+  storageOptions: v.optional(vStorageOptionsIncludingDeprecated),
   providerOptions,
   ...vCallSettingsFields,
   ...vPromptFields,

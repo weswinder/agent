@@ -91,13 +91,6 @@ export const getThreadDetails = query({
   },
 });
 
-/**
- * ==============================
- * Functions for demo purposes.
- * In a real app, you'd use real authentication & authorization.
- * ==============================
- */
-
 // If the thread doesn't have a title, generate one.
 async function maybeUpdateThreadTitle(thread: Thread<ToolSet>) {
   const existingTitle = (await thread.getMetadata()).title;
@@ -105,11 +98,18 @@ async function maybeUpdateThreadTitle(thread: Thread<ToolSet>) {
   if (!existingTitle || existingTitle.endsWith(" thread")) {
     const { text } = await thread.generateText(
       { prompt: "Generate a title for this thread." },
-      { storageOptions: { saveAnyInputMessages: false } },
+      { storageOptions: { saveMessages: "none" } },
     );
     await thread.updateMetadata({ title: text });
   }
 }
+
+/**
+ * ==============================
+ * Functions for demo purposes.
+ * In a real app, you'd use real authentication & authorization.
+ * ==============================
+ */
 
 async function getUserId(_ctx: QueryCtx | MutationCtx | ActionCtx) {
   // For demo purposes. Usually you'd use auth here.

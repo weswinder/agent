@@ -96,14 +96,31 @@ export type ContextOptions = {
  */
 export type StorageOptions = {
   /**
+   * Whether to save messages to the thread history.
+   * Pass "all" to save all input and output messages.
+   * Pass "none" to not save any input or output messages.
+   * Pass "promptAndOutput" to save the prompt and all output messages.
+   * If you pass {messages} but no {prompt}, it will assume messages.at(-1) is
+   * the prompt.
+   * Defaults to "promptAndOutput".
+   */
+  saveMessages?: "all" | "none" | "promptAndOutput";
+  /**
+   * @deprecated Use saveMessages instead.
    * Defaults to false, allowing you to pass in arbitrary context that will
    * be in addition to automatically fetched content.
    * Pass true to have all input messages saved to the thread history.
    */
   saveAllInputMessages?: boolean;
-  /** Defaults to true, saving the prompt, or last message passed to generateText. */
+  /**
+   * @deprecated Use saveMessages instead.
+   * Defaults to true, saving the prompt, or last message passed to generateText.
+   */
   saveAnyInputMessages?: boolean;
-  /** Defaults to true. Whether to save messages generated while chatting. */
+  /**
+   * @deprecated Use saveMessages instead.
+   * Defaults to true. Whether to save messages generated while chatting.
+   */
   saveOutputMessages?: boolean;
 };
 

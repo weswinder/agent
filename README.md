@@ -253,22 +253,15 @@ and have them all saved (vs. just the last one), or avoid saving any input
 or output messages, you can pass in a `storageOptions` object, either to the
 Agent constructor or per-message.
 
-The usecase for passing multiple messages is if you want to include some extra
-messages for context to the LLM, but only the last message is the user's actual
-request. e.g. `messages = [...messagesFromRag, messageFromUser]`.
+The usecase for passing in multiple messages but not saving them is if you want
+to include some extra messages for context to the LLM, but only the last message
+is the user's actual request. e.g. `messages = [...messagesFromRag, messageFromUser]`.
+The default is to save the prompt and all output messages.
 
 ```ts
 const result = await thread.generateText({ messages }, {
-  // The default values are shown below.
   storageOptions: {
-    // When false, allows you to pass in arbitrary context that will
-    // be in addition to automatically fetched content.
-    // Pass true to have all input messages saved to the thread history.
-    saveAllInputMessages: false,
-    // By default it saves the input message, or the last message if multiple are provided.
-    saveAnyInputMessages: true,
-    // Save the generated messages to the thread history.
-    saveOutputMessages: true,
+    saveMessages: "all" | "none" | "promptAndOutput";
   },
 });
 ```

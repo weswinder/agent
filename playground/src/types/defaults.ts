@@ -3,7 +3,7 @@ import { ContextOptions, StorageOptions } from "@convex-dev/agent";
 // TODO: store preferences in local storage
 export const DEFAULT_CONTEXT_OPTIONS = {
   recentMessages: 10,
-  excludeToolMessages: true,
+  excludeToolMessages: false,
   searchOtherThreads: false,
   searchOptions: {
     limit: 0,
@@ -14,7 +14,5 @@ export const DEFAULT_CONTEXT_OPTIONS = {
 } as const satisfies ContextOptions;
 
 export const DEFAULT_STORAGE_OPTIONS = {
-  saveAllInputMessages: false,
-  saveAnyInputMessages: true,
-  saveOutputMessages: true,
+  saveMessages: "promptAndOutput",
 } as const satisfies StorageOptions;
