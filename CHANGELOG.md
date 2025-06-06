@@ -1,7 +1,8 @@
 # Changelog
 
-## 0.1.6 alpha
+## 0.1.6
 
+- Fix pagination for the Agent messages when loading more
 - Allow using useSmoothText in Next.js
 - Fix: re-export `ToolCtx` in `@convex-dev/agent/react`
 
