@@ -1,5 +1,10 @@
 # Changelog
 
+## unreleased
+
+- Add `rawRequestResponseHandler` to the Agent definition, so you can log
+  the raw request and response from the LLM.
+
 ## 0.1.6
 
 - Fix pagination for the Agent messages when loading more
