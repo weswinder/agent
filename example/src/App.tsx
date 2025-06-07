@@ -9,8 +9,8 @@ import { Images } from "./pages/Images";
 export default function App() {
   return (
     <BrowserRouter>
-      <div className="min-h-screen flex flex-col">
-        <header className="sticky top-0 z-10 bg-white/80 backdrop-blur-sm p-4 flex justify-between items-center border-b">
+      <div className="h-screen flex flex-col">
+        <header className="z-50 bg-white/80 backdrop-blur-sm p-4 flex justify-between items-center border-b">
           <nav className="flex gap-4 items-center">
             <Link to="/" className="hover:text-indigo-600">
               <h2 className="text-xl font-semibold accent-text">
@@ -19,7 +19,7 @@ export default function App() {
             </Link>
           </nav>
         </header>
-        <main className="flex-1 p-8">
+        <main className="flex-1 h-full overflow-scroll">
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/weather-fashion" element={<WeatherFashion />} />

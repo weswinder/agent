@@ -74,6 +74,20 @@ export const listThreadMessages = query({
   },
 });
 
+export const listThreads = query({
+  args: {
+    paginationOpts: paginationOptsValidator,
+  },
+  handler: async (ctx, args) => {
+    const userId = await getUserId(ctx);
+    const threads = await ctx.runQuery(
+      components.agent.threads.listThreadsByUserId,
+      { userId, paginationOpts: args.paginationOpts },
+    );
+    return threads;
+  },
+});
+
 export const createNewThread = mutation({
   args: { title: v.optional(v.string()) },
   handler: async (ctx, { title }) => {
