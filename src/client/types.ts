@@ -145,6 +145,9 @@ export type UsageHandler = (
 export type RawRequestResponseHandler = (
   ctx: RunActionCtx,
   args: {
+    userId: string | undefined;
+    threadId: string | undefined;
+    agentName: string | undefined;
     request: LanguageModelRequestMetadata;
     response: LanguageModelResponseMetadata;
   }

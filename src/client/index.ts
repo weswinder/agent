@@ -979,6 +979,9 @@ export class Agent<AgentTools extends ToolSet> {
           }
           if (this.options.rawRequestResponseHandler) {
             await this.options.rawRequestResponseHandler(ctx, {
+              userId,
+              threadId,
+              agentName: this.options.name,
               request: step.request,
               response: step.response,
             });
@@ -1138,6 +1141,9 @@ export class Agent<AgentTools extends ToolSet> {
         }
         if (this.options.rawRequestResponseHandler) {
           await this.options.rawRequestResponseHandler(ctx, {
+            userId,
+            threadId,
+            agentName: this.options.name,
             request: step.request,
             response: step.response,
           });
@@ -1325,6 +1331,9 @@ export class Agent<AgentTools extends ToolSet> {
       result.messageId = messageId;
       if (this.options.rawRequestResponseHandler) {
         await this.options.rawRequestResponseHandler(ctx, {
+          userId,
+          threadId,
+          agentName: this.options.name,
           request: result.request,
           response: result.response,
         });
@@ -1430,6 +1439,9 @@ export class Agent<AgentTools extends ToolSet> {
         }
         if (this.options.rawRequestResponseHandler) {
           await this.options.rawRequestResponseHandler(ctx, {
+            userId,
+            threadId,
+            agentName: this.options.name,
             request: await stream.request,
             response: result.response,
           });
