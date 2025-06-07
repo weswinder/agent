@@ -54,6 +54,10 @@ export const fashionAgent = new Agent(components.agent, {
   },
   maxSteps: 5,
   usageHandler,
+  rawRequestResponseHandler: async (ctx, { request, response }) => {
+    console.log("request", request);
+    console.log("response", response);
+  },
 });
 
 // Create a thread from within a mutation and generate text

@@ -64,6 +64,7 @@ import type {
   Options,
   OurObjectArgs,
   OurStreamObjectArgs,
+  RawRequestResponseHandler,
   RunActionCtx,
   RunMutationCtx,
   RunQueryCtx,
@@ -169,6 +170,11 @@ export class Agent<AgentTools extends ToolSet> {
        * The usage handler to use for this agent.
        */
       usageHandler?: UsageHandler;
+      /**
+       * Called for each LLM request/response, so you can do things like
+       * log the raw request body or response headers to a table, or logs.
+       */
+      rawRequestResponseHandler?: RawRequestResponseHandler;
     }
   ) {}
 
@@ -952,7 +958,9 @@ export class Agent<AgentTools extends ToolSet> {
       toolCtx,
       args.tools ?? threadTools ?? this.options.tools
     ) as TOOLS extends undefined ? AgentTools : TOOLS;
-    const saveOutputMessages = this._shouldSaveOutputMessages(options?.storageOptions);
+    const saveOutputMessages = this._shouldSaveOutputMessages(
+      options?.storageOptions
+    );
     const trackUsage = usageHandler ?? this.options.usageHandler;
     try {
       const result = (await generateText({
@@ -967,6 +975,12 @@ export class Agent<AgentTools extends ToolSet> {
               threadId,
               promptMessageId: messageId,
               step,
+            });
+          }
+          if (this.options.rawRequestResponseHandler) {
+            await this.options.rawRequestResponseHandler(ctx, {
+              request: step.request,
+              response: step.response,
             });
           }
           if (trackUsage && step.usage) {
@@ -1121,6 +1135,12 @@ export class Agent<AgentTools extends ToolSet> {
             step,
           });
           await streamer?.finish(saved);
+        }
+        if (this.options.rawRequestResponseHandler) {
+          await this.options.rawRequestResponseHandler(ctx, {
+            request: step.request,
+            response: step.response,
+          });
         }
         if (trackUsage && step.usage) {
           await trackUsage(ctx, {
@@ -1303,6 +1323,12 @@ export class Agent<AgentTools extends ToolSet> {
         });
       }
       result.messageId = messageId;
+      if (this.options.rawRequestResponseHandler) {
+        await this.options.rawRequestResponseHandler(ctx, {
+          request: result.request,
+          response: result.response,
+        });
+      }
       if (trackUsage && result.usage) {
         await trackUsage(ctx, {
           userId,
@@ -1400,6 +1426,12 @@ export class Agent<AgentTools extends ToolSet> {
             provider: aiArgs.model.provider,
             usage: result.usage,
             providerMetadata: result.providerMetadata,
+          });
+        }
+        if (this.options.rawRequestResponseHandler) {
+          await this.options.rawRequestResponseHandler(ctx, {
+            request: await stream.request,
+            response: result.response,
           });
         }
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1524,7 +1556,7 @@ export class Agent<AgentTools extends ToolSet> {
         title: v.optional(v.string()),
         summary: v.optional(v.string()),
       },
-      handler: async (ctx, args) => {
+      handler: async (ctx, args): Promise<{ threadId: string }> => {
         const { threadId } = await this.createThread(ctx, args);
         return { threadId };
       },

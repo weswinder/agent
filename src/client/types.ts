@@ -6,6 +6,8 @@ import type {
   generateText,
   GenerateTextResult,
   JSONValue,
+  LanguageModelRequestMetadata,
+  LanguageModelResponseMetadata,
   LanguageModelV1,
   RepairTextFunction,
   streamObject,
@@ -137,6 +139,14 @@ export type UsageHandler = (
     providerMetadata: ProviderMetadata | undefined;
     model: string;
     provider: string;
+  }
+) => void | Promise<void>;
+
+export type RawRequestResponseHandler = (
+  ctx: RunActionCtx,
+  args: {
+    request: LanguageModelRequestMetadata;
+    response: LanguageModelResponseMetadata;
   }
 ) => void | Promise<void>;
 
