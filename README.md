@@ -623,6 +623,24 @@ const supportAgent = new Agent(components.agent, {
 Tip: Define the `usageHandler` within a function where you have more variables
 available to attribute the usage to a different user, team, project, etc.
 
+### Logging the raw request and response
+
+You can provide a `rawRequestResponseHandler` to the agent to log the raw request and response from the LLM.
+
+You could use this to log the request and response to a table, or use console logs with
+[Log Streaming](https://docs.convex.dev/production/integrations/log-streams/)
+to allow debugging and searching through Axiom or another logging service.
+
+```ts
+const supportAgent = new Agent(components.agent, {
+  ...
+  rawRequestResponseHandler: async (ctx, { request, response }) => {
+    console.log("request", request);
+    console.log("response", response);
+  },
+});
+```
+
 ## Troubleshooting
 
 ### Circular dependencies
