@@ -69,9 +69,15 @@ export const useExistingFile = mutation({
     await ctx.db.patch(file._id, {
       refcount: file.refcount + 1,
     });
-    return file._id;
+    return { fileId: file._id, storageId: file.storageId };
   },
-  returns: v.union(v.id("files"), v.null()),
+  returns: v.union(
+    v.null(),
+    v.object({
+      fileId: v.id("files"),
+      storageId: v.string(),
+    })
+  ),
 });
 
 export const copyFile = mutation({

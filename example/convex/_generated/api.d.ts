@@ -120,7 +120,7 @@ export declare const components: {
         "mutation",
         "internal",
         { filename?: string; hash: string },
-        string | null
+        null | { fileId: string; storageId: string }
       >;
     };
     messages: {

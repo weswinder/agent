@@ -76,6 +76,7 @@ import type {
   UsageHandler,
 } from "./types.js";
 
+export { storeFile } from "./storeFile.js";
 export { vMessageDoc, vThreadDoc } from "../component/schema.js";
 export {
   vAssistantMessage,

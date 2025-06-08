@@ -22,6 +22,7 @@ import type {
 } from "./validators";
 import type { ActionCtx, AgentComponent } from "./client/types.js";
 import type { RunMutationCtx } from "./client/types.js";
+import { storeFile } from "./client/storeFile.js";
 
 const MAX_FILE_SIZE = 1024 * 64;
 
@@ -216,8 +217,7 @@ export async function serializeContent(
             const { url, fileId } = await storeFile(
               ctx,
               component,
-              image,
-              part.mimeType
+              new Blob([image], { type: part.mimeType || guessMimeType(image) })
             );
             image = url;
             fileIds.push(fileId);
@@ -230,8 +230,7 @@ export async function serializeContent(
             const { url, fileId } = await storeFile(
               ctx,
               component,
-              data,
-              part.mimeType
+              new Blob([data], { type: part.mimeType })
             );
             data = url;
             fileIds.push(fileId);
@@ -263,39 +262,6 @@ export function deserializeContent(content: SerializedContent): Content {
         return part;
     }
   }) as Content;
-}
-
-async function storeFile(
-  ctx: ActionCtx | RunMutationCtx,
-  component: AgentComponent,
-  arrayBuffer: ArrayBuffer,
-  mimeType: string | undefined,
-  filename?: string
-) {
-  if (!("runAction" in ctx)) {
-    throw new Error(
-      "You're trying to save a file that's too large in a mutation. " +
-        "You can store the file in file storage from an action first, then pass a URL instead. " +
-        "To have the agent component track the file, you can use `saveFile` from an action then use the fileId with getFile in the mutation. " +
-        "Read more in the docs."
-    );
-  }
-  const type = mimeType || guessMimeType(arrayBuffer);
-  const storageId = await ctx.storage.store(new Blob([arrayBuffer], { type }));
-  const { fileId, storageId: storageIdUsed } = await ctx.runMutation(
-    component.files.addFile,
-    {
-      storageId,
-      hash: crypto.subtle.digest("SHA-256", arrayBuffer).toString(),
-      filename,
-    }
-  );
-  const url = (await ctx.storage.getUrl(storageIdUsed))!;
-  if (storageId !== storageIdUsed) {
-    // We're re-using another file's storageId
-    await ctx.storage.delete(storageId);
-  }
-  return { url, fileId };
 }
 
 /**

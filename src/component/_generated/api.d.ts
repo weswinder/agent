@@ -93,7 +93,7 @@ export type Mounts = {
       "mutation",
       "public",
       { filename?: string; hash: string },
-      string | null
+      null | { fileId: string; storageId: string }
     >;
   };
   messages: {
