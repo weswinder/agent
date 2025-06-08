@@ -20,6 +20,8 @@ import type {
   Step,
   StepWithMessagesWithMetadata,
 } from "./validators";
+import type { ActionCtx, AgentComponent } from "./client/types.js";
+import type { RunMutationCtx } from "@convex-dev/prosemirror-sync";
 
 export type AIMessageWithoutId = Omit<AIMessage, "id">;
 
@@ -39,23 +41,26 @@ export type SerializedContent = SerializeUrlsAndUint8Arrays<Content>;
 
 export type SerializedMessage = SerializeUrlsAndUint8Arrays<CoreMessage>;
 
-export function serializeMessage(
+export async function serializeMessage(
+  ctx: ActionCtx | RunMutationCtx,
+  component: AgentComponent,
   messageWithId: CoreMessage & { id?: string }
-): SerializedMessage {
+): Promise<{ message: SerializedMessage; fileIds?: string[] }> {
   const { id: _, experimental_providerMetadata, ...message } = messageWithId;
-  const content = message.content;
+  const { content, fileIds } = await serializeContent(
+    ctx,
+    component,
+    message.content
+  );
   return {
-    // for backwards compatibility
-    providerOptions: experimental_providerMetadata,
-    ...message,
-    content: serializeContent(content),
-  } as SerializedMessage;
-}
-
-export function serializeMessageWithId(
-  messageWithId: CoreMessage & { id?: string }
-): { message: SerializedMessage; id: string | undefined } {
-  return { message: serializeMessage(messageWithId), id: messageWithId.id };
+    message: {
+      // for backwards compatibility
+      providerOptions: experimental_providerMetadata,
+      ...message,
+      content,
+    } as SerializedMessage,
+    fileIds,
+  };
 }
 
 export function deserializeMessage(message: SerializedMessage): CoreMessage {
@@ -65,16 +70,29 @@ export function deserializeMessage(message: SerializedMessage): CoreMessage {
   } as CoreMessage;
 }
 
-export function serializeStep<TOOLS extends ToolSet>(
+export async function serializeStep<TOOLS extends ToolSet>(
+  ctx: ActionCtx,
+  component: AgentComponent,
   step: StepResult<TOOLS>
-): Step {
-  const content = step.response?.messages.map((message) => {
-    return serializeMessageWithId(message);
-  });
+): Promise<Step> {
+  const messages = await Promise.all(
+    step.response?.messages.map(async (messageWithId) => {
+      const { message, fileIds } = await serializeMessage(
+        ctx,
+        component,
+        messageWithId
+      );
+      return {
+        message,
+        id: messageWithId.id,
+        fileIds,
+      };
+    })
+  );
   const timestamp = step.response?.timestamp.getTime();
   const response = {
     ...step.response,
-    messages: content,
+    messages,
     timestamp,
     headers: {}, // these are large and low value
   };
@@ -84,10 +102,12 @@ export function serializeStep<TOOLS extends ToolSet>(
   };
 }
 
-export function serializeNewMessagesInStep<TOOLS extends ToolSet>(
+export async function serializeNewMessagesInStep<TOOLS extends ToolSet>(
+  ctx: ActionCtx,
+  component: AgentComponent,
   step: StepResult<TOOLS>,
   metadata: { model: string; provider: string }
-): MessageWithMetadata[] {
+): Promise<MessageWithMetadata[]> {
   // If there are tool results, there's another message with the tool results
   // ref: https://github.com/vercel/ai/blob/main/packages/ai/core/generate-text/to-response-messages.ts
   const assistantFields = {
@@ -103,19 +123,25 @@ export function serializeNewMessagesInStep<TOOLS extends ToolSet>(
   const toolFields = {
     sources: step.sources,
   };
-  const messages: MessageWithMetadata[] = (
-    step.toolResults.length > 0
+  const messages: MessageWithMetadata[] = await Promise.all(
+    (step.toolResults.length > 0
       ? step.response.messages.slice(-2)
       : step.response.messages.slice(-1)
-  ).map(
-    (message): MessageWithMetadata => ({
-      message: serializeMessage(message),
-      // Let's not store the ID by default here. It's being generated internally
-      // and not referenced elsewhere that we know of.
-      // id: message.id,
-      ...(message.role === "tool" ? toolFields : assistantFields),
-      text: step.text,
-      // fileId: message.fileId,
+    ).map(async (messageWithId): Promise<MessageWithMetadata> => {
+      const { message, fileIds } = await serializeMessage(
+        ctx,
+        component,
+        messageWithId
+      );
+      return {
+        message,
+        // Let's not store the ID by default here. It's being generated internally
+        // and not referenced elsewhere that we know of.
+        // id: message.id,
+        ...(message.role === "tool" ? toolFields : assistantFields),
+        text: step.text,
+        fileIds,
+      };
     })
   );
   return messages;
@@ -166,24 +192,59 @@ export function serializeObjectResult(
   };
 }
 
-export function serializeContent(content: Content): SerializedContent {
+export async function serializeContent(
+  ctx: ActionCtx | RunMutationCtx,
+  component: AgentComponent,
+  content: Content
+): Promise<{ content: SerializedContent; fileIds?: string[] }> {
   if (typeof content === "string") {
-    return content;
+    return { content };
   }
-  const serialized = content.map(
-    ({ experimental_providerMetadata, ...rest }) => {
+  const fileIds: string[] = [];
+  const serialized = await Promise.all(
+    content.map(async ({ experimental_providerMetadata, ...rest }) => {
       const part = { providerOptions: experimental_providerMetadata, ...rest };
       switch (part.type) {
-        case "image":
-          return { ...part, image: serializeDataOrUrl(part.image) };
-        case "file":
-          return { ...part, data: serializeDataOrUrl(part.data) };
+        case "image": {
+          let image = serializeDataOrUrl(part.image);
+          if (
+            image instanceof ArrayBuffer &&
+            image.byteLength > MAX_FILE_SIZE
+          ) {
+            const { url, fileId } = await storeFile(
+              ctx,
+              component,
+              image,
+              part.mimeType
+            );
+            image = url;
+            fileIds.push(fileId);
+          }
+          return { ...part, image };
+        }
+        case "file": {
+          let data = serializeDataOrUrl(part.data);
+          if (data instanceof ArrayBuffer && data.byteLength > MAX_FILE_SIZE) {
+            const { url, fileId } = await storeFile(
+              ctx,
+              component,
+              data,
+              part.mimeType
+            );
+            data = url;
+            fileIds.push(fileId);
+          }
+          return { ...part, data };
+        }
         default:
           return part;
       }
-    }
+    })
   );
-  return serialized as SerializedContent;
+  return {
+    content: serialized as SerializedContent,
+    fileIds: fileIds.length > 0 ? fileIds : undefined,
+  };
 }
 
 export function deserializeContent(content: SerializedContent): Content {
@@ -200,6 +261,41 @@ export function deserializeContent(content: SerializedContent): Content {
         return part;
     }
   }) as Content;
+}
+
+const MAX_FILE_SIZE = 1024 * 10;
+
+async function storeFile(
+  ctx: ActionCtx | RunMutationCtx,
+  component: AgentComponent,
+  arrayBuffer: ArrayBuffer,
+  mimeType: string | undefined,
+  filename?: string
+) {
+  if (!("runAction" in ctx)) {
+    throw new Error(
+      "You're trying to save a file that's too large in a mutation. " +
+        "You can store the file in file storage from an action first, then pass a URL instead. " +
+        "To have the agent component track the file, you can use `saveFile` from an action then use the fileId with getFile in the mutation. " +
+        "Read more in the docs."
+    );
+  }
+  const type = mimeType || guessMimeType(arrayBuffer);
+  const storageId = await ctx.storage.store(new Blob([arrayBuffer], { type }));
+  const { fileId, storageId: storageIdUsed } = await ctx.runMutation(
+    component.files.addFile,
+    {
+      storageId,
+      hash: crypto.subtle.digest("SHA-256", arrayBuffer).toString(),
+      filename,
+    }
+  );
+  const url = (await ctx.storage.getUrl(storageIdUsed))!;
+  if (storageId !== storageIdUsed) {
+    // We're re-using another file's storageId
+    await ctx.storage.delete(storageId);
+  }
+  return { url, fileId };
 }
 
 /**
@@ -265,7 +361,6 @@ function guessMimeType(buf: ArrayBuffer | string): string {
   return "application/octet-stream";
 }
 
-// TODO: store in file storage if it's big
 function serializeDataOrUrl(
   dataOrUrl: DataContent | URL
 ): ArrayBuffer | string {
