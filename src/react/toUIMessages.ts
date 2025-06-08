@@ -43,9 +43,14 @@ export function toUIMessages(
       if (text) {
         parts.push({ type: "text", text });
       }
-      if (message.files) {
-        parts.push(...message.files.map(toUIFilePart));
-      }
+      nonStringContent.forEach((contentPart) => {
+        switch (contentPart.type) {
+          case "file":
+          case "image":
+            parts.push(toUIFilePart(contentPart));
+            break;
+        }
+      });
       uiMessages.push({
         ...common,
         role: "user",
@@ -95,11 +100,12 @@ export function toUIMessages(
           source,
         });
       }
-      for (const file of message.files ?? []) {
-        assistantMessage.parts.push(toUIFilePart(file));
-      }
       for (const contentPart of nonStringContent) {
         switch (contentPart.type) {
+          case "file":
+          case "image":
+            assistantMessage.parts.push(toUIFilePart(contentPart));
+            break;
           case "tool-call":
             assistantMessage.parts.push({
               type: "step-start",

@@ -63,7 +63,7 @@ export async function deleteMessage(
   if (messageDoc.embeddingId) {
     await ctx.db.delete(messageDoc.embeddingId);
   }
-  for (const { fileId } of messageDoc.files ?? []) {
+  for (const fileId of messageDoc.fileIds ?? []) {
     if (!fileId) continue;
     const file = await ctx.db.get(fileId);
     if (file) {
@@ -187,7 +187,7 @@ async function addMessagesHandler(
       //     id: messageId,
       //   });
       // }
-      for (const { fileId } of message.files ?? []) {
+      for (const fileId of message.fileIds ?? []) {
         if (!fileId) continue;
         await ctx.db.patch(fileId, {
           refcount: (await ctx.db.get(fileId))!.refcount + 1,

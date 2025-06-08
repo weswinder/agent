@@ -6,7 +6,9 @@ import {
   type AssistantContent,
   type CoreMessage,
   type DataContent,
+  type FilePart,
   type GenerateObjectResult,
+  type ImagePart,
   type StepResult,
   type ToolContent,
   type ToolSet,
@@ -114,11 +116,6 @@ export function serializeNewMessagesInStep<TOOLS extends ToolSet>(
       ...(message.role === "tool" ? toolFields : assistantFields),
       text: step.text,
       // fileId: message.fileId,
-      files: step.files.map((file) => ({
-        mimeType: file.mimeType,
-        data: serializeDataOrUrl(file.uint8Array ?? file.base64),
-        // TODO: if the file is big, store it and populate url, fileId
-      })),
     })
   );
   return messages;
@@ -130,7 +127,7 @@ export function serializeObjectResult(
 ): StepWithMessagesWithMetadata {
   const text = JSON.stringify(result.object);
 
-  const message= {
+  const message = {
     role: "assistant" as const,
     content: text,
     id: result.response.id,
@@ -163,9 +160,8 @@ export function serializeObjectResult(
       response: {
         ...result.response,
         timestamp: result.response.timestamp.getTime(),
-        messages: [ { message, id: result.response.id } ],
+        messages: [{ message, id: result.response.id }],
       },
-
     },
   };
 }
@@ -206,6 +202,69 @@ export function deserializeContent(content: SerializedContent): Content {
   }) as Content;
 }
 
+/**
+ * Return a best-guess MIME type based on the magic-number signature
+ * found at the start of an ArrayBuffer.
+ *
+ * @param buf – the source ArrayBuffer
+ * @returns the detected MIME type, or `"application/octet-stream"` if unknown
+ */
+function guessMimeType(buf: ArrayBuffer | string): string {
+  if (typeof buf === "string") {
+    if (buf.match(/^data:\w+\/\w+;base64/)) {
+      return buf.split(";")[0].split(":")[1]!;
+    }
+    return "text/plain";
+  }
+  if (buf.byteLength < 4) return "application/octet-stream";
+
+  // Read the first 12 bytes (enough for all signatures below)
+  const bytes = new Uint8Array(buf.slice(0, 12));
+  const hex = [...bytes].map((b) => b.toString(16).padStart(2, "0")).join("");
+
+  // Helper so we can look at only the needed prefix
+  const startsWith = (sig: string) => hex.startsWith(sig.toLowerCase());
+
+  // --- image formats ---
+  if (startsWith("89504e47")) return "image/png"; // PNG  - 89 50 4E 47
+  if (
+    startsWith("ffd8ffdb") ||
+    startsWith("ffd8ffe0") ||
+    startsWith("ffd8ffee") ||
+    startsWith("ffd8ffe1")
+  )
+    return "image/jpeg"; // JPEG
+  if (startsWith("47494638")) return "image/gif"; // GIF
+  if (startsWith("424d")) return "image/bmp"; // BMP
+  if (startsWith("52494646") && hex.substr(16, 8) === "57454250")
+    return "image/webp"; // WEBP (RIFF....WEBP)
+
+  // --- audio/video ---
+  if (startsWith("494433")) return "audio/mpeg"; // MP3 (ID3)
+  if (startsWith("000001ba") || startsWith("000001b3")) return "video/mpeg"; // MPEG container
+  if (startsWith("1a45dfa3")) return "video/webm"; // WEBM / Matroska
+  if (startsWith("00000018") && hex.substr(16, 8) === "66747970")
+    return "video/mp4"; // MP4
+  if (startsWith("4f676753")) return "audio/ogg"; // OGG / Opus
+
+  // --- documents & archives ---
+  if (startsWith("25504446")) return "application/pdf"; // PDF
+  if (
+    startsWith("504b0304") ||
+    startsWith("504b0506") ||
+    startsWith("504b0708")
+  )
+    return "application/zip"; // ZIP / DOCX / PPTX / XLSX / EPUB
+  if (startsWith("52617221")) return "application/x-rar-compressed"; // RAR
+  if (startsWith("7f454c46")) return "application/x-elf"; // ELF binaries
+  if (startsWith("1f8b08")) return "application/gzip"; // GZIP
+  if (startsWith("425a68")) return "application/x-bzip2"; // BZIP2
+  if (startsWith("3c3f786d6c")) return "application/xml"; // XML
+
+  // Plain text, JSON and others are trickier—fallback:
+  return "application/octet-stream";
+}
+
 // TODO: store in file storage if it's big
 function serializeDataOrUrl(
   dataOrUrl: DataContent | URL
@@ -238,18 +297,16 @@ function deserializeUrl(urlOrString: string | ArrayBuffer): URL | DataContent {
   return urlOrString;
 }
 
-export function toUIFilePart(file: {
-  data?: ArrayBuffer | string;
-  url?: string;
-  mimeType: string;
-}): FileUIPart {
+export function toUIFilePart(part: ImagePart | FilePart): FileUIPart {
+  const dataOrUrl = serializeDataOrUrl(
+    part.type === "image" ? part.image : part.data
+  );
+
   return {
     type: "file",
     data:
-      file.data instanceof ArrayBuffer
-        ? encodeBase64(file.data)
-        : file.url ?? file.data ?? "",
-    mimeType: file.mimeType,
+      dataOrUrl instanceof ArrayBuffer ? encodeBase64(dataOrUrl) : dataOrUrl,
+    mimeType: part.mimeType ?? guessMimeType(dataOrUrl),
   };
 }
 
