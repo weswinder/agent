@@ -2,6 +2,7 @@ import { paginator } from "convex-helpers/server/pagination";
 import type { Id } from "./_generated/dataModel.js";
 import { mutation, type MutationCtx, query } from "./_generated/server.js";
 import { schema, v } from "./schema.js";
+import { paginationOptsValidator } from "convex/server";
 
 export const addFile = mutation({
   args: {
@@ -96,25 +97,17 @@ export async function copyFileHandler(
 
 export const getFilesToDelete = query({
   args: {
-    cursor: v.optional(v.string()),
-    limit: v.optional(v.number()),
+    paginationOpts: paginationOptsValidator,
   },
   handler: async (ctx, args) => {
     const files = await paginator(ctx.db, schema)
       .query("files")
       .withIndex("refcount", (q) => q.eq("refcount", 0))
-      .paginate({
-        numItems: args.limit ?? 100,
-        cursor: args.cursor ?? null,
-      });
-    return {
-      files: files.page,
-      continueCursor: files.continueCursor,
-      isDone: files.isDone,
-    };
+      .paginate(args.paginationOpts);
+    return files;
   },
   returns: v.object({
-    files: v.array(v.doc("files")),
+    page: v.array(v.doc("files")),
     continueCursor: v.string(),
     isDone: v.boolean(),
   }),

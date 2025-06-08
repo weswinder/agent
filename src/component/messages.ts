@@ -11,7 +11,6 @@ import {
 import {
   vMessageEmbeddings,
   vMessageStatus,
-  vMessageWithMetadata,
   vMessageWithMetadataInternal,
   vPaginationResult,
   vSearchOptions,

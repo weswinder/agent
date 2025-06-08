@@ -81,10 +81,20 @@ export declare const components: {
       getFilesToDelete: FunctionReference<
         "query",
         "internal",
-        { cursor?: string; limit?: number },
+        {
+          paginationOpts: {
+            cursor: string | null;
+            endCursor?: string | null;
+            id?: number;
+            maximumBytesRead?: number;
+            maximumRowsRead?: number;
+            numItems: number;
+          };
+        },
         {
           continueCursor: string;
-          files: Array<{
+          isDone: boolean;
+          page: Array<{
             _creationTime: number;
             _id: string;
             filename?: string;
@@ -92,7 +102,6 @@ export declare const components: {
             refcount: number;
             storageId: string;
           }>;
-          isDone: boolean;
         }
       >;
       useExistingFile: FunctionReference<
@@ -292,6 +301,7 @@ export declare const components: {
             embeddingId?: string;
             error?: string;
             fileIds?: Array<string>;
+            files?: Array<any>;
             finishReason?:
               | "stop"
               | "length"
@@ -457,6 +467,7 @@ export declare const components: {
             embeddingId?: string;
             error?: string;
             fileIds?: Array<string>;
+            files?: Array<any>;
             finishReason?:
               | "stop"
               | "length"
@@ -998,6 +1009,7 @@ export declare const components: {
           embeddingId?: string;
           error?: string;
           fileIds?: Array<string>;
+          files?: Array<any>;
           finishReason?:
             | "stop"
             | "length"
@@ -1146,6 +1158,7 @@ export declare const components: {
           embeddingId?: string;
           error?: string;
           fileIds?: Array<string>;
+          files?: Array<any>;
           finishReason?:
             | "stop"
             | "length"
@@ -1291,6 +1304,7 @@ export declare const components: {
             embeddingId?: string;
             error?: string;
             fileIds?: Array<string>;
+            files?: Array<any>;
             finishReason?:
               | "stop"
               | "length"
@@ -1482,6 +1496,7 @@ export declare const components: {
             embeddingId?: string;
             error?: string;
             fileIds?: Array<string>;
+            files?: Array<any>;
             finishReason?:
               | "stop"
               | "length"
@@ -1671,6 +1686,7 @@ export declare const components: {
           embeddingId?: string;
           error?: string;
           fileIds?: Array<string>;
+          files?: Array<any>;
           finishReason?:
             | "stop"
             | "length"
@@ -1819,6 +1835,7 @@ export declare const components: {
           embeddingId?: string;
           error?: string;
           fileIds?: Array<string>;
+          files?: Array<any>;
           finishReason?:
             | "stop"
             | "length"

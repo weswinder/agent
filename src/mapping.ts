@@ -23,6 +23,8 @@ import type {
 import type { ActionCtx, AgentComponent } from "./client/types.js";
 import type { RunMutationCtx } from "./client/types.js";
 
+const MAX_FILE_SIZE = 1024 * 64;
+
 export type AIMessageWithoutId = Omit<AIMessage, "id">;
 
 export type SerializeUrlsAndUint8Arrays<T> = T extends URL
@@ -262,8 +264,6 @@ export function deserializeContent(content: SerializedContent): Content {
     }
   }) as Content;
 }
-
-const MAX_FILE_SIZE = 1024 * 10;
 
 async function storeFile(
   ctx: ActionCtx | RunMutationCtx,
