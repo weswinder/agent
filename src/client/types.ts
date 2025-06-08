@@ -178,7 +178,7 @@ export type TextArgs<
    */
   promptMessageId?: string;
   /**
-   * The model to use for the tool calls. This will override the model specified
+   * The model to use for the LLM calls. This will override the model specified
    * in the Agent constructor.
    */
   model?: LanguageModelV1;
