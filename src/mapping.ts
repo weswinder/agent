@@ -22,7 +22,7 @@ import type {
 } from "./validators";
 import type { ActionCtx, AgentComponent } from "./client/types.js";
 import type { RunMutationCtx } from "./client/types.js";
-import { storeFile } from "./client/storeFile.js";
+import { storeFile } from "./client/files.js";
 
 const MAX_FILE_SIZE = 1024 * 64;
 
