@@ -1,4 +1,5 @@
-import { createOpenRouter } from "@openrouter/ai-sdk-provider";
+import { createOpenRouter, LanguageModelV1 } from "@openrouter/ai-sdk-provider";
+import type { EmbeddingModel } from "ai";
 import { openai } from "@ai-sdk/openai";
 
 if (!process.env.OPENAI_API_KEY && !process.env.OPENROUTER_API_KEY) {
@@ -7,7 +8,7 @@ if (!process.env.OPENAI_API_KEY && !process.env.OPENROUTER_API_KEY) {
   );
 }
 
-let chat, textEmbedding;
+let chat: LanguageModelV1, textEmbedding: EmbeddingModel<string> | undefined;
 
 if (process.env.OPENAI_API_KEY) {
   chat = openai.chat("gpt-4o-mini");
