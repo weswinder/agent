@@ -130,10 +130,15 @@ export function serializeObjectResult(
 ): StepWithMessagesWithMetadata {
   const text = JSON.stringify(result.object);
 
+  const message= {
+    role: "assistant" as const,
+    content: text,
+    id: result.response.id,
+  };
   return {
     messages: [
       {
-        message: { role: "assistant" as const, content: text },
+        message,
         id: result.response.id,
         model: metadata.model,
         provider: metadata.provider,
@@ -158,14 +163,9 @@ export function serializeObjectResult(
       response: {
         ...result.response,
         timestamp: result.response.timestamp.getTime(),
-        messages: [
-          serializeMessageWithId({
-            role: "assistant" as const,
-            content: text,
-            id: result.response.id,
-          }),
-        ],
+        messages: [ { message, id: result.response.id } ],
       },
+
     },
   };
 }
