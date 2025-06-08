@@ -69,8 +69,8 @@ export declare const components: {
       addFile: FunctionReference<
         "mutation",
         "internal",
-        { hash: string; storageId: string },
-        { fileId: string; storageIdUnused: boolean }
+        { filename?: string; hash: string; storageId: string },
+        { fileId: string; storageId: string }
       >;
       copyFile: FunctionReference<
         "mutation",
@@ -87,6 +87,7 @@ export declare const components: {
           files: Array<{
             _creationTime: number;
             _id: string;
+            filename?: string;
             hash: string;
             refcount: number;
             storageId: string;
@@ -97,7 +98,7 @@ export declare const components: {
       useExistingFile: FunctionReference<
         "mutation",
         "internal",
-        { hash: string },
+        { filename?: string; hash: string },
         string | null
       >;
     };
@@ -125,12 +126,7 @@ export declare const components: {
           failPendingSteps?: boolean;
           messages: Array<{
             error?: string;
-            files?: Array<{
-              data?: ArrayBuffer | string;
-              fileId?: string;
-              mimeType: string;
-              url?: string;
-            }>;
+            fileIds?: Array<string>;
             finishReason?:
               | "stop"
               | "length"
@@ -295,12 +291,7 @@ export declare const components: {
             agentName?: string;
             embeddingId?: string;
             error?: string;
-            files?: Array<{
-              data?: ArrayBuffer | string;
-              fileId?: string;
-              mimeType: string;
-              url?: string;
-            }>;
+            fileIds?: Array<string>;
             finishReason?:
               | "stop"
               | "length"
@@ -465,12 +456,7 @@ export declare const components: {
             agentName?: string;
             embeddingId?: string;
             error?: string;
-            files?: Array<{
-              data?: ArrayBuffer | string;
-              fileId?: string;
-              mimeType: string;
-              url?: string;
-            }>;
+            fileIds?: Array<string>;
             finishReason?:
               | "stop"
               | "length"
@@ -655,12 +641,7 @@ export declare const components: {
             };
             messages: Array<{
               error?: string;
-              files?: Array<{
-                data?: ArrayBuffer | string;
-                fileId?: string;
-                mimeType: string;
-                url?: string;
-              }>;
+              fileIds?: Array<string>;
               finishReason?:
                 | "stop"
                 | "length"
@@ -1016,12 +997,7 @@ export declare const components: {
           agentName?: string;
           embeddingId?: string;
           error?: string;
-          files?: Array<{
-            data?: ArrayBuffer | string;
-            fileId?: string;
-            mimeType: string;
-            url?: string;
-          }>;
+          fileIds?: Array<string>;
           finishReason?:
             | "stop"
             | "length"
@@ -1169,12 +1145,7 @@ export declare const components: {
           agentName?: string;
           embeddingId?: string;
           error?: string;
-          files?: Array<{
-            data?: ArrayBuffer | string;
-            fileId?: string;
-            mimeType: string;
-            url?: string;
-          }>;
+          fileIds?: Array<string>;
           finishReason?:
             | "stop"
             | "length"
@@ -1319,12 +1290,7 @@ export declare const components: {
             agentName?: string;
             embeddingId?: string;
             error?: string;
-            files?: Array<{
-              data?: ArrayBuffer | string;
-              fileId?: string;
-              mimeType: string;
-              url?: string;
-            }>;
+            fileIds?: Array<string>;
             finishReason?:
               | "stop"
               | "length"
@@ -1515,12 +1481,7 @@ export declare const components: {
             agentName?: string;
             embeddingId?: string;
             error?: string;
-            files?: Array<{
-              data?: ArrayBuffer | string;
-              fileId?: string;
-              mimeType: string;
-              url?: string;
-            }>;
+            fileIds?: Array<string>;
             finishReason?:
               | "stop"
               | "length"
@@ -1709,12 +1670,7 @@ export declare const components: {
           agentName?: string;
           embeddingId?: string;
           error?: string;
-          files?: Array<{
-            data?: ArrayBuffer | string;
-            fileId?: string;
-            mimeType: string;
-            url?: string;
-          }>;
+          fileIds?: Array<string>;
           finishReason?:
             | "stop"
             | "length"
@@ -1862,12 +1818,7 @@ export declare const components: {
           agentName?: string;
           embeddingId?: string;
           error?: string;
-          files?: Array<{
-            data?: ArrayBuffer | string;
-            fileId?: string;
-            mimeType: string;
-            url?: string;
-          }>;
+          fileIds?: Array<string>;
           finishReason?:
             | "stop"
             | "length"
