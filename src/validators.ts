@@ -261,7 +261,7 @@ export const vLanguageModelV1CallWarning = v.union(
   })
 );
 
-export const vMessageWithMetadata = v.object({
+export const vMessageWithMetadataInternal = v.object({
   id: v.optional(v.string()), // external id, e.g. from Vercel AI SDK
   message: vMessage,
   text: v.optional(v.string()),
@@ -277,6 +277,10 @@ export const vMessageWithMetadata = v.object({
   usage: v.optional(vUsage),
   warnings: v.optional(v.array(vLanguageModelV1CallWarning)),
   error: v.optional(v.string()),
+});
+export const vMessageWithMetadata = v.object({
+  ...vMessageWithMetadataInternal.fields,
+  files: v.optional(v.array(vFileWithStringId)),
 });
 export type MessageWithMetadata = Infer<typeof vMessageWithMetadata>;
 
@@ -313,7 +317,7 @@ export type Step = Infer<typeof vStep>;
 
 export const vStepWithMessages = v.object({
   step: vStep,
-  messages: v.array(vMessageWithMetadata),
+  messages: v.array(vMessageWithMetadataInternal),
   embeddings: v.optional(vMessageEmbeddings),
 });
 export type StepWithMessagesWithMetadata = Infer<typeof vStepWithMessages>;

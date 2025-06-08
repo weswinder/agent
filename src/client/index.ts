@@ -40,7 +40,7 @@ import {
   isTool,
 } from "../shared.js";
 import {
-  type MessageWithMetadata as InnerMessageWithMetadata,
+  type MessageWithMetadata,
   type MessageStatus,
   type ProviderMetadata,
   type SearchOptions,
@@ -60,7 +60,6 @@ import type {
   AgentComponent,
   ContextOptions,
   GenerationOutputMetadata,
-  OpaqueIds,
   Options,
   OurObjectArgs,
   OurStreamObjectArgs,
@@ -1718,5 +1717,4 @@ export function filterOutOrphanedToolMessages(docs: MessageDoc[]) {
   return result;
 }
 
-type MessageWithMetadata = OpaqueIds<InnerMessageWithMetadata>;
 type CoreMessageMaybeWithId = CoreMessage & { id?: string | undefined };
