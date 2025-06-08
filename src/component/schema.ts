@@ -63,6 +63,7 @@ export const schema = defineSchema({
     // DEPRECATED
     parentMessageId: v.optional(v.id("messages")),
     stepId: v.optional(v.id("steps")),
+    files: v.optional(v.array(v.any())),
   })
     // Allows finding successful visible messages in order
     // Also surface pending messages separately to e.g. stream

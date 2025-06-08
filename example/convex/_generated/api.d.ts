@@ -306,6 +306,7 @@ export declare const components: {
             embeddingId?: string;
             error?: string;
             fileIds?: Array<string>;
+            files?: Array<any>;
             finishReason?:
               | "stop"
               | "length"
@@ -471,6 +472,7 @@ export declare const components: {
             embeddingId?: string;
             error?: string;
             fileIds?: Array<string>;
+            files?: Array<any>;
             finishReason?:
               | "stop"
               | "length"
@@ -1012,6 +1014,7 @@ export declare const components: {
           embeddingId?: string;
           error?: string;
           fileIds?: Array<string>;
+          files?: Array<any>;
           finishReason?:
             | "stop"
             | "length"
@@ -1160,6 +1163,7 @@ export declare const components: {
           embeddingId?: string;
           error?: string;
           fileIds?: Array<string>;
+          files?: Array<any>;
           finishReason?:
             | "stop"
             | "length"
@@ -1305,6 +1309,7 @@ export declare const components: {
             embeddingId?: string;
             error?: string;
             fileIds?: Array<string>;
+            files?: Array<any>;
             finishReason?:
               | "stop"
               | "length"
@@ -1496,6 +1501,7 @@ export declare const components: {
             embeddingId?: string;
             error?: string;
             fileIds?: Array<string>;
+            files?: Array<any>;
             finishReason?:
               | "stop"
               | "length"
@@ -1685,6 +1691,7 @@ export declare const components: {
           embeddingId?: string;
           error?: string;
           fileIds?: Array<string>;
+          files?: Array<any>;
           finishReason?:
             | "stop"
             | "length"
@@ -1833,6 +1840,7 @@ export declare const components: {
           embeddingId?: string;
           error?: string;
           fileIds?: Array<string>;
+          files?: Array<any>;
           finishReason?:
             | "stop"
             | "length"
@@ -2603,6 +2611,7 @@ export declare const components: {
         {
           maxParallelism?: number;
           onComplete?: { context?: any; fnHandle: string };
+          validateAsync?: boolean;
           workflowArgs: any;
           workflowHandle: string;
           workflowName: string;
