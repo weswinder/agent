@@ -1,5 +1,6 @@
+import type { FilePart, ImagePart } from "ai";
 import type { Id } from "../component/_generated/dataModel.js";
-import type { ActionCtx, AgentComponent } from "./types.js";
+import type { ActionCtx, AgentComponent, QueryCtx } from "./types.js";
 import type { RunMutationCtx } from "@convex-dev/prosemirror-sync";
 
 /**
@@ -49,6 +50,7 @@ export async function storeFile(
     storageId: newStorageId,
     hash,
     filename,
+    mimeType: blob.type,
   });
   const url = (await ctx.storage.getUrl(storageId as Id<"_storage">))!;
   if (storageId !== newStorageId) {
@@ -58,4 +60,43 @@ export async function storeFile(
     await ctx.storage.delete(newStorageId);
   }
   return { url, fileId, storageId: storageId as Id<"_storage"> };
+}
+
+export async function getFile(
+  ctx: ActionCtx | QueryCtx,
+  component: AgentComponent,
+  fileId: Id<"files">
+) {
+  const file = await ctx.runQuery(component.files.get, { fileId });
+  if (!file) {
+    throw new Error(`File not found in component: ${fileId}`);
+  }
+  const url = await ctx.storage.getUrl(file.storageId as Id<"_storage">);
+  if (!url) {
+    throw new Error(`File not found in storage: ${file.storageId}`);
+  }
+  const filePart: FilePart = {
+    type: "file",
+    data: new URL(url),
+    mimeType: file.mimeType,
+    filename: file.filename,
+  };
+  const imagePart: ImagePart | undefined = file.mimeType.startsWith("image/")
+    ? {
+        type: "image",
+        image: new URL(url),
+        mimeType: file.mimeType,
+      }
+    : undefined;
+  return {
+    filePart,
+    imagePart,
+    file: {
+      fileId,
+      url,
+      storageId: file.storageId as Id<"_storage">,
+      hash: file.hash,
+      filename: file.filename,
+    },
+  };
 }

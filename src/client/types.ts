@@ -25,6 +25,8 @@ import type {
   GenericDataModel,
   GenericMutationCtx,
   GenericQueryCtx,
+  StorageActionWriter,
+  StorageReader,
   WithoutSystemFields,
 } from "convex/server";
 import type { GenericId } from "convex/values";
@@ -495,7 +497,10 @@ export type RunActionCtx = {
   runAction: GenericActionCtx<GenericDataModel>["runAction"];
 };
 export type ActionCtx = RunActionCtx & {
-  storage: GenericActionCtx<GenericDataModel>["storage"];
+  storage: StorageActionWriter;
+};
+export type QueryCtx = RunQueryCtx & {
+  storage: StorageReader;
 };
 
 export type OpaqueIds<T> =

@@ -3,13 +3,17 @@ import type { Id } from "./_generated/dataModel.js";
 import { mutation, type MutationCtx, query } from "./_generated/server.js";
 import { schema, v } from "./schema.js";
 import { paginationOptsValidator } from "convex/server";
+import type { Infer } from "convex/values";
+
+const addFileArgs = v.object({
+  storageId: v.string(),
+  hash: v.string(),
+  filename: v.optional(v.string()),
+  mimeType: v.string(),
+});
 
 export const addFile = mutation({
-  args: {
-    storageId: v.string(),
-    hash: v.string(),
-    filename: v.optional(v.string()),
-  },
+  args: addFileArgs,
   handler: addFileHandler,
   returns: {
     fileId: v.id("files"),
@@ -19,7 +23,7 @@ export const addFile = mutation({
 
 export async function addFileHandler(
   ctx: MutationCtx,
-  args: { storageId: string; hash: string; filename: string | undefined }
+  args: Infer<typeof addFileArgs>
 ) {
   const existingFile = await ctx.db
     .query("files")
@@ -45,6 +49,16 @@ export async function addFileHandler(
     storageId: args.storageId,
   };
 }
+
+export const get = query({
+  args: {
+    fileId: v.id("files"),
+  },
+  returns: v.union(v.null(), v.doc("files")),
+  handler: async (ctx, args) => {
+    return ctx.db.get(args.fileId);
+  },
+});
 
 /**
  * If you plan to have the same file added over and over without a reference to

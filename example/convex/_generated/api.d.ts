@@ -81,7 +81,12 @@ export declare const components: {
       addFile: FunctionReference<
         "mutation",
         "internal",
-        { filename?: string; hash: string; storageId: string },
+        {
+          filename?: string;
+          hash: string;
+          mimeType: string;
+          storageId: string;
+        },
         { fileId: string; storageId: string }
       >;
       copyFile: FunctionReference<
@@ -89,6 +94,20 @@ export declare const components: {
         "internal",
         { fileId: string },
         null
+      >;
+      get: FunctionReference<
+        "query",
+        "internal",
+        { fileId: string },
+        null | {
+          _creationTime: number;
+          _id: string;
+          filename?: string;
+          hash: string;
+          mimeType: string;
+          refcount: number;
+          storageId: string;
+        }
       >;
       getFilesToDelete: FunctionReference<
         "query",
@@ -111,6 +130,7 @@ export declare const components: {
             _id: string;
             filename?: string;
             hash: string;
+            mimeType: string;
             refcount: number;
             storageId: string;
           }>;
