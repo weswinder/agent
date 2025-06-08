@@ -305,7 +305,7 @@ async function storeFile(
  * @param buf – the source ArrayBuffer
  * @returns the detected MIME type, or `"application/octet-stream"` if unknown
  */
-function guessMimeType(buf: ArrayBuffer | string): string {
+export function guessMimeType(buf: ArrayBuffer | string): string {
   if (typeof buf === "string") {
     if (buf.match(/^data:\w+\/\w+;base64/)) {
       return buf.split(";")[0].split(":")[1]!;
@@ -334,6 +334,10 @@ function guessMimeType(buf: ArrayBuffer | string): string {
   if (startsWith("424d")) return "image/bmp"; // BMP
   if (startsWith("52494646") && hex.substr(16, 8) === "57454250")
     return "image/webp"; // WEBP (RIFF....WEBP)
+  if (startsWith("49492a00")) return "image/tiff"; // TIFF
+  // <svg in hex is 3c 3f 78 6d 6c
+  if (startsWith("3c737667")) return "image/svg+xml"; // <svg
+  if (startsWith("3c3f786d")) return "image/svg+xml"; // <?xm
 
   // --- audio/video ---
   if (startsWith("494433")) return "audio/mpeg"; // MP3 (ID3)
@@ -361,7 +365,7 @@ function guessMimeType(buf: ArrayBuffer | string): string {
   return "application/octet-stream";
 }
 
-function serializeDataOrUrl(
+export function serializeDataOrUrl(
   dataOrUrl: DataContent | URL
 ): ArrayBuffer | string {
   if (typeof dataOrUrl === "string") {
@@ -379,7 +383,9 @@ function serializeDataOrUrl(
   ) as ArrayBuffer;
 }
 
-function deserializeUrl(urlOrString: string | ArrayBuffer): URL | DataContent {
+export function deserializeUrl(
+  urlOrString: string | ArrayBuffer
+): URL | DataContent {
   if (typeof urlOrString === "string") {
     if (
       urlOrString.startsWith("http://") ||
