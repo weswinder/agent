@@ -168,6 +168,7 @@ export const schema = defineSchema({
 
   files: defineTable({
     storageId: v.string(),
+    filename: v.optional(v.string()),
     hash: v.string(),
     refcount: v.number(),
   })
