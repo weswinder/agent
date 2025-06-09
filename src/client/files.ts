@@ -10,6 +10,7 @@ type File = {
   hash: string;
   filename: string | undefined;
 };
+
 /**
  * Store a file in the file storage and return the URL and fileId.
  * @param ctx A ctx object from an action.
