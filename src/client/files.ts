@@ -1,7 +1,11 @@
 import type { FilePart, ImagePart } from "ai";
 import type { Id } from "../component/_generated/dataModel.js";
-import type { ActionCtx, AgentComponent, QueryCtx } from "./types.js";
-import type { RunMutationCtx } from "@convex-dev/prosemirror-sync";
+import type {
+  ActionCtx,
+  AgentComponent,
+  QueryCtx,
+  RunMutationCtx,
+} from "./types.js";
 
 export const MAX_FILE_SIZE = 1024 * 64;
 
