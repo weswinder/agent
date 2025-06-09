@@ -1,103 +1,155 @@
-# Streaming Chat Example
+# Images and Files Example
 
-This example shows how to use the `@convex-dev/agent` component to build a streaming chat application.
+This example shows how to use the `@convex-dev/agent` component to work with
+images and files.
 
-The approach sends text deltas via the websocket, and then merges them in with
-the full message in a React hook.
+See [filesImages.ts](./convex/filesImages.ts) for the server-side code.
+and [FilesImages.tsx](./src/FilesImages.tsx) for the client-side code.
 
-## Server setup
+## Sending an image by uploading first and generating asynchronously
 
-See [`listThreadMessages` in chatStreaming.ts](./convex/chatStreaming.ts) for the server-side code.
+The standard approach is to:
 
-You have a function that both allows paginating over messages, as well as taking
-in a `streamArgs` object and returning the `streams` result from `syncStreams`.
+1. Upload the file to the database (`uploadFile` action). Note: this can be in
+  a regular action or in an httpAction, depending on what's more convenient.
+2. Send a message to the thread (`submitFileQuestion` action)
+3. Send the file to the LLM to generate / stream text asynchronously
+  (`generateResponse` action)
+4. Query for the messages from the thread (`listThreadMessages` query)
+
+Rationale:
+
+It's better to submit a message in a mutation vs. an action because you can use
+an optimistic update on the client side to show the sent message immediately and
+have it disappear exactly when the message comes down in the query.
+
+However, you can't save to file storage from a mutation, so the file needs to
+already exist (hence the fileId).
+
+You can then asynchronously generate the response (with retries / etc) without
+the client waiting.
+
+### 1: Saving the file
 
 ```ts
-import { paginationOptsValidator } from "convex/server";
-import { vStreamArgs } from "@convex-dev/agent/react";
-
- export const listThreadMessages = query({
-   args: {
-     threadId: v.string(),
-     paginationOpts: paginationOptsValidator,
-     streamArgs: vStreamArgs,
-     //... other arguments you want
-   },
-   handler: async (ctx, { threadId, paginationOpts, streamArgs }) => {
-     // await authorizeThreadAccess(ctx, threadId);
-     const paginated = await agent.listMessages(ctx, { threadId, paginationOpts });
-     const streams = await agent.syncStreams(ctx, { threadId, streamArgs });
-     // Here you could filter out / modify the documents & stream deltas.
-     return { ...paginated, streams };
-   },
- });
+    const { file } = await storeFile(
+      ctx,
+      components.agent,
+      new Blob([bytes], { type: mimeType }),
+      filename,
+      sha256,
+    );
+    const { fileId, url, storageId } = file;
 ```
 
-### Client setup
-
-See [ChatStreaming.tsx](./src/ChatStreaming.tsx) for the client-side code.
-
-The crux is to use the `useThreadMessages` hook, and pass in `stream: true`:
+### 2: Sending the message
 
 ```ts
-import { useThreadMessages } from "@convex-dev/agent/react";
-
-// in the component
-  const messages = useThreadMessages(
-    api.streaming.listThreadMessages,
-    { threadId },
-    { initialNumItems: 10, stream: true },
-  );
+// in your mutation
+    const { filePart, imagePart } = await getFile(
+      ctx,
+      components.agent,
+      fileId,
+    );
+    const { messageId } = await fileAgent.saveMessage(ctx, {
+      threadId,
+      message: {
+        role: "user",
+        content: [
+          imagePart ?? filePart, // if it's an image, prefer that kind.
+          { type: "text", text: "What is this image?" }
+        ],
+      },
+      metadata: { fileIds: [fileId] }, // IMPORTANT: this tracks the file usage.
+    });
 ```
 
-### Text smoothing
+### 3: Generating the response & querying the responses
 
-The `useSmoothText` hook is a simple hook that smooths the text as it is streamed.
+This is done in the same way as text inputs.
 
 ```ts
-import { useSmoothText } from "@convex-dev/agent/react";
-
-// in the component
-  const [visibleText] = useSmoothText(message.content);
+// in an action
+await thread.generateText({ promptMessageId: messageId });
 ```
 
-See [ChatStreaming.tsx](./src/ChatStreaming.tsx) for an example.
-You can configure the initial characters per second. It will adapt over time to
-match the average speed of the text coming in.
-
-### Optimistic updates for sending messages
-
-The `optimisticallySendMessage` function is a helper function for sending a
-message, so you can optimistically show a message in the message list until the
-mutation has completed on the server.
-
-Pass in the query that you're using to list messages, and it will insert the
-ephemeral message at the top of the list.
-
 ```ts
-const sendMessage = useMutation(api.streaming.streamStoryAsynchronously)
-  .withOptimisticUpdate(optimisticallySendMessage(api.streaming.listThreadMessages));
+// in a query
+const messages = await agent.listMessages(ctx, { threadId, paginationOpts });
 ```
 
-If your arguments don't include `{ threadId, prompt }` then you can use it as a
-helper function in your optimistic update:
+## Inline saving approach
+
+You can also pass in an image / file direction when generating text, if you're
+in an action. Any image or file passed in the `message` argument will
+automatically be saved in file storage if it's larger than 64k, and a fileId
+will be saved to the message.
+
+Example:
 
 ```ts
-import { optimisticallySendMessage } from "@convex-dev/agent/react";
-
-const sendMessage = useMutation(
-  api.chatStreaming.streamStoryAsynchronously,
-).withOptimisticUpdate(
-  (store, args) => {
-    optimisticallySendMessage(api.chatStreaming.listThreadMessages)(store, {
-      threadId: /* get the threadId from your args / context */,
-      prompt: /* change your args into the user prompt. */,
-    })
+await thread.generateText({
+  message: {
+    role: "user",
+    content: [
+      { type: "image", image: imageBytes, mimeType: "image/png" },
+      { type: "text", text: "What is this image?" }
+    ]
   }
-);
+});
+```
+
+## Under the hood
+
+Saving to the files has 3 components:
+
+1. Saving to file storage (in your app, not in the component's storage).
+  This means you can access it directly with the `storageId` and generate URLs.
+2. Saving a reference (the storageId) to the file in the component. This will
+  automatically keep track of how many messages are referencing the file, so you
+  can vacuum files that are no longer used (see [crons.ts](./convex/crons.ts)).
+3. Inserting a URL in place of the data in the message sent to the LLM, along
+  with the mimeType and other metadata provided
+  (or [inferred](../../src/mapping.ts#L220)).
+
+### Can I just store the file myself an pass in a URL?
+
+Yes! You can always pass a URL in the place of an image or file to the LLM.
+
+```ts
+const storageId = await ctx.storage.store(blob)
+const url = await ctx.storage.getUrl(storageId);
+
+await thread.generateText({
+  message: {
+    role: "user",
+    content: [
+      { type: "image", data: url, mimeType: blob.type },
+      { type: "text", text: "What is this image?" }
+    ]
+  }
+});
+```
+
+
+## Generating images
+
+There's an example in [filesImages.ts](./convex/filesImages.ts#L216) that
+takes a prompt, generates an image with OpenAI's dall-e 2, then saves the image
+to a thread.
+
+You can try it out with:
+
+```sh
+// in the examples/files-images directory, after you've started the backend
+npx convex run filesImages:generateImageOneShot '{prompt: "make a picture of a cat" }'
 ```
 
 ## Running the example
+
+NOTE: Sending URLs to LLMs is much easier with the cloud backend, since it has
+publicly available storage URLs. To develop locally you can use `ngrok` or
+similar to proxy the traffic.
 
 ```sh
 npm run setup

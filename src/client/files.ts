@@ -3,6 +3,8 @@ import type { Id } from "../component/_generated/dataModel.js";
 import type { ActionCtx, AgentComponent, QueryCtx } from "./types.js";
 import type { RunMutationCtx } from "@convex-dev/prosemirror-sync";
 
+export const MAX_FILE_SIZE = 1024 * 64;
+
 type File = {
   url: string;
   fileId: string;

@@ -18,9 +18,8 @@ import { assert } from "convex-helpers";
 import type { MessageWithMetadata } from "./validators";
 import type { ActionCtx, AgentComponent } from "./client/types.js";
 import type { RunMutationCtx } from "./client/types.js";
-import { storeFile } from "./client/files.js";
+import { MAX_FILE_SIZE, storeFile } from "./client/files.js";
 
-const MAX_FILE_SIZE = 1024 * 64;
 
 export type AIMessageWithoutId = Omit<AIMessage, "id">;
 
