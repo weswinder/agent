@@ -21,6 +21,7 @@ describe("files", () => {
         storageId,
         hash,
         filename,
+        mimeType: "text/plain",
       }
     );
     expect(fileId).toBeTruthy();
@@ -30,6 +31,7 @@ describe("files", () => {
       storageId,
       hash,
       filename,
+      mimeType: "text/plain",
     });
     expect(fileId2).toBe(fileId);
     // Add the same file with a different filename (should create a new entry)
@@ -37,6 +39,7 @@ describe("files", () => {
       storageId,
       hash,
       filename: "other.txt",
+      mimeType: "text/plain",
     });
     expect(fileId3).not.toBe(fileId);
     // Add the same file with undefined filename (should create a new entry)
@@ -44,6 +47,7 @@ describe("files", () => {
       storageId,
       hash,
       filename: undefined,
+      mimeType: "text/plain",
     });
     expect(fileId4).not.toBe(fileId);
   });
@@ -58,13 +62,14 @@ describe("files", () => {
       storageId,
       hash,
       filename,
+      mimeType: "text/plain",
     });
     // Should match
     const fileId2 = await t.mutation(api.files.useExistingFile, {
       hash,
       filename,
     });
-    expect(fileId2).toBe(fileId);
+    expect(fileId2?.fileId).toBe(fileId);
     // Should not match with different filename
     const fileId3 = await t.mutation(api.files.useExistingFile, {
       hash,
@@ -87,6 +92,7 @@ describe("files", () => {
         storageId: `storage-del-${i}`,
         hash: `hash-del-${i}`,
         filename: `file-del-${i}.txt`,
+        mimeType: "text/plain",
       });
       // Manually set refcount to 0
       await t.run(async (ctx) => {
