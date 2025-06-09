@@ -67,7 +67,6 @@ type UsePaginatedQueryState = {
 const splitQuery =
   (key: QueryPageKey, splitCursor: string, continueCursor: string) =>
   (prevState: UsePaginatedQueryState) => {
-    console.log("splitQuery", key, splitCursor, continueCursor);
     const queries = { ...prevState.queries };
     const splitKey1 = prevState.nextPageKey;
     const splitKey2 = prevState.nextPageKey + 1;
@@ -105,7 +104,6 @@ const splitQuery =
 
 const completeSplitQuery =
   (key: QueryPageKey) => (prevState: UsePaginatedQueryState) => {
-    console.log("completeSplitQuery", key);
     const completedSplit = prevState.ongoingSplits[key];
     if (completedSplit === undefined) {
       return prevState;
@@ -143,7 +141,6 @@ export function usePaginatedQuery<Query extends PaginatedQueryReference>(
   args: PaginatedQueryArgs<Query> | "skip",
   options: { initialNumItems: number }
 ): UsePaginatedQueryReturnType<Query> {
-  console.log("usePaginatedQuery", query, args, options);
   if (
     typeof options?.initialNumItems !== "number" ||
     options.initialNumItems < 0
@@ -158,7 +155,6 @@ export function usePaginatedQuery<Query extends PaginatedQueryReference>(
   const createInitialState = useMemo(() => {
     return () => {
       const id = nextPaginationId();
-      console.log("createInitialState", id, queryName, argsObject);
       return {
         query,
         args: argsObject as Record<string, Value>,
@@ -208,7 +204,6 @@ export function usePaginatedQuery<Query extends PaginatedQueryReference>(
     skip !== state.skip
   ) {
     currState = createInitialState();
-    console.log("resetting state", currState);
     setState(currState);
   }
   const convexClient = useConvex();
@@ -225,14 +220,6 @@ export function usePaginatedQuery<Query extends PaginatedQueryReference>(
     const allItems = [];
     for (const pageKey of currState.pageKeys) {
       currResult = resultsObject[pageKey];
-      console.log({
-        pageKey,
-        continue: currResult?.continueCursor,
-        cursor: currState.queries[pageKey]?.args?.paginationOpts?.cursor,
-        split: currResult?.splitCursor,
-        status: currResult?.pageStatus,
-        length: currResult?.page?.length,
-      });
       if (currResult === undefined) {
         break;
       }
@@ -264,13 +251,11 @@ export function usePaginatedQuery<Query extends PaginatedQueryReference>(
       }
       const ongoingSplit = currState.ongoingSplits[pageKey];
       if (ongoingSplit !== undefined) {
-        console.log("ongoingSplit", pageKey, ongoingSplit);
         if (
           resultsObject[ongoingSplit[0]] !== undefined &&
           resultsObject[ongoingSplit[1]] !== undefined
         ) {
           // Both pages of the split have results now. Swap them in.
-          console.log("completeSplitQuery", pageKey);
           setState(completeSplitQuery(pageKey));
         }
       } else if (
@@ -279,12 +264,6 @@ export function usePaginatedQuery<Query extends PaginatedQueryReference>(
           currResult.pageStatus === "SplitRequired" ||
           currResult.page.length > options.initialNumItems * 2)
       ) {
-        console.log(
-          "splitQuery",
-          pageKey,
-          currResult.pageStatus,
-          currResult.page.length
-        );
         // If a single page has more than double the expected number of items,
         // or if the server requests a split, split the page into two.
         setState(
@@ -321,7 +300,6 @@ export function usePaginatedQuery<Query extends PaginatedQueryReference>(
           },
         } as const;
       } else {
-        console.log("LoadingMore", maybeLastResult);
         return {
           status: "LoadingMore",
           isLoading: true,
@@ -332,7 +310,6 @@ export function usePaginatedQuery<Query extends PaginatedQueryReference>(
       }
     }
     if (maybeLastResult.isDone) {
-      console.log("Exhausted", maybeLastResult);
       return {
         status: "Exhausted",
         isLoading: false,
@@ -356,14 +333,6 @@ export function usePaginatedQuery<Query extends PaginatedQueryReference>(
             const nextPageKey = prevState.nextPageKey + 2;
             const pageKeys = prevState.pageKeys; //[...prevState.pageKeys, prevState.nextPageKey];
             const queries = { ...prevState.queries };
-            console.log(
-              "loading more",
-              lastPageKey,
-              replaceKey,
-              newKey,
-              nextPageKey,
-              pageKeys
-            );
 
             queries[replaceKey] = {
               query: prevState.query,
