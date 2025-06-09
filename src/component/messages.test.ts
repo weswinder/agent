@@ -129,7 +129,8 @@ describe("agent", () => {
     const { messages: messages2 } = await t.mutation(api.messages.addMessages, {
       threadId: thread._id as Id<"threads">,
       messages: [{ message: { role: "user", content: "hello" } }],
-      promptMessageId: messages.at(-1)!._id,
+      agentName: "test",
+      promptMessageId: messages.at(-1)!._id as Id<"messages">,
     });
     const maxMessage2 = await t.run(async (ctx) => {
       return await getMaxMessage(ctx, thread._id as Id<"threads">);
