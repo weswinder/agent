@@ -847,7 +847,7 @@ export class Agent<AgentTools extends ToolSet> {
    * @returns
    */
   async saveMessages(
-    ctx: RunMutationCtx,
+    ctx: RunMutationCtx | RunActionCtx,
     args: {
       threadId: string;
       userId?: string;
@@ -906,7 +906,14 @@ export class Agent<AgentTools extends ToolSet> {
         );
       }
     } else {
-      embeddings = await this.generateEmbeddings(args.messages);
+      embeddings = await this.generateEmbeddings(
+        ctx,
+        {
+          userId: args.userId,
+          threadId: args.threadId,
+        },
+        args.messages
+      );
     }
     const result = await ctx.runMutation(this.component.messages.addMessages, {
       threadId: args.threadId,
@@ -1080,7 +1087,12 @@ export class Agent<AgentTools extends ToolSet> {
             : undefined,
           threadId: args.threadId,
           beforeMessageId: args.upToAndIncludingMessageId,
-          ...(await this._searchOptionsWithDefaults(opts, messagesToSearch)),
+          ...(await this._searchOptionsWithEmbeddingAndDefaults(
+            ctx,
+            { userId: args.userId, threadId: args.threadId },
+            opts,
+            messagesToSearch
+          )),
         }
       );
       // TODO: track what messages we used for context
@@ -1139,7 +1151,20 @@ export class Agent<AgentTools extends ToolSet> {
    * @param messages The messages to get the embeddings for.
    * @returns The embeddings for the messages.
    */
-  async generateEmbeddings(messages: CoreMessage[]) {
+  async generateEmbeddings(
+    ctx: RunActionCtx,
+    {
+      userId,
+      threadId,
+    }: {
+      userId: string | undefined;
+      threadId: string | undefined;
+    },
+    messages: CoreMessage[]
+  ) {
+    if (!this.options.textEmbedding) {
+      return undefined;
+    }
     let embeddings:
       | {
           vectors: (number[] | null)[];
@@ -1147,34 +1172,34 @@ export class Agent<AgentTools extends ToolSet> {
           model: string;
         }
       | undefined;
-    if (this.options.textEmbedding) {
-      const messageTexts = messages.map((m) => !isTool(m) && extractText(m));
-      // Find the indexes of the messages that have text.
-      const textIndexes = messageTexts
-        .map((t, i) => (t ? i : undefined))
-        .filter((i) => i !== undefined);
-      if (textIndexes.length === 0) {
-        return undefined;
-      }
-      // Then embed those messages.
-      const textEmbeddings = await this.options.textEmbedding.doEmbed({
-        values: messageTexts.filter((t): t is string => !!t),
-      });
-      // TODO: record usage of embeddings
-      // Then assemble the embeddings into a single array with nulls for the messages without text.
-      const embeddingsOrNull = Array(messages.length).fill(null);
-      textIndexes.forEach((i, j) => {
-        embeddingsOrNull[i] = textEmbeddings.embeddings[j];
-      });
-      if (textEmbeddings.embeddings.length > 0) {
-        const dimension = textEmbeddings.embeddings[0].length;
-        validateVectorDimension(dimension);
-        embeddings = {
-          vectors: embeddingsOrNull,
-          dimension,
-          model: this.options.textEmbedding.modelId,
-        };
-      }
+    const messageTexts = messages.map((m) => !isTool(m) && extractText(m));
+    // Find the indexes of the messages that have text.
+    const textIndexes = messageTexts
+      .map((t, i) => (t ? i : undefined))
+      .filter((i) => i !== undefined);
+    if (textIndexes.length === 0) {
+      return undefined;
+    }
+    // Then embed those messages.
+    const textEmbeddings = await this.doEmbed(ctx, {
+      userId,
+      threadId,
+      values: messageTexts.filter((t): t is string => !!t),
+    });
+    // TODO: record usage of embeddings
+    // Then assemble the embeddings into a single array with nulls for the messages without text.
+    const embeddingsOrNull = Array(messages.length).fill(null);
+    textIndexes.forEach((i, j) => {
+      embeddingsOrNull[i] = textEmbeddings.embeddings[j];
+    });
+    if (textEmbeddings.embeddings.length > 0) {
+      const dimension = textEmbeddings.embeddings[0].length;
+      validateVectorDimension(dimension);
+      embeddings = {
+        vectors: embeddingsOrNull,
+        dimension,
+        model: this.options.textEmbedding.modelId,
+      };
     }
     return embeddings;
   }
@@ -1219,6 +1244,11 @@ export class Agent<AgentTools extends ToolSet> {
       return;
     }
     const embeddings = await this.generateEmbeddings(
+      ctx,
+      {
+        userId: messagesMissingEmbeddings[0]!.userId,
+        threadId: messagesMissingEmbeddings[0]!.threadId,
+      },
       messagesMissingEmbeddings.map((m) => m!.message!)
     );
     if (!embeddings) {
@@ -1289,6 +1319,8 @@ export class Agent<AgentTools extends ToolSet> {
       }
     );
     const embeddings = await this.generateEmbeddings(
+      ctx,
+      { userId: args.userId, threadId: args.threadId },
       messages.map((m) => m.message)
     );
     const saved = await ctx.runMutation(this.component.messages.addMessages, {
@@ -1311,7 +1343,7 @@ export class Agent<AgentTools extends ToolSet> {
    * @param args The arguments to the saveObject function.
    */
   async saveObject(
-    ctx: RunMutationCtx,
+    ctx: RunActionCtx,
     args: {
       userId: string | undefined;
       threadId: string;
@@ -1325,6 +1357,8 @@ export class Agent<AgentTools extends ToolSet> {
       provider: this.options.chat.provider,
     });
     const embeddings = await this.generateEmbeddings(
+      ctx,
+      { userId: args.userId, threadId: args.threadId },
       messages.map((m) => m.message)
     );
 
@@ -1498,7 +1532,9 @@ export class Agent<AgentTools extends ToolSet> {
     };
   }
 
-  async _searchOptionsWithDefaults(
+  async _searchOptionsWithEmbeddingAndDefaults(
+    ctx: RunActionCtx,
+    { userId, threadId }: { userId?: string; threadId?: string },
     contextOptions: ContextOptions,
     messages: CoreMessage[]
   ): Promise<SearchOptions> {
@@ -1523,13 +1559,52 @@ export class Agent<AgentTools extends ToolSet> {
       this.options.textEmbedding
     ) {
       search.vector = (
-        await this.options.textEmbedding.doEmbed({
+        await this.doEmbed(ctx, {
+          threadId,
+          userId,
           values: [text],
         })
       ).embeddings[0];
       search.vectorModel = this.options.textEmbedding.modelId;
     }
     return search;
+  }
+
+  async doEmbed(
+    ctx: RunActionCtx,
+    options: {
+      userId: string | undefined;
+      threadId: string | undefined;
+      values: string[];
+      abortSignal?: AbortSignal;
+      headers?: Record<string, string | undefined>;
+    }
+  ): Promise<{ embeddings: number[][] }> {
+    const embedding = this.options.textEmbedding;
+    assert(embedding, "textEmbedding is required");
+    const result = await embedding.doEmbed({
+      values: options.values,
+      abortSignal: options.abortSignal,
+      headers: options.headers,
+    });
+    if (this.options.usageHandler && result.usage) {
+      await this.options.usageHandler(ctx, {
+        userId: options.userId,
+        threadId: options.threadId,
+        agentName: this.options.name,
+        model: embedding.modelId,
+        provider: embedding.provider,
+        providerMetadata: result.rawResponse
+          ? { [embedding.provider]: result.rawResponse }
+          : undefined,
+        usage: {
+          promptTokens: result.usage.tokens,
+          completionTokens: 0,
+          totalTokens: result.usage.tokens,
+        },
+      });
+    }
+    return { embeddings: result.embeddings };
   }
 
   /**
