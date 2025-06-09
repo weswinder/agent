@@ -12,8 +12,6 @@ import {
   vProviderOptions,
   vProviderMetadata,
   vReasoningDetails,
-  vFile,
-  vFileWithStringId,
   vTextStreamPart,
 } from "../validators.js";
 import { typedV } from "convex-helpers/validators";
@@ -35,10 +33,10 @@ export const schema = defineSchema({
     id: v.optional(v.string()), // external id, e.g. from Vercel AI SDK
     userId: v.optional(v.string()), // useful for searching across threads
     threadId: v.id("threads"),
-    // Repeats until a non-tool message.
     order: v.number(),
     stepOrder: v.number(),
     embeddingId: v.optional(vVectorId),
+    fileIds: v.optional(v.array(v.id("files"))),
     error: v.optional(v.string()),
     status: vMessageStatus,
 
@@ -53,7 +51,6 @@ export const schema = defineSchema({
     // Convenience fields extracted from the message
     tool: v.boolean(), // either tool call (assistant) or tool result (tool)
     text: v.optional(v.string()),
-    files: v.optional(v.array(vFile)),
 
     // Result metadata
     usage: v.optional(vUsage),
@@ -66,6 +63,7 @@ export const schema = defineSchema({
     // DEPRECATED
     parentMessageId: v.optional(v.id("messages")),
     stepId: v.optional(v.id("steps")),
+    files: v.optional(v.array(v.any())),
   })
     // Allows finding successful visible messages in order
     // Also surface pending messages separately to e.g. stream
@@ -168,6 +166,7 @@ export const schema = defineSchema({
 
   files: defineTable({
     storageId: v.string(),
+    filename: v.optional(v.string()),
     hash: v.string(),
     refcount: v.number(),
   })
@@ -207,7 +206,7 @@ export const vMessageDoc = v.object({
   // Outside of the component, they are strings
   threadId: v.string(),
   embeddingId: v.optional(v.string()),
-  files: v.optional(v.array(vFileWithStringId)),
+  fileIds: v.optional(v.array(v.string())),
 });
 export type MessageDoc = Infer<typeof vMessageDoc>;
 

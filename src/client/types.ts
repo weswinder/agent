@@ -494,6 +494,9 @@ export type RunActionCtx = {
   runMutation: GenericActionCtx<GenericDataModel>["runMutation"];
   runAction: GenericActionCtx<GenericDataModel>["runAction"];
 };
+export type ActionCtx = RunActionCtx & {
+  storage: GenericActionCtx<GenericDataModel>["storage"];
+};
 
 export type OpaqueIds<T> =
   T extends GenericId<infer _T>

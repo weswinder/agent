@@ -16,7 +16,9 @@
     "allowSyntheticDefaultImports": true,
     "module": "ESNext",
     "moduleResolution": "Bundler",
-    "isolatedModules": true,
+    // See these docs to get this working:
+    //https://github.com/xixixao/convex-typescript-plugin/
+    // "plugins": [{ "name": "@xixixao/convex-typescript-plugin" }],
     "noEmit": true,
     "paths": {
       "@example/*": ["../../examples/*"]

@@ -60,18 +60,6 @@ export const vFilePart = v.object({
   providerOptions,
 });
 
-export const vFile = v.object({
-  data: v.optional(v.union(v.bytes(), v.string())),
-  url: v.optional(v.string()),
-  mimeType: v.string(),
-  fileId: v.optional(v.id("files")),
-});
-
-export const vFileWithStringId = v.object({
-  ...vFile.fields,
-  fileId: v.optional(v.string()),
-});
-
 export const vUserContent = v.union(
   v.string(),
   v.array(v.union(vTextPart, vImagePart, vFilePart))
@@ -261,11 +249,11 @@ export const vLanguageModelV1CallWarning = v.union(
   })
 );
 
-export const vMessageWithMetadata = v.object({
+export const vMessageWithMetadataInternal = v.object({
   id: v.optional(v.string()), // external id, e.g. from Vercel AI SDK
   message: vMessage,
   text: v.optional(v.string()),
-  files: v.optional(v.array(vFile)),
+  fileIds: v.optional(v.array(v.id("files"))),
   // metadata
   finishReason: v.optional(vFinishReason),
   model: v.optional(v.string()),
@@ -277,6 +265,10 @@ export const vMessageWithMetadata = v.object({
   usage: v.optional(vUsage),
   warnings: v.optional(v.array(vLanguageModelV1CallWarning)),
   error: v.optional(v.string()),
+});
+export const vMessageWithMetadata = v.object({
+  ...vMessageWithMetadataInternal.fields,
+  fileIds: v.optional(v.array(v.string())),
 });
 export type MessageWithMetadata = Infer<typeof vMessageWithMetadata>;
 
@@ -313,7 +305,7 @@ export type Step = Infer<typeof vStep>;
 
 export const vStepWithMessages = v.object({
   step: vStep,
-  messages: v.array(vMessageWithMetadata),
+  messages: v.array(vMessageWithMetadataInternal),
   embeddings: v.optional(vMessageEmbeddings),
 });
 export type StepWithMessagesWithMetadata = Infer<typeof vStepWithMessages>;

@@ -59,8 +59,8 @@ export type Mounts = {
     addFile: FunctionReference<
       "mutation",
       "public",
-      { hash: string; storageId: string },
-      { fileId: string; storageIdUnused: boolean }
+      { filename?: string; hash: string; storageId: string },
+      { fileId: string; storageId: string }
     >;
     copyFile: FunctionReference<"mutation", "public", { fileId: string }, null>;
     getFilesToDelete: FunctionReference<
@@ -72,6 +72,7 @@ export type Mounts = {
         files: Array<{
           _creationTime: number;
           _id: string;
+          filename?: string;
           hash: string;
           refcount: number;
           storageId: string;
@@ -82,7 +83,7 @@ export type Mounts = {
     useExistingFile: FunctionReference<
       "mutation",
       "public",
-      { hash: string },
+      { filename?: string; hash: string },
       string | null
     >;
   };
@@ -110,12 +111,7 @@ export type Mounts = {
         failPendingSteps?: boolean;
         messages: Array<{
           error?: string;
-          files?: Array<{
-            data?: ArrayBuffer | string;
-            fileId?: string;
-            mimeType: string;
-            url?: string;
-          }>;
+          fileIds?: Array<string>;
           finishReason?:
             | "stop"
             | "length"
@@ -252,12 +248,8 @@ export type Mounts = {
           agentName?: string;
           embeddingId?: string;
           error?: string;
-          files?: Array<{
-            data?: ArrayBuffer | string;
-            fileId?: string;
-            mimeType: string;
-            url?: string;
-          }>;
+          fileIds?: Array<string>;
+          files?: Array<any>;
           finishReason?:
             | "stop"
             | "length"
@@ -394,12 +386,8 @@ export type Mounts = {
           agentName?: string;
           embeddingId?: string;
           error?: string;
-          files?: Array<{
-            data?: ArrayBuffer | string;
-            fileId?: string;
-            mimeType: string;
-            url?: string;
-          }>;
+          fileIds?: Array<string>;
+          files?: Array<any>;
           finishReason?:
             | "stop"
             | "length"
@@ -556,12 +544,7 @@ export type Mounts = {
           };
           messages: Array<{
             error?: string;
-            files?: Array<{
-              data?: ArrayBuffer | string;
-              fileId?: string;
-              mimeType: string;
-              url?: string;
-            }>;
+            fileIds?: Array<string>;
             finishReason?:
               | "stop"
               | "length"
@@ -914,12 +897,8 @@ export type Mounts = {
         agentName?: string;
         embeddingId?: string;
         error?: string;
-        files?: Array<{
-          data?: ArrayBuffer | string;
-          fileId?: string;
-          mimeType: string;
-          url?: string;
-        }>;
+        fileIds?: Array<string>;
+        files?: Array<any>;
         finishReason?:
           | "stop"
           | "length"
@@ -1067,12 +1046,8 @@ export type Mounts = {
         agentName?: string;
         embeddingId?: string;
         error?: string;
-        files?: Array<{
-          data?: ArrayBuffer | string;
-          fileId?: string;
-          mimeType: string;
-          url?: string;
-        }>;
+        fileIds?: Array<string>;
+        files?: Array<any>;
         finishReason?:
           | "stop"
           | "length"
@@ -1217,12 +1192,8 @@ export type Mounts = {
           agentName?: string;
           embeddingId?: string;
           error?: string;
-          files?: Array<{
-            data?: ArrayBuffer | string;
-            fileId?: string;
-            mimeType: string;
-            url?: string;
-          }>;
+          fileIds?: Array<string>;
+          files?: Array<any>;
           finishReason?:
             | "stop"
             | "length"
@@ -1385,12 +1356,8 @@ export type Mounts = {
           agentName?: string;
           embeddingId?: string;
           error?: string;
-          files?: Array<{
-            data?: ArrayBuffer | string;
-            fileId?: string;
-            mimeType: string;
-            url?: string;
-          }>;
+          fileIds?: Array<string>;
+          files?: Array<any>;
           finishReason?:
             | "stop"
             | "length"
@@ -1551,12 +1518,8 @@ export type Mounts = {
         agentName?: string;
         embeddingId?: string;
         error?: string;
-        files?: Array<{
-          data?: ArrayBuffer | string;
-          fileId?: string;
-          mimeType: string;
-          url?: string;
-        }>;
+        fileIds?: Array<string>;
+        files?: Array<any>;
         finishReason?:
           | "stop"
           | "length"
@@ -1704,12 +1667,8 @@ export type Mounts = {
         agentName?: string;
         embeddingId?: string;
         error?: string;
-        files?: Array<{
-          data?: ArrayBuffer | string;
-          fileId?: string;
-          mimeType: string;
-          url?: string;
-        }>;
+        fileIds?: Array<string>;
+        files?: Array<any>;
         finishReason?:
           | "stop"
           | "length"

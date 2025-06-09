@@ -12,6 +12,7 @@ import {
   vMessageEmbeddings,
   vMessageStatus,
   vMessageWithMetadata,
+  vMessageWithMetadataInternal,
   vPaginationResult,
   vSearchOptions,
   vStepWithMessages,
@@ -62,7 +63,7 @@ export async function deleteMessage(
   if (messageDoc.embeddingId) {
     await ctx.db.delete(messageDoc.embeddingId);
   }
-  for (const { fileId } of messageDoc.files ?? []) {
+  for (const fileId of messageDoc.fileIds ?? []) {
     if (!fileId) continue;
     const file = await ctx.db.get(fileId);
     if (file) {
@@ -81,7 +82,7 @@ const addMessagesArgs = {
   stepId: v.optional(v.id("steps")),
   promptMessageId: v.optional(v.id("messages")),
   agentName: v.optional(v.string()),
-  messages: v.array(vMessageWithMetadata),
+  messages: v.array(vMessageWithMetadataInternal),
   embeddings: v.optional(vMessageEmbeddings),
   pending: v.optional(v.boolean()),
   failPendingSteps: v.optional(v.boolean()),
@@ -186,7 +187,7 @@ async function addMessagesHandler(
       //     id: messageId,
       //   });
       // }
-      for (const { fileId } of message.files ?? []) {
+      for (const fileId of message.fileIds ?? []) {
         if (!fileId) continue;
         await ctx.db.patch(fileId, {
           refcount: (await ctx.db.get(fileId))!.refcount + 1,
