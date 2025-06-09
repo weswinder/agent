@@ -11,6 +11,7 @@
 import type * as chatBasic from "../chatBasic.js";
 import type * as chatStreaming from "../chatStreaming.js";
 import type * as example from "../example.js";
+import type * as filesImages from "../filesImages.js";
 import type * as http from "../http.js";
 import type * as ideaAgents from "../ideaAgents.js";
 import type * as ideas from "../ideas.js";
@@ -35,6 +36,7 @@ declare const fullApi: ApiFromModules<{
   chatBasic: typeof chatBasic;
   chatStreaming: typeof chatStreaming;
   example: typeof example;
+  filesImages: typeof filesImages;
   http: typeof http;
   ideaAgents: typeof ideaAgents;
   ideas: typeof ideas;

@@ -42,6 +42,18 @@ export function Index() {
           </li>
           <li className="border rounded p-4 hover:shadow transition">
             <Link
+              to="/files-images"
+              className="text-xl font-semibold text-indigo-700 hover:underline"
+            >
+              Files & Images
+            </Link>
+            <p className="mt-2 text-gray-700">
+              Upload images to ask an LLM about, and have them automatically
+              saved and tracked.
+            </p>
+          </li>
+          <li className="border rounded p-4 hover:shadow transition">
+            <Link
               to="/weather-fashion"
               className="text-xl font-semibold text-indigo-700 hover:underline"
             >

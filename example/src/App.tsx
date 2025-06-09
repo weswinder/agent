@@ -6,6 +6,7 @@ import ChatStreaming from "@example/chat-streaming/src/ChatStreaming";
 import { Index } from "./pages/Index";
 import { WeatherFashion } from "./pages/WeatherFashion";
 import { Images } from "./pages/Images";
+import FilesImages from "@example/files-images/src/FilesImages";
 export default function App() {
   return (
     <BrowserRouter>
@@ -25,6 +26,7 @@ export default function App() {
             <Route path="/weather-fashion" element={<WeatherFashion />} />
             <Route path="/chat-basic" element={<ChatBasic />} />
             <Route path="/chat-streaming" element={<ChatStreaming />} />
+            <Route path="/files-images" element={<FilesImages />} />
             <Route path="/ideas/:id" element={<IdeaDetail />} />
             <Route path="/images" element={<Images />} />
           </Routes>
