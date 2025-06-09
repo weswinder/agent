@@ -6,12 +6,11 @@ import { groq } from "@ai-sdk/groq";
 let chat: LanguageModelV1;
 let textEmbedding: EmbeddingModel<string>;
 
-if (process.env.GROQ_API_KEY) {
-  chat = groq.languageModel("llama3-8b-8192");
-  textEmbedding = groq.textEmbeddingModel("text-embedding-3-small");
-} else if (process.env.OPENAI_API_KEY) {
+if (process.env.OPENAI_API_KEY) {
   chat = openai.chat("gpt-4o-mini");
   textEmbedding = openai.textEmbeddingModel("text-embedding-3-small");
+} else if (process.env.GROQ_API_KEY) {
+  chat = groq.languageModel("meta-llama/llama-4-scout-17b-16e-instruct");
 } else if (process.env.OPENROUTER_API_KEY) {
   chat = openrouter.chat("openai/gpt-4o-mini");
 } else {
