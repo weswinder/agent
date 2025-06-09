@@ -50,7 +50,7 @@ export const getThread = _getThread;
 export const updateThread = _updateThread;
 
 function publicMessage(message: Doc<"messages">): MessageDoc {
-  return omit(message, ["parentMessageId", "stepId"]);
+  return omit(message, ["parentMessageId", "stepId", "files"]);
 }
 
 export async function deleteMessage(

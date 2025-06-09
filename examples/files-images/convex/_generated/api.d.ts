@@ -330,7 +330,6 @@ export declare const components: {
             embeddingId?: string;
             error?: string;
             fileIds?: Array<string>;
-            files?: Array<any>;
             finishReason?:
               | "stop"
               | "length"
@@ -508,7 +507,6 @@ export declare const components: {
           embeddingId?: string;
           error?: string;
           fileIds?: Array<string>;
-          files?: Array<any>;
           finishReason?:
             | "stop"
             | "length"
@@ -654,7 +652,6 @@ export declare const components: {
             embeddingId?: string;
             error?: string;
             fileIds?: Array<string>;
-            files?: Array<any>;
             finishReason?:
               | "stop"
               | "length"
@@ -846,7 +843,6 @@ export declare const components: {
             embeddingId?: string;
             error?: string;
             fileIds?: Array<string>;
-            files?: Array<any>;
             finishReason?:
               | "stop"
               | "length"
@@ -1036,7 +1032,6 @@ export declare const components: {
           embeddingId?: string;
           error?: string;
           fileIds?: Array<string>;
-          files?: Array<any>;
           finishReason?:
             | "stop"
             | "length"
@@ -1185,7 +1180,6 @@ export declare const components: {
           embeddingId?: string;
           error?: string;
           fileIds?: Array<string>;
-          files?: Array<any>;
           finishReason?:
             | "stop"
             | "length"

@@ -17,6 +17,18 @@
 - Add `rawRequestResponseHandler` to the Agent definition, so you can log
   the raw request and response from the LLM.
 
+### Breaking
+
+- The `steps` table is now gone. It will still be around in your backend, where
+  you can inspect or clear it if you want, but it will not be written to, and
+  the low-level APIs around saving steps alongside messages are gone.
+  To get debug information, you can use the `rawRequestResponseHandler` and
+  dump the request and response to your own debug table. Maybe conditional on
+  some environment variable so you can turn it on/off for debugging.
+- The `files` field is deprecated in favor of `fileIds` in the message metadata.
+  This wasn't really used before but it was possible folks discovered how to
+  set it.
+
 ## 0.1.6
 
 - Fix pagination for the Agent messages when loading more

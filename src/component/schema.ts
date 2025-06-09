@@ -181,6 +181,7 @@ export const vMessageDoc = v.object({
   ...omit(schema.tables.messages.validator.fields, [
     "parentMessageId",
     "stepId",
+    "files",
   ]),
   // Overwrite all the types that have a v.id validator
   // Outside of the component, they are strings

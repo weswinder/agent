@@ -280,7 +280,6 @@ export type Mounts = {
           embeddingId?: string;
           error?: string;
           fileIds?: Array<string>;
-          files?: Array<any>;
           finishReason?:
             | "stop"
             | "length"
@@ -430,7 +429,6 @@ export type Mounts = {
         embeddingId?: string;
         error?: string;
         fileIds?: Array<string>;
-        files?: Array<any>;
         finishReason?:
           | "stop"
           | "length"
@@ -576,7 +574,6 @@ export type Mounts = {
           embeddingId?: string;
           error?: string;
           fileIds?: Array<string>;
-          files?: Array<any>;
           finishReason?:
             | "stop"
             | "length"
@@ -740,7 +737,6 @@ export type Mounts = {
           embeddingId?: string;
           error?: string;
           fileIds?: Array<string>;
-          files?: Array<any>;
           finishReason?:
             | "stop"
             | "length"
@@ -902,7 +898,6 @@ export type Mounts = {
         embeddingId?: string;
         error?: string;
         fileIds?: Array<string>;
-        files?: Array<any>;
         finishReason?:
           | "stop"
           | "length"
@@ -1051,7 +1046,6 @@ export type Mounts = {
         embeddingId?: string;
         error?: string;
         fileIds?: Array<string>;
-        files?: Array<any>;
         finishReason?:
           | "stop"
           | "length"
