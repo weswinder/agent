@@ -13,11 +13,7 @@ import {
 } from "./_generated/server";
 import { v } from "convex/values";
 import { getFile } from "@convex-dev/agent";
-import {
-  FilePart,
-  ImagePart,
-  experimental_generateImage as generateImage,
-} from "ai";
+import { FilePart, ImagePart } from "ai";
 import OpenAI from "openai";
 
 // Define an agent similarly to the AI SDK
@@ -133,17 +129,33 @@ export const generateImageOneShot = internalAction({
     await fileAgent.saveMessage(ctx, { threadId, prompt });
 
     // Generate the image
-    const imgResponse = await generateImage({
-      model: openai.imageModel("gpt-image-1"),
+    const provider = "openai";
+    const model = "dall-e-2";
+    const imgResponse = await new OpenAI().images.generate({
+      model,
       prompt,
-      size: "1024x1024",
-      n: 1,
-      providerOptions: {
-        openai: { quality: "low" },
-      },
+      size: "256x256",
+      response_format: "url",
     });
+    const url = imgResponse.data?.[0].url;
+    if (!url) {
+      throw new Error(
+        "No image URL found. Response: " + JSON.stringify(imgResponse),
+      );
+    }
+    console.debug("short-lived url:", url);
+    const image = await fetch(url);
+    if (!image.ok) {
+      throw new Error("Failed to fetch image. " + JSON.stringify(image));
+    }
+    const mimeType = image.headers.get("content-type")!;
+    if (!mimeType) {
+      throw new Error(
+        "No MIME type found. Response: " + JSON.stringify(image.headers),
+      );
+    }
 
-    // Save the image in an assistant message
+    // // Save the image in an assistant message
     const { message } = await fileAgent.saveMessage(ctx, {
       threadId,
       message: {
@@ -152,15 +164,15 @@ export const generateImageOneShot = internalAction({
           {
             type: "file",
             // NOTE: passing in the bytes directly!
-            data: imgResponse.image.uint8Array,
-            mimeType: imgResponse.image.mimeType,
-          } as FilePart,
+            data: await image.arrayBuffer(),
+            mimeType: image.headers.get("content-type")!,
+          },
         ],
       },
       metadata: {
-        warnings: imgResponse.warnings,
-        model: imgResponse.responses.at(-1)?.modelId,
-        provider: "openai",
+        text: imgResponse.data?.[0].revised_prompt || undefined,
+        model,
+        provider,
       },
     });
     return { threadId, assistantMessage: message };
