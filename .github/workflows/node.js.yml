@@ -15,7 +15,7 @@ jobs:
           cache-dependency-path: |
             example/package.json
             package.json
-          node-version: "18.x"
+          node-version: "19.x"
           cache: "npm"
       - run: npm i
       - run: cd example && npm i && cd ..

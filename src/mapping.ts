@@ -15,13 +15,11 @@ import {
   type UserContent,
 } from "ai";
 import { assert } from "convex-helpers";
-import type {
-  MessageWithMetadata,
-  Step,
-  StepWithMessagesWithMetadata,
-} from "./validators";
+import type { MessageWithMetadata } from "./validators";
 import type { ActionCtx, AgentComponent } from "./client/types.js";
 import type { RunMutationCtx } from "./client/types.js";
+import { MAX_FILE_SIZE, storeFile } from "./client/files.js";
+
 
 export type AIMessageWithoutId = Omit<AIMessage, "id">;
 
@@ -68,38 +66,6 @@ export function deserializeMessage(message: SerializedMessage): CoreMessage {
     ...message,
     content: deserializeContent(message.content),
   } as CoreMessage;
-}
-
-export async function serializeStep<TOOLS extends ToolSet>(
-  ctx: ActionCtx,
-  component: AgentComponent,
-  step: StepResult<TOOLS>
-): Promise<Step> {
-  const messages = await Promise.all(
-    step.response?.messages.map(async (messageWithId) => {
-      const { message, fileIds } = await serializeMessage(
-        ctx,
-        component,
-        messageWithId
-      );
-      return {
-        message,
-        id: messageWithId.id,
-        fileIds,
-      };
-    })
-  );
-  const timestamp = step.response?.timestamp.getTime();
-  const response = {
-    ...step.response,
-    messages,
-    timestamp,
-    headers: {}, // these are large and low value
-  };
-  return {
-    ...step,
-    response,
-  };
 }
 
 export async function serializeNewMessagesInStep<TOOLS extends ToolSet>(
@@ -150,7 +116,7 @@ export async function serializeNewMessagesInStep<TOOLS extends ToolSet>(
 export function serializeObjectResult(
   result: GenerateObjectResult<unknown>,
   metadata: { model: string; provider: string }
-): StepWithMessagesWithMetadata {
+): { messages: MessageWithMetadata[] } {
   const text = JSON.stringify(result.object);
 
   const message = {
@@ -172,23 +138,6 @@ export function serializeObjectResult(
         warnings: result.warnings,
       },
     ],
-    step: {
-      text,
-      isContinued: false,
-      stepType: "initial",
-      toolCalls: [],
-      toolResults: [],
-      usage: result.usage,
-      warnings: result.warnings,
-      finishReason: result.finishReason,
-      providerMetadata: result.providerMetadata,
-      request: result.request,
-      response: {
-        ...result.response,
-        timestamp: result.response.timestamp.getTime(),
-        messages: [{ message, id: result.response.id }],
-      },
-    },
   };
 }
 
@@ -211,28 +160,26 @@ export async function serializeContent(
             image instanceof ArrayBuffer &&
             image.byteLength > MAX_FILE_SIZE
           ) {
-            const { url, fileId } = await storeFile(
+            const { file } = await storeFile(
               ctx,
               component,
-              image,
-              part.mimeType
+              new Blob([image], { type: part.mimeType || guessMimeType(image) })
             );
-            image = url;
-            fileIds.push(fileId);
+            image = file.url;
+            fileIds.push(file.fileId);
           }
           return { ...part, image };
         }
         case "file": {
           let data = serializeDataOrUrl(part.data);
           if (data instanceof ArrayBuffer && data.byteLength > MAX_FILE_SIZE) {
-            const { url, fileId } = await storeFile(
+            const { file } = await storeFile(
               ctx,
               component,
-              data,
-              part.mimeType
+              new Blob([data], { type: part.mimeType })
             );
-            data = url;
-            fileIds.push(fileId);
+            data = file.url;
+            fileIds.push(file.fileId);
           }
           return { ...part, data };
         }
@@ -263,41 +210,6 @@ export function deserializeContent(content: SerializedContent): Content {
   }) as Content;
 }
 
-const MAX_FILE_SIZE = 1024 * 10;
-
-async function storeFile(
-  ctx: ActionCtx | RunMutationCtx,
-  component: AgentComponent,
-  arrayBuffer: ArrayBuffer,
-  mimeType: string | undefined,
-  filename?: string
-) {
-  if (!("runAction" in ctx)) {
-    throw new Error(
-      "You're trying to save a file that's too large in a mutation. " +
-        "You can store the file in file storage from an action first, then pass a URL instead. " +
-        "To have the agent component track the file, you can use `saveFile` from an action then use the fileId with getFile in the mutation. " +
-        "Read more in the docs."
-    );
-  }
-  const type = mimeType || guessMimeType(arrayBuffer);
-  const storageId = await ctx.storage.store(new Blob([arrayBuffer], { type }));
-  const { fileId, storageId: storageIdUsed } = await ctx.runMutation(
-    component.files.addFile,
-    {
-      storageId,
-      hash: crypto.subtle.digest("SHA-256", arrayBuffer).toString(),
-      filename,
-    }
-  );
-  const url = (await ctx.storage.getUrl(storageIdUsed))!;
-  if (storageId !== storageIdUsed) {
-    // We're re-using another file's storageId
-    await ctx.storage.delete(storageId);
-  }
-  return { url, fileId };
-}
-
 /**
  * Return a best-guess MIME type based on the magic-number signature
  * found at the start of an ArrayBuffer.
@@ -305,7 +217,7 @@ async function storeFile(
  * @param buf – the source ArrayBuffer
  * @returns the detected MIME type, or `"application/octet-stream"` if unknown
  */
-function guessMimeType(buf: ArrayBuffer | string): string {
+export function guessMimeType(buf: ArrayBuffer | string): string {
   if (typeof buf === "string") {
     if (buf.match(/^data:\w+\/\w+;base64/)) {
       return buf.split(";")[0].split(":")[1]!;
@@ -334,6 +246,10 @@ function guessMimeType(buf: ArrayBuffer | string): string {
   if (startsWith("424d")) return "image/bmp"; // BMP
   if (startsWith("52494646") && hex.substr(16, 8) === "57454250")
     return "image/webp"; // WEBP (RIFF....WEBP)
+  if (startsWith("49492a00")) return "image/tiff"; // TIFF
+  // <svg in hex is 3c 3f 78 6d 6c
+  if (startsWith("3c737667")) return "image/svg+xml"; // <svg
+  if (startsWith("3c3f786d")) return "image/svg+xml"; // <?xm
 
   // --- audio/video ---
   if (startsWith("494433")) return "audio/mpeg"; // MP3 (ID3)
@@ -361,7 +277,7 @@ function guessMimeType(buf: ArrayBuffer | string): string {
   return "application/octet-stream";
 }
 
-function serializeDataOrUrl(
+export function serializeDataOrUrl(
   dataOrUrl: DataContent | URL
 ): ArrayBuffer | string {
   if (typeof dataOrUrl === "string") {
@@ -379,7 +295,9 @@ function serializeDataOrUrl(
   ) as ArrayBuffer;
 }
 
-function deserializeUrl(urlOrString: string | ArrayBuffer): URL | DataContent {
+export function deserializeUrl(
+  urlOrString: string | ArrayBuffer
+): URL | DataContent {
   if (typeof urlOrString === "string") {
     if (
       urlOrString.startsWith("http://") ||

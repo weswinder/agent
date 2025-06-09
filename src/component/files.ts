@@ -2,13 +2,18 @@ import { paginator } from "convex-helpers/server/pagination";
 import type { Id } from "./_generated/dataModel.js";
 import { mutation, type MutationCtx, query } from "./_generated/server.js";
 import { schema, v } from "./schema.js";
+import { paginationOptsValidator } from "convex/server";
+import type { Infer } from "convex/values";
+
+const addFileArgs = v.object({
+  storageId: v.string(),
+  hash: v.string(),
+  filename: v.optional(v.string()),
+  mimeType: v.string(),
+});
 
 export const addFile = mutation({
-  args: {
-    storageId: v.string(),
-    hash: v.string(),
-    filename: v.optional(v.string()),
-  },
+  args: addFileArgs,
   handler: addFileHandler,
   returns: {
     fileId: v.id("files"),
@@ -18,7 +23,7 @@ export const addFile = mutation({
 
 export async function addFileHandler(
   ctx: MutationCtx,
-  args: { storageId: string; hash: string; filename: string | undefined }
+  args: Infer<typeof addFileArgs>
 ) {
   const existingFile = await ctx.db
     .query("files")
@@ -29,6 +34,7 @@ export async function addFileHandler(
     // increment the refcount
     await ctx.db.patch(existingFile._id, {
       refcount: existingFile.refcount + 1,
+      lastTouchedAt: Date.now(),
     });
     return {
       fileId: existingFile._id,
@@ -37,7 +43,9 @@ export async function addFileHandler(
   }
   const fileId = await ctx.db.insert("files", {
     ...args,
-    refcount: 1,
+    // We start out with it unused - when it's saved in a message we increment.
+    refcount: 0,
+    lastTouchedAt: Date.now(),
   });
   return {
     fileId,
@@ -45,10 +53,20 @@ export async function addFileHandler(
   };
 }
 
+export const get = query({
+  args: {
+    fileId: v.id("files"),
+  },
+  returns: v.union(v.null(), v.doc("files")),
+  handler: async (ctx, args) => {
+    return ctx.db.get(args.fileId);
+  },
+});
+
 /**
  * If you plan to have the same file added over and over without a reference to
  * the fileId, you can use this query to get the fileId of the existing file.
- * And if it's the same file, it will increment the refcount.
+ * Note: this will not increment the refcount. only saving messages does that.
  * It will only match if the filename is the same (or both are undefined).
  */
 export const useExistingFile = mutation({
@@ -66,11 +84,17 @@ export const useExistingFile = mutation({
       return null;
     }
     await ctx.db.patch(file._id, {
-      refcount: file.refcount + 1,
+      lastTouchedAt: Date.now(),
     });
-    return file._id;
+    return { fileId: file._id, storageId: file.storageId };
   },
-  returns: v.union(v.id("files"), v.null()),
+  returns: v.union(
+    v.null(),
+    v.object({
+      fileId: v.id("files"),
+      storageId: v.string(),
+    })
+  ),
 });
 
 export const copyFile = mutation({
@@ -91,31 +115,59 @@ export async function copyFileHandler(
   }
   await ctx.db.patch(args.fileId, {
     refcount: file.refcount + 1,
+    lastTouchedAt: Date.now(),
   });
 }
 
+/**
+ * Get files that are unused and can be deleted.
+ * This is useful for cleaning up files that are no longer needed.
+ * Note: recently added files that have not been saved yet will show up here.
+ * You can inspect the `lastTouchedAt` field to see how recently it was used.
+ * I'd recommend not deleting anything touched in the last 24 hours.
+ */
 export const getFilesToDelete = query({
   args: {
-    cursor: v.optional(v.string()),
-    limit: v.optional(v.number()),
+    paginationOpts: paginationOptsValidator,
   },
   handler: async (ctx, args) => {
     const files = await paginator(ctx.db, schema)
       .query("files")
       .withIndex("refcount", (q) => q.eq("refcount", 0))
-      .paginate({
-        numItems: args.limit ?? 100,
-        cursor: args.cursor ?? null,
-      });
-    return {
-      files: files.page,
-      continueCursor: files.continueCursor,
-      isDone: files.isDone,
-    };
+      .paginate(args.paginationOpts);
+    return files;
   },
   returns: v.object({
-    files: v.array(v.doc("files")),
+    page: v.array(v.doc("files")),
     continueCursor: v.string(),
     isDone: v.boolean(),
   }),
+});
+
+export const deleteFiles = mutation({
+  args: {
+    fileIds: v.array(v.id("files")),
+    force: v.optional(v.boolean()),
+  },
+  handler: async (ctx, args) => {
+    await Promise.all(
+      args.fileIds.map(async (fileId) => {
+        const file = await ctx.db.get(fileId);
+        if (!file) {
+          console.error(`File ${fileId} not found when deleting, skipping...`);
+          return;
+        }
+        if (file.refcount && file.refcount > 0) {
+          if (!args.force) {
+            console.error(
+              `File ${fileId} has refcount ${file.refcount} > 0, skipping...`
+            );
+            return;
+          }
+        }
+        await ctx.db.delete(fileId);
+      })
+    );
+  },
+  returns: v.null(),
 });

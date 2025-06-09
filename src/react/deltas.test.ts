@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { mergeDeltas, applyDeltasToStreamMessage } from "./deltas";
 import type { StreamMessage, StreamDelta, TextStreamPart } from "../validators";
+import { omit } from "convex-helpers";
 
 function makeStreamMessage(
   streamId: string,
@@ -283,7 +284,9 @@ describe("mergeDeltas", () => {
       [],
       deltas
     );
-    expect(messages1).toEqual(messages2);
+    expect(messages1.map((m) => omit(m, ["_creationTime"]))).toEqual(
+      messages2.map((m) => omit(m, ["_creationTime"]))
+    );
     expect(streams1).toEqual(streams2);
     expect(changed1).toBe(changed2);
     // Inputs should remain unchanged

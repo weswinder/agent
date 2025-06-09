@@ -25,6 +25,8 @@ import type {
   GenericDataModel,
   GenericMutationCtx,
   GenericQueryCtx,
+  StorageActionWriter,
+  StorageReader,
   WithoutSystemFields,
 } from "convex/server";
 import type { GenericId } from "convex/values";
@@ -178,7 +180,7 @@ export type TextArgs<
    */
   promptMessageId?: string;
   /**
-   * The model to use for the tool calls. This will override the model specified
+   * The model to use for the LLM calls. This will override the model specified
    * in the Agent constructor.
    */
   model?: LanguageModelV1;
@@ -495,7 +497,10 @@ export type RunActionCtx = {
   runAction: GenericActionCtx<GenericDataModel>["runAction"];
 };
 export type ActionCtx = RunActionCtx & {
-  storage: GenericActionCtx<GenericDataModel>["storage"];
+  storage: StorageActionWriter;
+};
+export type QueryCtx = RunQueryCtx & {
+  storage: StorageReader;
 };
 
 export type OpaqueIds<T> =

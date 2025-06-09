@@ -4,7 +4,6 @@ import {
   vThreadStatus,
   vMessage,
   vMessageStatus,
-  vStep,
   vUsage,
   vSource,
   vLanguageModelV1CallWarning,
@@ -62,7 +61,7 @@ export const schema = defineSchema({
     finishReason: v.optional(vFinishReason),
     // DEPRECATED
     parentMessageId: v.optional(v.id("messages")),
-    stepId: v.optional(v.id("steps")),
+    stepId: v.optional(v.string()),
     files: v.optional(v.array(v.any())),
   })
     // Allows finding successful visible messages in order
@@ -82,27 +81,6 @@ export const schema = defineSchema({
     })
     // Allows finding messages by vector embedding id
     .index("embeddingId", ["embeddingId"]),
-
-  steps: defineTable({
-    threadId: v.id("threads"),
-    // Could be different from the order if we fail.
-    parentMessageId: v.id("messages"),
-    order: v.number(), // parent message order
-    stepOrder: v.number(), // step order
-    step: vStep,
-    status: vMessageStatus,
-  })
-    .index("status_threadId_order_stepOrder", [
-      "status",
-      "threadId",
-      "order",
-      "stepOrder",
-    ])
-    .index("parentMessageId_order_stepOrder", [
-      "parentMessageId",
-      "order",
-      "stepOrder",
-    ]),
 
   // Status: if it's done, it's deleted, then deltas are vacuumed
   streamingMessages: defineTable({
@@ -166,9 +144,11 @@ export const schema = defineSchema({
 
   files: defineTable({
     storageId: v.string(),
+    mimeType: v.string(),
     filename: v.optional(v.string()),
     hash: v.string(),
     refcount: v.number(),
+    lastTouchedAt: v.number(),
   })
     .index("hash", ["hash"])
     .index("refcount", ["refcount"]),

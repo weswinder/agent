@@ -278,37 +278,6 @@ export const vMessageEmbeddings = v.object({
   vectors: v.array(v.union(v.array(v.number()), v.null())),
 });
 
-export const vStep = v.object({
-  files: v.optional(v.array(v.any())),
-  finishReason: vFinishReason,
-  isContinued: v.boolean(),
-  logprobs: v.optional(v.any()),
-  providerMetadata,
-  experimental_providerMetadata: providerMetadata,
-  reasoning: v.optional(v.string()),
-  reasoningDetails: v.optional(vReasoningDetails),
-  request: v.optional(vRequest),
-  response: v.optional(vResponse),
-  sources: v.optional(v.array(vSource)),
-  stepType: v.union(
-    v.literal("initial"),
-    v.literal("continue"),
-    v.literal("tool-result")
-  ),
-  text: v.string(),
-  toolCalls: v.array(vToolCallPart),
-  toolResults: v.array(vToolResultPart),
-  usage: v.optional(vUsage),
-  warnings: v.optional(v.array(vLanguageModelV1CallWarning)),
-});
-export type Step = Infer<typeof vStep>;
-
-export const vStepWithMessages = v.object({
-  step: vStep,
-  messages: v.array(vMessageWithMetadataInternal),
-  embeddings: v.optional(vMessageEmbeddings),
-});
-export type StepWithMessagesWithMetadata = Infer<typeof vStepWithMessages>;
 
 export const vObjectResult = v.object({
   request: vRequest,
