@@ -143,3 +143,31 @@ export const getFilesToDelete = query({
     isDone: v.boolean(),
   }),
 });
+
+export const deleteFiles = mutation({
+  args: {
+    fileIds: v.array(v.id("files")),
+    force: v.optional(v.boolean()),
+  },
+  handler: async (ctx, args) => {
+    await Promise.all(
+      args.fileIds.map(async (fileId) => {
+        const file = await ctx.db.get(fileId);
+        if (!file) {
+          console.error(`File ${fileId} not found when deleting, skipping...`);
+          return;
+        }
+        if (file.refcount && file.refcount > 0) {
+          if (!args.force) {
+            console.error(
+              `File ${fileId} has refcount ${file.refcount} > 0, skipping...`
+            );
+            return;
+          }
+        }
+        await ctx.db.delete(fileId);
+      })
+    );
+  },
+  returns: v.null(),
+});

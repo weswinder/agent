@@ -75,7 +75,8 @@ import type {
   UsageHandler,
 } from "./types.js";
 
-export { storeFile } from "./files.js";
+export { storeFile, getFile } from "./files.js";
+export { serializeDataOrUrl } from "../mapping.js";
 export { vMessageDoc, vThreadDoc } from "../component/schema.js";
 export {
   vAssistantMessage,
@@ -827,7 +828,7 @@ export class Agent<AgentTools extends ToolSet> {
         }
     )
   ) {
-    const { lastMessageId } = await this.saveMessages(ctx, {
+    const { lastMessageId, messages } = await this.saveMessages(ctx, {
       threadId: args.threadId,
       userId: args.userId,
       messages:
@@ -837,7 +838,7 @@ export class Agent<AgentTools extends ToolSet> {
       metadata: args.metadata ? [args.metadata] : undefined,
       skipEmbeddings: args.skipEmbeddings,
     });
-    return { messageId: lastMessageId };
+    return { messageId: lastMessageId, message: messages.at(-1)! };
   }
 
   /**

@@ -161,26 +161,26 @@ export async function serializeContent(
             image instanceof ArrayBuffer &&
             image.byteLength > MAX_FILE_SIZE
           ) {
-            const { url, fileId } = await storeFile(
+            const { file } = await storeFile(
               ctx,
               component,
               new Blob([image], { type: part.mimeType || guessMimeType(image) })
             );
-            image = url;
-            fileIds.push(fileId);
+            image = file.url;
+            fileIds.push(file.fileId);
           }
           return { ...part, image };
         }
         case "file": {
           let data = serializeDataOrUrl(part.data);
           if (data instanceof ArrayBuffer && data.byteLength > MAX_FILE_SIZE) {
-            const { url, fileId } = await storeFile(
+            const { file } = await storeFile(
               ctx,
               component,
               new Blob([data], { type: part.mimeType })
             );
-            data = url;
-            fileIds.push(fileId);
+            data = file.url;
+            fileIds.push(file.fileId);
           }
           return { ...part, data };
         }

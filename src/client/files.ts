@@ -3,6 +3,13 @@ import type { Id } from "../component/_generated/dataModel.js";
 import type { ActionCtx, AgentComponent, QueryCtx } from "./types.js";
 import type { RunMutationCtx } from "@convex-dev/prosemirror-sync";
 
+type File = {
+  url: string;
+  fileId: string;
+  storageId: Id<"_storage">;
+  hash: string;
+  filename: string | undefined;
+};
 /**
  * Store a file in the file storage and return the URL and fileId.
  * @param ctx A ctx object from an action.
@@ -20,7 +27,11 @@ export async function storeFile(
   blob: Blob,
   filename?: string,
   sha256?: string
-): Promise<{ url: string; fileId: string; storageId: Id<"_storage"> }> {
+): Promise<{
+  file: File;
+  filePart: FilePart;
+  imagePart: ImagePart | undefined;
+}> {
   if (!("runAction" in ctx)) {
     throw new Error(
       "You're trying to save a file that's too large in a mutation. " +
@@ -37,10 +48,16 @@ export async function storeFile(
     filename,
   });
   if (reused) {
+    const url = (await ctx.storage.getUrl(reused.storageId))!;
     return {
-      url: (await ctx.storage.getUrl(reused.storageId))!,
-      fileId: reused.fileId,
-      storageId: reused.storageId as Id<"_storage">,
+      ...getParts(url, blob.type, filename),
+      file: {
+        url,
+        fileId: reused.fileId,
+        storageId: reused.storageId as Id<"_storage">,
+        hash,
+        filename,
+      },
     };
   }
   const newStorageId = await ctx.storage.store(blob, {
@@ -59,7 +76,16 @@ export async function storeFile(
     // and only in the case of racing to check then store the file.
     await ctx.storage.delete(newStorageId);
   }
-  return { url, fileId, storageId: storageId as Id<"_storage"> };
+  return {
+    ...getParts(url, blob.type, filename),
+    file: {
+      url,
+      fileId,
+      storageId: storageId as Id<"_storage">,
+      hash,
+      filename,
+    },
+  };
 }
 
 /**
@@ -81,7 +107,7 @@ export async function storeFile(
 export async function getFile(
   ctx: ActionCtx | QueryCtx,
   component: AgentComponent,
-  fileId: Id<"files">
+  fileId: string
 ) {
   const file = await ctx.runQuery(component.files.get, { fileId });
   if (!file) {
@@ -91,22 +117,8 @@ export async function getFile(
   if (!url) {
     throw new Error(`File not found in storage: ${file.storageId}`);
   }
-  const filePart: FilePart = {
-    type: "file",
-    data: new URL(url),
-    mimeType: file.mimeType,
-    filename: file.filename,
-  };
-  const imagePart: ImagePart | undefined = file.mimeType.startsWith("image/")
-    ? {
-        type: "image",
-        image: new URL(url),
-        mimeType: file.mimeType,
-      }
-    : undefined;
   return {
-    filePart,
-    imagePart,
+    ...getParts(url, file.mimeType, file.filename),
     file: {
       fileId,
       url,
@@ -115,4 +127,28 @@ export async function getFile(
       filename: file.filename,
     },
   };
+}
+
+function getParts(
+  url: string,
+  mimeType: string,
+  filename: string | undefined
+): {
+  filePart: FilePart;
+  imagePart: ImagePart | undefined;
+} {
+  const filePart: FilePart = {
+    type: "file",
+    data: new URL(url),
+    mimeType,
+    filename,
+  };
+  const imagePart: ImagePart | undefined = mimeType.startsWith("image/")
+    ? {
+        type: "image",
+        image: new URL(url),
+        mimeType,
+      }
+    : undefined;
+  return { filePart, imagePart };
 }

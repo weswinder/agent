@@ -63,6 +63,12 @@ export type Mounts = {
       { fileId: string; storageId: string }
     >;
     copyFile: FunctionReference<"mutation", "public", { fileId: string }, null>;
+    deleteFiles: FunctionReference<
+      "mutation",
+      "public",
+      { fileIds: Array<string>; force?: boolean },
+      null
+    >;
     get: FunctionReference<
       "query",
       "public",

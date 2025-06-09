@@ -83,6 +83,12 @@ export declare const components: {
         { fileId: string },
         null
       >;
+      deleteFiles: FunctionReference<
+        "mutation",
+        "internal",
+        { fileIds: Array<string>; force?: boolean },
+        null
+      >;
       get: FunctionReference<
         "query",
         "internal",
