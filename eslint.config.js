@@ -10,6 +10,7 @@ export default [
     ignores: [
       "dist/**",
       "eslint.config.js",
+      "setup.cjs",
       "**/_generated/",
       "node10stubs.mjs",
     ],

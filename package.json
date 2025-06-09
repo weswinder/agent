@@ -19,7 +19,7 @@
   "scripts": {
     "example": "npm run setup && cd example && npm run dev",
     "dev": "run-p 'example' 'build:watch'",
-    "setup": "npm i && npm run build && cd example && npm i",
+    "setup": "node setup.cjs",
     "build": "npm run build:esm && npm run build:cjs",
     "build:watch": "cd src && npx chokidar '../tsconfig.json' '*.ts' 'react/**/*.ts' 'component/**/*.ts' 'client/**/*.ts' -c 'npm run build' --initial",
     "build:esm": "tsc --project ./esm.json && npm run copy:dts:esm && echo '{\\n  \"type\": \"module\"\\n}' > dist/esm/package.json",
