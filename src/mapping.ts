@@ -21,7 +21,7 @@ import type {
   StepWithMessagesWithMetadata,
 } from "./validators";
 import type { ActionCtx, AgentComponent } from "./client/types.js";
-import type { RunMutationCtx } from "@convex-dev/prosemirror-sync";
+import type { RunMutationCtx } from "./client/types.js";
 
 export type AIMessageWithoutId = Omit<AIMessage, "id">;
 
