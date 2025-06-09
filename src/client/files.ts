@@ -43,7 +43,13 @@ export async function storeFile(
   }
   const hash =
     sha256 ||
-    crypto.subtle.digest("SHA-256", await blob.arrayBuffer()).toString();
+    Array.from(
+      new Uint8Array(
+        await crypto.subtle.digest("SHA-256", await blob.arrayBuffer())
+      )
+    )
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("");
   const reused = await ctx.runMutation(component.files.useExistingFile, {
     hash,
     filename,
@@ -61,9 +67,13 @@ export async function storeFile(
       },
     };
   }
-  const newStorageId = await ctx.storage.store(blob, {
-    sha256: hash,
-  });
+  const newStorageId = await ctx.storage.store(blob);
+  if (sha256) {
+    const metadata = await ctx.storage.getMetadata(newStorageId);
+    if (metadata?.sha256 !== sha256) {
+      throw new Error("Hash mismatch: " + metadata?.sha256 + " != " + sha256);
+    }
+  }
   const { fileId, storageId } = await ctx.runMutation(component.files.addFile, {
     storageId: newStorageId,
     hash,
