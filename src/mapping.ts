@@ -15,11 +15,7 @@ import {
   type UserContent,
 } from "ai";
 import { assert } from "convex-helpers";
-import type {
-  MessageWithMetadata,
-  Step,
-  StepWithMessagesWithMetadata,
-} from "./validators";
+import type { MessageWithMetadata } from "./validators";
 import type { ActionCtx, AgentComponent } from "./client/types.js";
 import type { RunMutationCtx } from "./client/types.js";
 import { storeFile } from "./client/files.js";
@@ -73,38 +69,6 @@ export function deserializeMessage(message: SerializedMessage): CoreMessage {
   } as CoreMessage;
 }
 
-export async function serializeStep<TOOLS extends ToolSet>(
-  ctx: ActionCtx,
-  component: AgentComponent,
-  step: StepResult<TOOLS>
-): Promise<Step> {
-  const messages = await Promise.all(
-    step.response?.messages.map(async (messageWithId) => {
-      const { message, fileIds } = await serializeMessage(
-        ctx,
-        component,
-        messageWithId
-      );
-      return {
-        message,
-        id: messageWithId.id,
-        fileIds,
-      };
-    })
-  );
-  const timestamp = step.response?.timestamp.getTime();
-  const response = {
-    ...step.response,
-    messages,
-    timestamp,
-    headers: {}, // these are large and low value
-  };
-  return {
-    ...step,
-    response,
-  };
-}
-
 export async function serializeNewMessagesInStep<TOOLS extends ToolSet>(
   ctx: ActionCtx,
   component: AgentComponent,
@@ -153,7 +117,7 @@ export async function serializeNewMessagesInStep<TOOLS extends ToolSet>(
 export function serializeObjectResult(
   result: GenerateObjectResult<unknown>,
   metadata: { model: string; provider: string }
-): StepWithMessagesWithMetadata {
+): { messages: MessageWithMetadata[] } {
   const text = JSON.stringify(result.object);
 
   const message = {
@@ -175,23 +139,6 @@ export function serializeObjectResult(
         warnings: result.warnings,
       },
     ],
-    step: {
-      text,
-      isContinued: false,
-      stepType: "initial",
-      toolCalls: [],
-      toolResults: [],
-      usage: result.usage,
-      warnings: result.warnings,
-      finishReason: result.finishReason,
-      providerMetadata: result.providerMetadata,
-      request: result.request,
-      response: {
-        ...result.response,
-        timestamp: result.response.timestamp.getTime(),
-        messages: [{ message, id: result.response.id }],
-      },
-    },
   };
 }
 

@@ -14,7 +14,6 @@ import {
   vMessageWithMetadataInternal,
   vPaginationResult,
   vSearchOptions,
-  vStepWithMessages,
 } from "../validators.js";
 import { api, internal } from "./_generated/api.js";
 import type { Doc, Id } from "./_generated/dataModel.js";
@@ -78,7 +77,6 @@ export const messageStatuses = vMessageDoc.fields.status.members.map(
 const addMessagesArgs = {
   userId: v.optional(v.string()),
   threadId: v.id("threads"),
-  stepId: v.optional(v.id("steps")),
   promptMessageId: v.optional(v.id("messages")),
   agentName: v.optional(v.string()),
   messages: v.array(vMessageWithMetadataInternal),
@@ -91,7 +89,6 @@ export const addMessages = mutation({
   handler: addMessagesHandler,
   returns: v.object({
     messages: v.array(vMessageDoc),
-    pending: v.optional(vMessageDoc),
   }),
 });
 async function addMessagesHandler(
@@ -195,7 +192,7 @@ async function addMessagesHandler(
       toReturn.push((await ctx.db.get(messageId))!);
     }
   }
-  return { messages: toReturn };
+  return { messages: toReturn.map(publicMessage) };
 }
 
 // exported for tests
@@ -235,68 +232,6 @@ function orderedMessagesStream(
   );
 }
 
-const addStepArgs = {
-  userId: v.optional(v.string()),
-  threadId: v.id("threads"),
-  promptMessageId: v.id("messages"),
-  step: vStepWithMessages,
-  failPendingSteps: v.optional(v.boolean()),
-};
-
-export const addStep = mutation({
-  args: addStepArgs,
-  returns: v.array(vMessageDoc),
-  handler: addStepHandler,
-});
-async function addStepHandler(
-  ctx: MutationCtx,
-  args: ObjectType<typeof addStepArgs>
-) {
-  const parentMessage = await ctx.db.get(args.promptMessageId);
-  assert(parentMessage, `Message ${args.promptMessageId} not found`);
-  const order = parentMessage.order;
-  // TODO: only fetch the last one if we aren't failing pending steps
-  let steps = await ctx.db
-    .query("steps")
-    .withIndex("parentMessageId_order_stepOrder", (q) =>
-      // TODO: fetch pending, and commit later
-      q.eq("parentMessageId", args.promptMessageId)
-    )
-    .collect();
-  if (args.failPendingSteps) {
-    for (const step of steps) {
-      if (step.status === "pending") {
-        await ctx.db.patch(step._id, { status: "failed" });
-      }
-    }
-    steps = steps.filter((s) => s.status !== "failed");
-  }
-  const { step, messages } = args.step;
-  const stepId = await ctx.db.insert("steps", {
-    threadId: args.threadId,
-    parentMessageId: args.promptMessageId,
-    order,
-    stepOrder: (steps.at(-1)?.stepOrder ?? -1) + 1,
-    status: step.finishReason === "stop" ? "success" : "pending",
-    step,
-  });
-  const added = await addMessagesHandler(ctx, {
-    userId: args.userId,
-    threadId: args.threadId,
-    stepId,
-    promptMessageId: args.promptMessageId,
-    agentName: parentMessage.agentName,
-    messages,
-    pending: step.finishReason === "stop" ? false : true,
-    failPendingSteps: false,
-  });
-  // We don't commit if the parent is still pending.
-  if (step.finishReason === "stop") {
-    await commitMessageHandler(ctx, { messageId: args.promptMessageId });
-  }
-  return added.messages.map(publicMessage);
-}
-
 export const rollbackMessage = mutation({
   args: {
     messageId: v.id("messages"),
@@ -318,18 +253,6 @@ export const rollbackMessage = mutation({
       }
     }
 
-    const steps = await ctx.db
-      .query("steps")
-      .withIndex("parentMessageId_order_stepOrder", (q) =>
-        // TODO: fetch pending, and commit later
-        q.eq("parentMessageId", messageId)
-      )
-      .collect();
-    for (const step of steps) {
-      if (step.status === "pending") {
-        await ctx.db.patch(step._id, { status: "failed" });
-      }
-    }
     await ctx.db.patch(messageId, {
       status: "failed",
       error: error,
@@ -351,17 +274,6 @@ async function commitMessageHandler(
   const message = await ctx.db.get(messageId);
   assert(message, `Message ${messageId} not found`);
 
-  const allSteps = await ctx.db
-    .query("steps")
-    .withIndex("parentMessageId_order_stepOrder", (q) =>
-      q.eq("parentMessageId", messageId)
-    )
-    .collect();
-  for (const step of allSteps) {
-    if (step.status === "pending") {
-      await ctx.db.patch(step._id, { status: "success" });
-    }
-  }
   const order = message.order!;
   const messages = await mergedStream(
     [true, false].map((tool) =>

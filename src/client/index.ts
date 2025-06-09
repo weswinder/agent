@@ -31,7 +31,6 @@ import {
   serializeMessage,
   serializeNewMessagesInStep,
   serializeObjectResult,
-  serializeStep,
 } from "../mapping.js";
 import {
   DEFAULT_MESSAGE_RANGE,
@@ -578,7 +577,8 @@ export class Agent<AgentTools extends ToolSet> {
             promptMessageId: messageId,
             step,
           });
-          await streamer?.finish(saved);
+          // TODO: figure out pending/not
+          await streamer?.finish(saved.messages);
         }
         if (this.options.rawRequestResponseHandler) {
           await this.options.rawRequestResponseHandler(ctx, {
@@ -1278,12 +1278,7 @@ export class Agent<AgentTools extends ToolSet> {
        */
       provider?: string;
     }
-  ): Promise<MessageDoc[]> {
-    const step = await serializeStep(
-      ctx,
-      this.component,
-      args.step as StepResult<ToolSet>
-    );
+  ): Promise<{ messages: MessageDoc[]; pending?: MessageDoc }> {
     const messages = await serializeNewMessagesInStep(
       ctx,
       this.component,
@@ -1296,11 +1291,13 @@ export class Agent<AgentTools extends ToolSet> {
     const embeddings = await this.generateEmbeddings(
       messages.map((m) => m.message)
     );
-    const saved = await ctx.runMutation(this.component.messages.addStep, {
+    const saved = await ctx.runMutation(this.component.messages.addMessages, {
       userId: args.userId,
       threadId: args.threadId,
+      agentName: this.options.name,
       promptMessageId: args.promptMessageId,
-      step: { step, messages, embeddings },
+      messages,
+      embeddings,
       failPendingSteps: false,
     });
     return saved;
@@ -1323,7 +1320,7 @@ export class Agent<AgentTools extends ToolSet> {
       metadata?: Omit<MessageWithMetadata, "message">;
     }
   ): Promise<void> {
-    const { step, messages } = serializeObjectResult(args.result, {
+    const { messages } = serializeObjectResult(args.result, {
       model: this.options.chat.modelId,
       provider: this.options.chat.provider,
     });
@@ -1331,12 +1328,15 @@ export class Agent<AgentTools extends ToolSet> {
       messages.map((m) => m.message)
     );
 
-    await ctx.runMutation(this.component.messages.addStep, {
+    await ctx.runMutation(this.component.messages.addMessages, {
       userId: args.userId,
       threadId: args.threadId,
       promptMessageId: args.promptMessageId,
       failPendingSteps: false,
-      step: { step, messages, embeddings },
+      messages,
+      embeddings,
+      agentName: this.options.name,
+      pending: false,
     });
   }
 
@@ -1527,7 +1527,6 @@ export class Agent<AgentTools extends ToolSet> {
           values: [text],
         })
       ).embeddings[0];
-      // TODO: record usage of embeddings
       search.vectorModel = this.options.textEmbedding.modelId;
     }
     return search;
