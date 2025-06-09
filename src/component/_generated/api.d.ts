@@ -72,6 +72,7 @@ export type Mounts = {
         _id: string;
         filename?: string;
         hash: string;
+        lastTouchedAt: number;
         mimeType: string;
         refcount: number;
         storageId: string;
@@ -98,6 +99,7 @@ export type Mounts = {
           _id: string;
           filename?: string;
           hash: string;
+          lastTouchedAt: number;
           mimeType: string;
           refcount: number;
           storageId: string;

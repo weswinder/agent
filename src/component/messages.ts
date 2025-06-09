@@ -144,53 +144,51 @@ async function addMessagesHandler(
     stepOrder = -1;
   }
   const toReturn: Doc<"messages">[] = [];
-  if (messages.length > 0) {
-    if (embeddings) {
-      assert(
-        embeddings.vectors.length === messages.length,
-        "embeddings.vectors.length must match messages.length"
-      );
-    }
-    for (let i = 0; i < messages.length; i++) {
-      const message = messages[i];
-      let embeddingId: VectorTableId | undefined;
-      if (embeddings && embeddings.vectors[i]) {
-        embeddingId = await insertVector(ctx, embeddings.dimension, {
-          vector: embeddings.vectors[i]!,
-          model: embeddings.model,
-          table: "messages",
-          userId,
-          threadId,
-        });
-      }
-      stepOrder++;
-      const messageId = await ctx.db.insert("messages", {
-        ...rest,
-        ...message,
-        embeddingId,
-        parentMessageId: promptMessageId,
+  if (embeddings) {
+    assert(
+      embeddings.vectors.length === messages.length,
+      "embeddings.vectors.length must match messages.length"
+    );
+  }
+  for (let i = 0; i < messages.length; i++) {
+    const message = messages[i];
+    let embeddingId: VectorTableId | undefined;
+    if (embeddings && embeddings.vectors[i]) {
+      embeddingId = await insertVector(ctx, embeddings.dimension, {
+        vector: embeddings.vectors[i]!,
+        model: embeddings.model,
+        table: "messages",
         userId,
-        order,
-        tool: isTool(message.message),
-        text: extractText(message.message),
-        status: fail ? "failed" : pending ? "pending" : "success",
-        error: fail ? "Parent message failed" : undefined,
-        stepOrder,
+        threadId,
       });
-      // Let's just not set the id field and have it set only in explicit cases.
-      // if (!message.id) {
-      //   await ctx.db.patch(messageId, {
-      //     id: messageId,
-      //   });
-      // }
-      for (const fileId of message.fileIds ?? []) {
-        if (!fileId) continue;
-        await ctx.db.patch(fileId, {
-          refcount: (await ctx.db.get(fileId))!.refcount + 1,
-        });
-      }
-      toReturn.push((await ctx.db.get(messageId))!);
     }
+    stepOrder++;
+    const messageId = await ctx.db.insert("messages", {
+      ...rest,
+      ...message,
+      embeddingId,
+      parentMessageId: promptMessageId,
+      userId,
+      order,
+      tool: isTool(message.message),
+      text: extractText(message.message),
+      status: fail ? "failed" : pending ? "pending" : "success",
+      error: fail ? "Parent message failed" : undefined,
+      stepOrder,
+    });
+    // Let's just not set the id field and have it set only in explicit cases.
+    // if (!message.id) {
+    //   await ctx.db.patch(messageId, {
+    //     id: messageId,
+    //   });
+    // }
+    for (const fileId of message.fileIds ?? []) {
+      if (!fileId) continue;
+      await ctx.db.patch(fileId, {
+        refcount: (await ctx.db.get(fileId))!.refcount + 1,
+      });
+    }
+    toReturn.push((await ctx.db.get(messageId))!);
   }
   return { messages: toReturn.map(publicMessage) };
 }

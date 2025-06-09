@@ -92,6 +92,7 @@ export declare const components: {
           _id: string;
           filename?: string;
           hash: string;
+          lastTouchedAt: number;
           mimeType: string;
           refcount: number;
           storageId: string;
@@ -118,6 +119,7 @@ export declare const components: {
             _id: string;
             filename?: string;
             hash: string;
+            lastTouchedAt: number;
             mimeType: string;
             refcount: number;
             storageId: string;

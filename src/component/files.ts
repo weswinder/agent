@@ -34,6 +34,7 @@ export async function addFileHandler(
     // increment the refcount
     await ctx.db.patch(existingFile._id, {
       refcount: existingFile.refcount + 1,
+      lastTouchedAt: Date.now(),
     });
     return {
       fileId: existingFile._id,
@@ -42,7 +43,9 @@ export async function addFileHandler(
   }
   const fileId = await ctx.db.insert("files", {
     ...args,
-    refcount: 1,
+    // We start out with it unused - when it's saved in a message we increment.
+    refcount: 0,
+    lastTouchedAt: Date.now(),
   });
   return {
     fileId,
@@ -63,7 +66,7 @@ export const get = query({
 /**
  * If you plan to have the same file added over and over without a reference to
  * the fileId, you can use this query to get the fileId of the existing file.
- * And if it's the same file, it will increment the refcount.
+ * Note: this will not increment the refcount. only saving messages does that.
  * It will only match if the filename is the same (or both are undefined).
  */
 export const useExistingFile = mutation({
@@ -81,7 +84,7 @@ export const useExistingFile = mutation({
       return null;
     }
     await ctx.db.patch(file._id, {
-      refcount: file.refcount + 1,
+      lastTouchedAt: Date.now(),
     });
     return { fileId: file._id, storageId: file.storageId };
   },
@@ -112,9 +115,17 @@ export async function copyFileHandler(
   }
   await ctx.db.patch(args.fileId, {
     refcount: file.refcount + 1,
+    lastTouchedAt: Date.now(),
   });
 }
 
+/**
+ * Get files that are unused and can be deleted.
+ * This is useful for cleaning up files that are no longer needed.
+ * Note: recently added files that have not been saved yet will show up here.
+ * You can inspect the `lastTouchedAt` field to see how recently it was used.
+ * I'd recommend not deleting anything touched in the last 24 hours.
+ */
 export const getFilesToDelete = query({
   args: {
     paginationOpts: paginationOptsValidator,

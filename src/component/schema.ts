@@ -148,6 +148,7 @@ export const schema = defineSchema({
     filename: v.optional(v.string()),
     hash: v.string(),
     refcount: v.number(),
+    lastTouchedAt: v.number(),
   })
     .index("hash", ["hash"])
     .index("refcount", ["refcount"]),
