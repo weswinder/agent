@@ -4,7 +4,6 @@ import { api } from "../convex/_generated/api";
 import {
   optimisticallySendMessage,
   toUIMessages,
-  useSmoothText,
   useThreadMessages,
   type UIMessage,
 } from "@convex-dev/agent/react";
@@ -94,59 +93,72 @@ export default function Example() {
       </header>
       <div className="min-h-screen flex flex-col bg-gray-50">
         <main className="flex-1 flex items-center justify-center p-8">
-          {file && (
-            <div className="flex flex-col gap-2">
-              <img src={file.url} alt={file.fileId} />
-            </div>
-          )}
-          <form
-            className="flex gap-2 items-center"
-            onSubmit={(e) => {
-              e.preventDefault();
-              void handleSubmitFileQuestion(question);
-            }}
-          >
-            <input
-              type="file"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) void handleFileUpload(file);
-              }}
-            />
-            <input
-              type="text"
-              value={question}
-              onChange={(e) => setQuestion(e.target.value)}
-              className="flex-1 px-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-400 bg-gray-50"
-              placeholder="Ask a question about the file"
-            />
-            <button
-              type="submit"
-              className="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition font-semibold disabled:opacity-50"
-              disabled={!file?.fileId || !question.trim()}
-            >
-              Send
-            </button>
-          </form>
-          {messages.results?.length > 0 && (
-            <>
-              <div className="flex flex-col gap-4 overflow-y-auto mb-4">
-                {toUIMessages(messages.results ?? []).map((m) => (
-                  <Message key={m.key} message={m} />
-                ))}
+          <div className="w-full max-w-xl mx-auto flex flex-col items-center gap-6 bg-white rounded-2xl shadow-lg p-8 border border-gray-200">
+            {/* Image Preview */}
+            {file && (
+              <div className="w-full flex flex-col items-center mb-4">
+                <img
+                  src={file.url}
+                  alt={file.fileId}
+                  className="max-h-64 rounded-xl border border-gray-300 shadow-md object-contain bg-gray-100"
+                />
               </div>
-              <button
-                className="px-4 py-2 rounded-lg bg-red-100 text-red-700 hover:bg-red-200 transition font-medium self-end"
-                onClick={() => {
-                  setThreadId(undefined);
-                  setFile(undefined);
+            )}
+
+            {/* Chat Messages */}
+            {messages.results?.length > 0 ? (
+              <>
+                <div className="w-full flex flex-col gap-4 overflow-y-auto mb-6 max-h-[400px] px-2">
+                  {toUIMessages(messages.results ?? []).map((m) => (
+                    <Message key={m.key} message={m} />
+                  ))}
+                </div>
+                <button
+                  className="w-full px-4 py-2 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 transition font-medium mt-2"
+                  onClick={() => {
+                    setThreadId(undefined);
+                    setFile(undefined);
+                  }}
+                  type="button"
+                >
+                  Start over
+                </button>
+              </>
+            ) : (
+              // Show form only if there are no messages
+              <form
+                className="w-full flex flex-col gap-4 items-center"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  void handleSubmitFileQuestion(question);
                 }}
-                type="button"
               >
-                Reset
-              </button>
-            </>
-          )}
+                <input
+                  type="file"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) void handleFileUpload(file);
+                  }}
+                  className="w-full file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 transition"
+                />
+                <input
+                  type="text"
+                  value={question}
+                  onChange={(e) => setQuestion(e.target.value)}
+                  className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-400 bg-gray-50 text-lg"
+                  placeholder="Ask a question about the file"
+                  disabled={!file?.fileId}
+                />
+                <button
+                  type="submit"
+                  className="w-full px-4 py-3 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition font-semibold text-lg disabled:opacity-50"
+                  disabled={!file?.fileId || !question.trim()}
+                >
+                  Send
+                </button>
+              </form>
+            )}
+          </div>
         </main>
         <Toaster />
       </div>
@@ -157,10 +169,12 @@ export default function Example() {
 function Message({ message }: { message: UIMessage }) {
   const isUser = message.role === "user";
   return (
-    <div className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
+    <div className={`flex ${isUser ? "justify-end" : "justify-start"} w-full`}>
       <div
-        className={`rounded-lg px-4 py-2 max-w-lg whitespace-pre-wrap shadow-sm ${
-          isUser ? "bg-blue-100 text-blue-900" : "bg-gray-200 text-gray-800"
+        className={`rounded-2xl px-5 py-3 max-w-[75%] whitespace-pre-wrap shadow-md text-base break-words border ${
+          isUser
+            ? "bg-blue-100 text-blue-900 border-blue-200"
+            : "bg-gray-100 text-gray-800 border-gray-200"
         }`}
       >
         {message.parts.map((part, i) => {
@@ -170,20 +184,42 @@ function Message({ message }: { message: UIMessage }) {
               return <div key={key}>{part.text}</div>;
             case "file":
               if (part.mimeType.startsWith("image/")) {
-                return <img key={key} src={part.data} />;
+                return (
+                  <img
+                    key={key}
+                    src={part.data}
+                    className="max-h-40 rounded-lg mt-2 border border-gray-300 shadow"
+                  />
+                );
               }
               return (
-                <a key={key} href={part.data}>
+                <a
+                  key={key}
+                  href={part.data}
+                  className="text-blue-600 underline"
+                >
                   {"📎"}File
                 </a>
               );
             case "reasoning":
-              return <div key={key}>{part.reasoning}</div>;
+              return (
+                <div key={key} className="italic text-gray-500">
+                  {part.reasoning}
+                </div>
+              );
             case "tool-invocation":
-              return <div key={key}>{part.toolInvocation.toolName}</div>;
+              return (
+                <div key={key} className="text-xs text-gray-400">
+                  {part.toolInvocation.toolName}
+                </div>
+              );
             case "source":
               return (
-                <a key={key} href={part.source.url}>
+                <a
+                  key={key}
+                  href={part.source.url}
+                  className="text-blue-500 underline"
+                >
                   {part.source.title ?? part.source.url}
                 </a>
               );
