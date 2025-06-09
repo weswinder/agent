@@ -62,6 +62,22 @@ export async function storeFile(
   return { url, fileId, storageId: storageId as Id<"_storage"> };
 }
 
+/**
+ * Get file metadata from the component.
+ * This also returns filePart (and imagePart if the file is an image),
+ * which are useful to construct a CoreMessage like
+ * ```ts
+ * const { filePart, imagePart } = await getFile(ctx, components.agent, fileId);
+ * const message: UserMessage = {
+ *   role: "user",
+ *   content: [imagePart ?? filePart],
+ * };
+ * ```
+ * @param ctx A ctx object from an action or query.
+ * @param component The agent component, usually `components.agent`.
+ * @param fileId The fileId of the file to get.
+ * @returns The file metadata and content parts.
+ */
 export async function getFile(
   ctx: ActionCtx | QueryCtx,
   component: AgentComponent,
