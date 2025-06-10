@@ -279,7 +279,6 @@ export function usePaginatedQuery<Query extends PaginatedQueryReference>(
       allItems.push(...currResult.page);
     }
     return [allItems, currResult];
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     resultsObject,
     currState.pageKeys,

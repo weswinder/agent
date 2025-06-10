@@ -287,7 +287,17 @@ describe("mergeDeltas", () => {
     expect(messages1.map((m) => omit(m, ["_creationTime"]))).toEqual(
       messages2.map((m) => omit(m, ["_creationTime"]))
     );
-    expect(streams1).toEqual(streams2);
+    expect(
+      streams1.map((s) => ({
+        ...s,
+        messages: s.messages.map((m) => omit(m, ["_creationTime"])),
+      }))
+    ).toEqual(
+      streams2.map((s) => ({
+        ...s,
+        messages: s.messages.map((m) => omit(m, ["_creationTime"])),
+      }))
+    );
     expect(changed1).toBe(changed2);
     // Inputs should remain unchanged
     expect(streamMessages).toEqual([makeStreamMessage(streamId, 8, 0)]);
