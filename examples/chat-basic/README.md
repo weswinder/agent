@@ -1,69 +1,48 @@
-# Streaming Chat Example
+# Basic Chat Example
 
-This example shows how to use the `@convex-dev/agent` component to build a streaming chat application.
-
-The approach sends text deltas via the websocket, and then merges them in with
-the full message in a React hook.
+This example shows how to use the `@convex-dev/agent` component to build a basic
+chat application.
 
 ## Server setup
 
-See [`listThreadMessages` in chatStreaming.ts](./convex/chatStreaming.ts) for the server-side code.
+See [`listThreadMessages` in chatBasic.ts](./convex/chatBasic.ts) for the server-side code.
 
-You have a function that both allows paginating over messages, as well as taking
-in a `streamArgs` object and returning the `streams` result from `syncStreams`.
+You have a function that allows paginating over messages.
 
 ```ts
 import { paginationOptsValidator } from "convex/server";
-import { vStreamArgs } from "@convex-dev/agent/react";
 
  export const listThreadMessages = query({
    args: {
      threadId: v.string(),
      paginationOpts: paginationOptsValidator,
-     streamArgs: vStreamArgs,
      //... other arguments you want
    },
-   handler: async (ctx, { threadId, paginationOpts, streamArgs }) => {
+   handler: async (ctx, { threadId, paginationOpts }): PaginationResult<MessageDoc> => {
      // await authorizeThreadAccess(ctx, threadId);
      const paginated = await agent.listMessages(ctx, { threadId, paginationOpts });
-     const streams = await agent.syncStreams(ctx, { threadId, streamArgs });
-     // Here you could filter out / modify the documents & stream deltas.
-     return { ...paginated, streams };
+     // Here you could filter out / modify the documents
+     return paginated;
    },
  });
 ```
 
 ### Client setup
 
-See [ChatStreaming.tsx](./src/ChatStreaming.tsx) for the client-side code.
+See [ChatBasic.tsx](./src/ChatBasic.tsx) for the client-side code.
 
-The crux is to use the `useThreadMessages` hook, and pass in `stream: true`:
+The crux is to use the `useThreadMessages` hook:
 
 ```ts
 import { useThreadMessages } from "@convex-dev/agent/react";
 
 // in the component
   const messages = useThreadMessages(
-    api.streaming.listThreadMessages,
+    api.chatBasic.listThreadMessages,
     { threadId },
-    { initialNumItems: 10, stream: true },
+    { initialNumItems: 10 },
   );
 ```
-
-### Text smoothing
-
-The `useSmoothText` hook is a simple hook that smooths the text as it is streamed.
-
-```ts
-import { useSmoothText } from "@convex-dev/agent/react";
-
-// in the component
-  const [visibleText] = useSmoothText(message.content);
-```
-
-See [ChatStreaming.tsx](./src/ChatStreaming.tsx) for an example.
-You can configure the initial characters per second. It will adapt over time to
-match the average speed of the text coming in.
 
 ### Optimistic updates for sending messages
 
@@ -75,8 +54,8 @@ Pass in the query that you're using to list messages, and it will insert the
 ephemeral message at the top of the list.
 
 ```ts
-const sendMessage = useMutation(api.streaming.streamStoryAsynchronously)
-  .withOptimisticUpdate(optimisticallySendMessage(api.streaming.listThreadMessages));
+const sendMessage = useMutation(api.chatBasic.generateResponse)
+  .withOptimisticUpdate(optimisticallySendMessage(api.chatBasic.listThreadMessages));
 ```
 
 If your arguments don't include `{ threadId, prompt }` then you can use it as a
@@ -86,10 +65,10 @@ helper function in your optimistic update:
 import { optimisticallySendMessage } from "@convex-dev/agent/react";
 
 const sendMessage = useMutation(
-  api.chatStreaming.streamStoryAsynchronously,
+  api.chatBasic.generateResponse,
 ).withOptimisticUpdate(
   (store, args) => {
-    optimisticallySendMessage(api.chatStreaming.listThreadMessages)(store, {
+    optimisticallySendMessage(api.chatBasic.listThreadMessages)(store, {
       threadId: /* get the threadId from your args / context */,
       prompt: /* change your args into the user prompt. */,
     })
@@ -101,7 +80,7 @@ const sendMessage = useMutation(
 
 ```sh
 npm run setup
-cd examples/chat-streaming
+cd examples/chat-basic
 npm i
 npm run dev
 ```

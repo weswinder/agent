@@ -24,7 +24,6 @@ AI Agent framework built on Convex.
 
 Play with the [examples](./examples/) by cloning this repo and running:
 ```sh
-npm run setup
 npm run example
 ```
 
@@ -215,8 +214,62 @@ const result = await thread.generateObject({
 });
 ```
 
+### Showing messages
 
-### Configuring the context of messages
+Fetch the full messages directly. These will include things like usage, etc.
+
+Server-side:
+
+```ts
+import type { MessageDoc } from "@convex-dev/agent";
+import { paginationOptsValidator, type PaginationResult } from "convex/server";
+
+export const listThreadMessages = query({
+  args: {
+    threadId: v.string(),
+    paginationOpts: paginationOptsValidator,
+    //... other arguments you want
+  },
+  handler: async (
+    ctx, { threadId, paginationOpts },
+  ): PaginationResult<MessageDoc> => {
+    // await authorizeThreadAccess(ctx, threadId);
+    const paginated = await agent.listMessages(ctx, {
+      threadId,
+      paginationOpts,
+    });
+    // Here you could filter out / modify the documents
+    return paginated;
+  },
+});
+```
+
+Client-side:
+
+```tsx
+import { api } from "../convex/_generated/api";
+import { useThreadMessages, toUIMessages } from "@convex-dev/agent/react";
+
+function MyComponent({ threadId }: { threadId: string }) {
+  const messages = useThreadMessages(
+    api.chatBasic.listThreadMessages,
+    { threadId },
+    { initialNumItems: 10 },
+  );
+  return (
+    <div>
+      {toUIMessages(messages.results ?? []).map((message) => (
+        <div key={message.key}>{message.content}</div>
+      ))}
+    </div>
+  );
+}
+```
+
+See [examples/chat-basic](./examples/chat-basic) for an example, and
+[examples/chat-streaming](./examples/chat-streaming) for a streaming example.
+
+### Configuring the context of message generation
 
 You can customize what history is included per-message via `contextOptions`.
 These options can be provided to the Agent constructor, or per-message.
@@ -348,25 +401,6 @@ export const myAsyncAction = internalAction({
     await supportAgent.generateAndSaveEmbeddings(ctx, { messageIds: [promptMessageId] });
     const { thread } = await supportAgent.continueThread(ctx, { threadId });
     await thread.generateText({ promptMessageId });
-  },
-});
-```
-
-### Fetching thread history
-
-Fetch the full messages directly. These will include things like usage, etc.
-
-```ts
-import type { MessageDoc } from "@convex-dev/agent";
-
-export const getMessages = query({
-  args: { threadId: v.id("threads") },
-  handler: async (ctx, { threadId }): Promise<MessageDoc[]> => {
-    const messages = await agent.listMessages(ctx, {
-      threadId,
-      paginationOpts: { cursor: null, numItems: 10 }
-    });
-    return messages.page;
   },
 });
 ```
