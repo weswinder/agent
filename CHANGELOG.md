@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.8 alpha
+
+- Add extensions to support NodeNext bundling
+
 ## 0.1.7
 
 - Image and file handling! It now auto-saves large input messages, and has an API

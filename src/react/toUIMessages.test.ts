@@ -93,12 +93,6 @@ describe("toUIMessages", () => {
           ],
         },
         tool: true,
-        files: [
-          {
-            mimeType: "text/plain",
-            data: "asdfasdfasdf",
-          },
-        ],
         reasoning: "I'm thinking...",
         text: "I'm thinking...",
       }),
