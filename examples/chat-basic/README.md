@@ -12,19 +12,25 @@ You have a function that allows paginating over messages.
 ```ts
 import { paginationOptsValidator } from "convex/server";
 
- export const listThreadMessages = query({
-   args: {
-     threadId: v.string(),
-     paginationOpts: paginationOptsValidator,
-     //... other arguments you want
-   },
-   handler: async (ctx, { threadId, paginationOpts }): PaginationResult<MessageDoc> => {
-     // await authorizeThreadAccess(ctx, threadId);
-     const paginated = await agent.listMessages(ctx, { threadId, paginationOpts });
-     // Here you could filter out / modify the documents
-     return paginated;
-   },
- });
+export const listThreadMessages = query({
+  args: {
+    threadId: v.string(),
+    paginationOpts: paginationOptsValidator,
+    //... other arguments you want
+  },
+  handler: async (
+    ctx,
+    { threadId, paginationOpts },
+  ): PaginationResult<MessageDoc> => {
+    // await authorizeThreadAccess(ctx, threadId);
+    const paginated = await agent.listMessages(ctx, {
+      threadId,
+      paginationOpts,
+    });
+    // Here you could filter out / modify the documents
+    return paginated;
+  },
+});
 ```
 
 ### Client setup
@@ -33,15 +39,24 @@ See [ChatBasic.tsx](./src/ChatBasic.tsx) for the client-side code.
 
 The crux is to use the `useThreadMessages` hook:
 
-```ts
-import { useThreadMessages } from "@convex-dev/agent/react";
+```tsx
+import { api } from "../convex/_generated/api";
+import { useThreadMessages, toUIMessages } from "@convex-dev/agent/react";
 
-// in the component
+function MyComponent({ threadId }: { threadId: string }) {
   const messages = useThreadMessages(
     api.chatBasic.listThreadMessages,
     { threadId },
     { initialNumItems: 10 },
   );
+  return (
+    <div>
+      {toUIMessages(messages.results ?? []).map((message) => (
+        <div key={message.key}>{message.content}</div>
+      ))}
+    </div>
+  );
+}
 ```
 
 ### Optimistic updates for sending messages
@@ -54,8 +69,11 @@ Pass in the query that you're using to list messages, and it will insert the
 ephemeral message at the top of the list.
 
 ```ts
-const sendMessage = useMutation(api.chatBasic.generateResponse)
-  .withOptimisticUpdate(optimisticallySendMessage(api.chatBasic.listThreadMessages));
+const sendMessage = useMutation(
+  api.chatBasic.generateResponse,
+).withOptimisticUpdate(
+  optimisticallySendMessage(api.chatBasic.listThreadMessages),
+);
 ```
 
 If your arguments don't include `{ threadId, prompt }` then you can use it as a
