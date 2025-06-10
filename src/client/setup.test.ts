@@ -3,13 +3,13 @@ import { test } from "vitest";
 import { convexTest } from "convex-test";
 export const modules = import.meta.glob("./**/*.*s");
 
-import componentSchema from "../component/schema";
+import componentSchema from "../component/schema.js";
 import {
   defineSchema,
   type GenericSchema,
   type SchemaDefinition,
 } from "convex/server";
-import { type AgentComponent } from ".";
+import { type AgentComponent } from "./index.js";
 import { componentsGeneric } from "convex/server";
 export { componentSchema };
 export const componentModules = import.meta.glob("../component/**/*.ts");
