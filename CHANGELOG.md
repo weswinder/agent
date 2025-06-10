@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.1.7 alpha
+## 0.1.7
 
 - Image and file handling! It now auto-saves large input messages, and has an API
   to save and get metadata about files, as well as automatic reference counting for files
@@ -17,6 +17,12 @@
 - Add `rawRequestResponseHandler` to the Agent definition, so you can log
   the raw request and response from the LLM.
 
+### Deprecated
+
+- The `files` field is deprecated in favor of `fileIds` in the message metadata.
+  This wasn't really used before but it was possible folks discovered how to
+  set it.
+
 ### Breaking
 
 - The `steps` table is now gone. It will still be around in your backend, where
@@ -25,9 +31,6 @@
   To get debug information, you can use the `rawRequestResponseHandler` and
   dump the request and response to your own debug table. Maybe conditional on
   some environment variable so you can turn it on/off for debugging.
-- The `files` field is deprecated in favor of `fileIds` in the message metadata.
-  This wasn't really used before but it was possible folks discovered how to
-  set it.
 
 ## 0.1.6
 
