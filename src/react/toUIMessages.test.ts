@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { toUIMessages } from "./toUIMessages";
-import type { MessageDoc } from "../client";
+import { toUIMessages } from "./toUIMessages.js";
+import type { MessageDoc } from "../client/index.js";
 
 // Helper to create a base message doc
 function baseMessageDoc(overrides: Partial<MessageDoc> = {}): MessageDoc {

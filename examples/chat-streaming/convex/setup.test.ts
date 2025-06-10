@@ -5,7 +5,7 @@ import schema from "./schema";
 export const modules = import.meta.glob("./**/*.*s");
 
 // Sorry about everything
-import componentSchema from "../node_modules/@convex-dev/agent/src/component/schema";
+import componentSchema from "../node_modules/@convex-dev/agent/src/component/schema.js";
 export { componentSchema };
 export const componentModules = import.meta.glob(
   "../node_modules/@convex-dev/agent/src/component/**/*.ts",

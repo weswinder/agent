@@ -1,15 +1,19 @@
 import { omit, pick } from "convex-helpers";
 import { v } from "convex/values";
-import { type StreamDelta, vStreamDelta, vStreamMessage } from "../validators";
-import { internal } from "./_generated/api";
-import type { Id } from "./_generated/dataModel";
+import {
+  type StreamDelta,
+  vStreamDelta,
+  vStreamMessage,
+} from "../validators.js";
+import { internal } from "./_generated/api.js";
+import type { Id } from "./_generated/dataModel.js";
 import {
   internalMutation,
   mutation,
   type MutationCtx,
   query,
-} from "./_generated/server";
-import schema from "./schema";
+} from "./_generated/server.js";
+import schema from "./schema.js";
 
 const MAX_DELTAS_PER_REQUEST = 1000;
 const MAX_DELTAS_PER_STREAM = 100;

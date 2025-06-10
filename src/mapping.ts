@@ -15,7 +15,7 @@ import {
   type UserContent,
 } from "ai";
 import { assert } from "convex-helpers";
-import type { MessageWithMetadata } from "./validators";
+import type { MessageWithMetadata } from "./validators.js";
 import type { ActionCtx, AgentComponent } from "./client/types.js";
 import type { RunMutationCtx } from "./client/types.js";
 import { MAX_FILE_SIZE, storeFile } from "./client/files.js";

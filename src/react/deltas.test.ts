@@ -1,6 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { mergeDeltas, applyDeltasToStreamMessage } from "./deltas";
-import type { StreamMessage, StreamDelta, TextStreamPart } from "../validators";
+import { mergeDeltas, applyDeltasToStreamMessage } from "./deltas.js";
+import type {
+  StreamMessage,
+  StreamDelta,
+  TextStreamPart,
+} from "../validators.js";
 import { omit } from "convex-helpers";
 
 function makeStreamMessage(

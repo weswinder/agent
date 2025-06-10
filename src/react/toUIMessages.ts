@@ -1,8 +1,8 @@
 import type { ToolInvocationUIPart } from "@ai-sdk/ui-utils";
 import type { UIMessage as AIUIMessage } from "ai";
-import type { MessageDoc } from "../client";
-import { deserializeMessage, toUIFilePart } from "../mapping";
-import type { MessageStatus } from "../validators";
+import type { MessageDoc } from "../client/index.js";
+import { deserializeMessage, toUIFilePart } from "../mapping.js";
+import type { MessageStatus } from "../validators.js";
 
 export type UIMessage = AIUIMessage & {
   key: string;

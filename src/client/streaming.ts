@@ -8,9 +8,9 @@ import type {
   ProviderOptions,
   StreamDelta,
   TextStreamPart,
-} from "../validators";
-import type { AgentComponent, MessageDoc } from "./index";
-import type { RunActionCtx } from "./types";
+} from "../validators.js";
+import type { AgentComponent, MessageDoc } from "./index.js";
+import type { RunActionCtx } from "./types.js";
 
 export type StreamingOptions = {
   /**

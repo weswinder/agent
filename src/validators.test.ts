@@ -16,9 +16,9 @@ import type {
 } from "ai";
 import type { Infer } from "convex/values";
 import { expectTypeOf, test } from "vitest";
-import type { ContextOptions, StorageOptions } from "./client";
-import type { SerializeUrlsAndUint8Arrays } from "./mapping";
-import type { TextStreamPart } from "./validators";
+import type { ContextOptions, StorageOptions } from "./client/types.js";
+import type { SerializeUrlsAndUint8Arrays } from "./mapping.js";
+import type { TextStreamPart } from "./validators.js";
 import {
   vAssistantContent,
   vAssistantMessage,
@@ -36,7 +36,7 @@ import {
   vToolMessage,
   vUserContent,
   vUserMessage,
-} from "./validators";
+} from "./validators.js";
 
 // type assertion
 type OurUserContent = SerializeUrlsAndUint8Arrays<UserContent>;

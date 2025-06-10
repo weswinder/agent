@@ -1,14 +1,14 @@
 /// <reference types="vite/client" />
 import { test } from "vitest";
 import { convexTest } from "convex-test";
-import schema from "./schema";
+import schema from "./schema.js";
 export const modules = import.meta.glob("./**/*.*s");
 
 // Sorry about everything
-import componentSchema from "../node_modules/@convex-dev/agent/src/component/schema";
+import componentSchema from "../node_modules/@convex-dev/agent/src/component/schema.js";
 export { componentSchema };
 export const componentModules = import.meta.glob(
-  "../node_modules/@convex-dev/agent/src/component/**/*.ts"
+  "../node_modules/@convex-dev/agent/src/component/**/*.ts",
 );
 
 export function initConvexTest() {

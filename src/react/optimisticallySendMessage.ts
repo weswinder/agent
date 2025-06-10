@@ -1,7 +1,7 @@
 import { insertAtTop } from "convex/react";
-import type { MessageDoc } from "../client";
+import type { MessageDoc } from "../client/index.js";
 import type { OptimisticLocalStore } from "convex/browser";
-import type { ThreadQuery } from "./types";
+import type { ThreadQuery } from "./types.js";
 
 export function optimisticallySendMessage(
   query: ThreadQuery<unknown, MessageDoc>

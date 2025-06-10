@@ -1,13 +1,13 @@
 import type { TextPart, ToolCallPart, ToolResultPart } from "ai";
-import type { MessageDoc } from "../client";
+import type { MessageDoc } from "../client/index.js";
 import type {
   Message,
   StreamDelta,
   StreamMessage,
   TextStreamPart,
-} from "../validators";
-import type { UIMessage } from "./toUIMessages";
-import { toUIMessages } from "./toUIMessages";
+} from "../validators.js";
+import type { UIMessage } from "./toUIMessages.js";
+import { toUIMessages } from "./toUIMessages.js";
 
 export { toUIMessages, type UIMessage };
 

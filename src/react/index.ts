@@ -6,24 +6,24 @@ import {
   type UsePaginatedQueryResult,
   useQuery,
 } from "convex/react";
-import { usePaginatedQuery } from "./usePaginatedQuery";
+import { usePaginatedQuery } from "./usePaginatedQuery.js";
 import type { FunctionArgs } from "convex/server";
 import { useMemo, useState } from "react";
-import type { MessageDoc } from "../client";
-import type { SyncStreamsReturnValue } from "../client/types";
-import type { StreamArgs } from "../validators";
-import type { UIMessage } from "./toUIMessages";
-import { toUIMessages } from "./toUIMessages";
-import { mergeDeltas } from "./deltas";
+import type { MessageDoc } from "../client/index.js";
+import type { SyncStreamsReturnValue } from "../client/types.js";
+import type { StreamArgs } from "../validators.js";
+import type { UIMessage } from "./toUIMessages.js";
+import { toUIMessages } from "./toUIMessages.js";
+import { mergeDeltas } from "./deltas.js";
 import type {
   ThreadQuery,
   ThreadStreamQuery,
   ThreadMessagesArgs,
   ThreadMessagesResult,
-} from "./types";
+} from "./types.js";
 
-export { optimisticallySendMessage } from "./optimisticallySendMessage";
-export { useSmoothText } from "./useSmoothText";
+export { optimisticallySendMessage } from "./optimisticallySendMessage.js";
+export { useSmoothText } from "./useSmoothText.js";
 export { toUIMessages, type UIMessage };
 
 /**

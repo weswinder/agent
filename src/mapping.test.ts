@@ -6,13 +6,13 @@ import {
   serializeMessage,
   deserializeMessage,
   serializeContent,
-} from "./mapping";
+} from "./mapping.js";
 import { api } from "./component/_generated/api.js";
-import type { AgentComponent, ActionCtx } from "./client/types";
-import { vMessage } from "./validators";
+import type { AgentComponent, ActionCtx } from "./client/types.js";
+import { vMessage } from "./validators.js";
 import fs from "fs";
 import path from "path";
-import type { SerializedContent } from "./mapping";
+import type { SerializedContent } from "./mapping.js";
 import { validate } from "convex-helpers/validators";
 
 const testAssetsDir = path.join(__dirname, "../test-assets");

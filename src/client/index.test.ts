@@ -1,5 +1,9 @@
 import { describe, expect, test } from "vitest";
-import { Agent, filterOutOrphanedToolMessages, type MessageDoc } from ".";
+import {
+  Agent,
+  filterOutOrphanedToolMessages,
+  type MessageDoc,
+} from "./index.js";
 import type { DataModelFromSchemaDefinition } from "convex/server";
 import {
   anyApi,
@@ -18,7 +22,7 @@ import { defineSchema } from "convex/server";
 import { MockLanguageModelV1 } from "ai/test";
 import type { LanguageModelV1, LanguageModelV1StreamPart } from "ai";
 import { simulateReadableStream } from "ai";
-import { components, initConvexTest } from "./setup.test";
+import { components, initConvexTest } from "./setup.test.js";
 import { z } from "zod";
 
 const schema = defineSchema({});
