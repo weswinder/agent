@@ -1,5 +1,7 @@
 # Convex Agent Component
 
+[![Powerful AI Apps Made Easy with the Agent Component](https://img.youtube.com/vi/tUKMPUlOCHY/0.jpg)](https://www.youtube.com/watch?v=tUKMPUlOCHY)
+
 [![npm version](https://badge.fury.io/js/@convex-dev%2fagent.svg)](https://badge.fury.io/js/@convex-dev%2fagent)
 
 <!-- START: Include on https://convex.dev/components -->
