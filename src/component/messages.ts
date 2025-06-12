@@ -273,7 +273,6 @@ export const updateMessage = mutation({
       message: v.optional(vMessageDoc.fields.message),
       status: v.optional(vMessageStatus),
       error: v.optional(v.string()),
-      stepId: v.optional(v.string()),
     }),
   },
   returns: vMessageDoc,
