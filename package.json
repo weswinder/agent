@@ -91,7 +91,7 @@
   "peerDependencies": {
     "ai": "^4.3.16",
     "convex": "^1.23.0",
-    "convex-helpers": "^0.1.91",
+    "convex-helpers": "^0.1.93",
     "react": "^18.3.1 || ^19.0.0"
   },
   "peerDependenciesMeta": {
@@ -106,7 +106,7 @@
     "@types/react": "^19.1.1",
     "chokidar-cli": "^3.0.0",
     "convex": "^1.24.8",
-    "convex-helpers": "^0.1.92",
+    "convex-helpers": "^0.1.93",
     "convex-test": "^0.0.37",
     "cpy-cli": "^5.0.0",
     "eslint": "^9.24.0",

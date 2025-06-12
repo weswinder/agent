@@ -2,11 +2,10 @@
 import type { ErrorMessage } from "convex-helpers";
 import {
   type PaginatedQueryArgs,
-  // usePaginatedQuery,
   type UsePaginatedQueryResult,
   useQuery,
 } from "convex/react";
-import { usePaginatedQuery } from "./usePaginatedQuery.js";
+import { usePaginatedQuery } from "convex-helpers/react";
 import type { FunctionArgs } from "convex/server";
 import { useMemo, useState } from "react";
 import type { MessageDoc } from "../client/index.js";
