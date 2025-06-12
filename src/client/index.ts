@@ -1505,11 +1505,19 @@ export class Agent<AgentTools extends ToolSet> {
       order = saved.messages.at(-1)?.order;
       stepOrder = saved.messages.at(-1)?.stepOrder;
     }
-    // Process messages to inline localhost files
-    const processedMessages = await this._processMessagesForLocalhost([
+
+    let processedMessages = [
       ...contextMessages.map((m) => deserializeMessage(m.message!)),
       ...messages,
-    ]);
+    ];
+
+    // Process messages to inline localhost files (if not, file urls pointing to localhost will be send to LLM provviders)
+    if (
+      this.options.inlineFilesInLocalDevelopment !== false &&
+      process.env.CONVEX_CLOUD_URL === "http://127.0.0.1:3210"
+    ) {
+      processedMessages = await this._inlineMessagesFiles(processedMessages);
+    }
 
     const { prompt: _, model, ...rest } = args;
     return {
@@ -1626,14 +1634,9 @@ export class Agent<AgentTools extends ToolSet> {
    * by converting them to base64. This solves the problem of LLMs not being
    * able to access localhost URLs.
    */
-  private async _processMessagesForLocalhost(
+  private async _inlineMessagesFiles(
     messages: CoreMessage[]
   ): Promise<CoreMessage[]> {
-    // Check if inlining is enabled (defaults to true)
-    if (this.options.inlineFilesInLocalDevelopment === false) {
-      return messages;
-    }
-
     // Process each message to convert localhost URLs to base64
     return Promise.all(
       messages.map(async (message): Promise<CoreMessage> => {
