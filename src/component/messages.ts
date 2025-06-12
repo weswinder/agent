@@ -265,6 +265,37 @@ export const commitMessage = mutation({
   returns: v.null(),
   handler: commitMessageHandler,
 });
+
+export const updateMessage = mutation({
+  args: {
+    messageId: v.id("messages"),
+    patch: v.object({
+      message: v.optional(vMessageDoc.fields.message),
+      status: v.optional(vMessageStatus),
+      error: v.optional(v.string()),
+      stepId: v.optional(v.string()),
+    }),
+  },
+  returns: vMessageDoc,
+  handler: async (ctx, args) => {
+    const message = await ctx.db.get(args.messageId);
+    assert(message, `Message ${args.messageId} not found`);
+
+    const patch: Partial<Doc<"messages">> = {
+      ...args.patch,
+    };
+
+    if (args.patch.message !== undefined) {
+      patch.message = args.patch.message;
+      patch.tool = isTool(args.patch.message);
+      patch.text = extractText(args.patch.message);
+    }
+
+    await ctx.db.patch(args.messageId, patch);
+    return publicMessage((await ctx.db.get(args.messageId))!);
+  },
+});
+
 async function commitMessageHandler(
   ctx: MutationCtx,
   { messageId }: { messageId: Id<"messages"> }
