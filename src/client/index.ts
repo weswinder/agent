@@ -2,12 +2,16 @@ import type { EmbeddingModelV1, LanguageModelV1 } from "@ai-sdk/provider";
 import type {
   CoreMessage,
   DeepPartial,
+  FilePart,
   GenerateObjectResult,
   GenerateTextResult,
+  ImagePart,
   StepResult,
   StreamObjectResult,
   StreamTextResult,
+  TextPart,
   ToolSet,
+  UserContent,
 } from "ai";
 import { generateObject, generateText, streamObject, streamText } from "ai";
 import { assert } from "convex-helpers";
@@ -176,6 +180,13 @@ export class Agent<AgentTools extends ToolSet> {
        * log the raw request body or response headers to a table, or logs.
        */
       rawRequestResponseHandler?: RawRequestResponseHandler;
+      /**
+       * When file or image URLs point to localhost, this will inline them
+       * by converting to base64. This is necessary because LLMs cannot
+       * access localhost URLs.
+       * Defaults to true.
+       */
+      inlineFilesInLocalDevelopment?: boolean;
     }
   ) {}
 
@@ -1495,6 +1506,12 @@ export class Agent<AgentTools extends ToolSet> {
       order = saved.messages.at(-1)?.order;
       stepOrder = saved.messages.at(-1)?.stepOrder;
     }
+    // Process messages to inline localhost files
+    const processedMessages = await this._processMessagesForLocalhost([
+      ...contextMessages.map((m) => deserializeMessage(m.message!)),
+      ...messages,
+    ]);
+
     const { prompt: _, model, ...rest } = args;
     return {
       args: {
@@ -1502,10 +1519,7 @@ export class Agent<AgentTools extends ToolSet> {
         maxRetries: args.maxRetries ?? this.options.maxRetries,
         model: model ?? this.options.chat,
         system: args.system ?? this.options.instructions,
-        messages: [
-          ...contextMessages.map((m) => deserializeMessage(m.message!)),
-          ...messages,
-        ],
+        messages: processedMessages,
       } as T & { model: LanguageModelV1 },
       userId,
       messageId,
@@ -1606,6 +1620,128 @@ export class Agent<AgentTools extends ToolSet> {
       });
     }
     return { embeddings: result.embeddings };
+  }
+
+  /**
+   * Process messages to inline file and image URLs that point to localhost
+   * by converting them to base64. This solves the problem of LLMs not being
+   * able to access localhost URLs.
+   */
+  private async _processMessagesForLocalhost(
+    messages: CoreMessage[]
+  ): Promise<CoreMessage[]> {
+    // Check if inlining is enabled (defaults to true)
+    if (this.options.inlineFilesInLocalDevelopment === false) {
+      return messages;
+    }
+
+    // Process each message to convert localhost URLs to base64
+    return Promise.all(
+      messages.map(async (message): Promise<CoreMessage> => {
+        // TODO: Likely only User messages have the localhost URL problem. Not 100% sure though.
+        if (message.role !== "user") {
+          return message;
+        }
+
+        // Handle text parts
+        if (typeof message.content === "string") {
+          return message;
+        }
+
+        if (Array.isArray(message.content)) {
+          const processedContent = await Promise.all(
+            message.content.map(async (part): Promise<TextPart | ImagePart | FilePart> => {
+              // Handle image parts
+              if (part.type === "image" && typeof part.image === "string") {
+                if (this._isLocalhostUrl(part.image)) {
+                  const base64Data = await this._convertUrlToBase64(part.image);
+                  if (base64Data) {
+                    return {
+                      ...part,
+                      image: base64Data,
+                    } as ImagePart;
+                  }
+                }
+              }
+
+              // Handle file parts
+              if (
+                part.type === "file" &&
+                part.data &&
+                typeof part.data === "string"
+              ) {
+                if (this._isLocalhostUrl(part.data)) {
+                  const base64Data = await this._convertUrlToBase64(part.data);
+                  if (base64Data) {
+                    return {
+                      ...part,
+                      data: base64Data,
+                    } as FilePart;
+                  }
+                }
+              }
+
+              return part;
+            })
+          );
+
+          return {
+            ...message,
+            content: processedContent,
+          };
+        }
+
+        return message;
+      })
+    );
+  }
+
+  /**
+   * Check if a URL points to localhost
+   */
+  private _isLocalhostUrl(url: string): boolean {
+    try {
+      const parsedUrl = new URL(url);
+      return (
+        parsedUrl.hostname === "localhost" ||
+        parsedUrl.hostname === "127.0.0.1" ||
+        parsedUrl.hostname === "::1" ||
+        parsedUrl.hostname === "0.0.0.0"
+      );
+    } catch {
+      // If URL parsing fails, it's not a valid URL
+      return false;
+    }
+  }
+
+  /**
+   * Convert a localhost URL to base64 data URI
+   */
+  private async _convertUrlToBase64(url: string): Promise<string | null> {
+    try {
+      // Fetch the file
+      const response = await fetch(url);
+      if (!response.ok) {
+        console.error(
+          `Failed to fetch file from ${url}: ${response.statusText}`
+        );
+        return null;
+      }
+
+      // Convert to base64
+      const buffer = await response.arrayBuffer();
+      const base64 = Buffer.from(buffer).toString("base64");
+
+      // Get content type
+      const contentType =
+        response.headers.get("content-type") || "application/octet-stream";
+
+      // Return as data URI
+      return `data:${contentType};base64,${base64}`;
+    } catch (error) {
+      console.error(`Error converting localhost URL to base64: ${error}`);
+      return null;
+    }
   }
 
   /**
