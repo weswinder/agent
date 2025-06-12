@@ -11,7 +11,6 @@ import type {
   StreamTextResult,
   TextPart,
   ToolSet,
-  UserContent,
 } from "ai";
 import { generateObject, generateText, streamObject, streamText } from "ai";
 import { assert } from "convex-helpers";
@@ -1638,60 +1637,45 @@ export class Agent<AgentTools extends ToolSet> {
     // Process each message to convert localhost URLs to base64
     return Promise.all(
       messages.map(async (message): Promise<CoreMessage> => {
-        // TODO: Likely only User messages have the localhost URL problem. Not 100% sure though.
-        if (message.role !== "user") {
+        if (
+          message.role !== "user" ||
+          typeof message.content === "string" ||
+          !Array.isArray(message.content)
+        ) {
           return message;
         }
 
-        // Handle text parts
-        if (typeof message.content === "string") {
-          return message;
-        }
-
-        if (Array.isArray(message.content)) {
-          const processedContent = await Promise.all(
-            message.content.map(async (part): Promise<TextPart | ImagePart | FilePart> => {
-              // Handle image parts
-              if (part.type === "image" && typeof part.image === "string") {
-                if (this._isLocalhostUrl(part.image)) {
-                  const base64Data = await this._convertUrlToBase64(part.image);
-                  if (base64Data) {
-                    return {
-                      ...part,
-                      image: base64Data,
-                    } as ImagePart;
-                  }
-                }
+        const processedContent = await Promise.all(
+          message.content.map(async (part) => {
+            if (part.type === "image" && part.image instanceof URL) {
+              if (this._isLocalhostUrl(part.image)) {
+                const imageData = await this._downloadFile(part.image);
+                return {
+                  ...part,
+                  image: imageData,
+                } as ImagePart;
               }
+            }
 
-              // Handle file parts
-              if (
-                part.type === "file" &&
-                part.data &&
-                typeof part.data === "string"
-              ) {
-                if (this._isLocalhostUrl(part.data)) {
-                  const base64Data = await this._convertUrlToBase64(part.data);
-                  if (base64Data) {
-                    return {
-                      ...part,
-                      data: base64Data,
-                    } as FilePart;
-                  }
-                }
+            // Handle file parts
+            if (part.type === "file" && part.data instanceof URL) {
+              if (this._isLocalhostUrl(part.data)) {
+                const fileData = await this._downloadFile(part.data);
+                return {
+                  ...part,
+                  data: fileData,
+                } as FilePart;
               }
+            }
 
-              return part;
-            })
-          );
+            return part;
+          })
+        );
 
-          return {
-            ...message,
-            content: processedContent,
-          };
-        }
-
-        return message;
+        return {
+          ...message,
+          content: processedContent,
+        };
       })
     );
   }
@@ -1699,49 +1683,26 @@ export class Agent<AgentTools extends ToolSet> {
   /**
    * Check if a URL points to localhost
    */
-  private _isLocalhostUrl(url: string): boolean {
-    try {
-      const parsedUrl = new URL(url);
-      return (
-        parsedUrl.hostname === "localhost" ||
-        parsedUrl.hostname === "127.0.0.1" ||
-        parsedUrl.hostname === "::1" ||
-        parsedUrl.hostname === "0.0.0.0"
-      );
-    } catch {
-      // If URL parsing fails, it's not a valid URL
-      return false;
-    }
+  private _isLocalhostUrl(url: URL): boolean {
+    return (
+      url.hostname === "localhost" ||
+      url.hostname === "127.0.0.1" ||
+      url.hostname === "::1" ||
+      url.hostname === "0.0.0.0"
+    );
   }
 
   /**
    * Convert a localhost URL to base64 data URI
    */
-  private async _convertUrlToBase64(url: string): Promise<string | null> {
-    try {
-      // Fetch the file
-      const response = await fetch(url);
-      if (!response.ok) {
-        console.error(
-          `Failed to fetch file from ${url}: ${response.statusText}`
-        );
-        return null;
-      }
-
-      // Convert to base64
-      const buffer = await response.arrayBuffer();
-      const base64 = Buffer.from(buffer).toString("base64");
-
-      // Get content type
-      const contentType =
-        response.headers.get("content-type") || "application/octet-stream";
-
-      // Return as data URI
-      return `data:${contentType};base64,${base64}`;
-    } catch (error) {
-      console.error(`Error converting localhost URL to base64: ${error}`);
-      return null;
+  private async _downloadFile(url: URL): Promise<ArrayBuffer> {
+    // Fetch the file
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch ${url}: ${response.statusText}`);
     }
+
+    return await response.arrayBuffer();
   }
 
   /**
