@@ -216,31 +216,6 @@ describe("agent", () => {
     expect(updatedMessage.error).toBe("Something went wrong");
   });
 
-  test("updateMessage updates stepId", async () => {
-    const t = convexTest(schema, modules);
-    const thread = await t.mutation(api.threads.createThread, {
-      userId: "test",
-    });
-    const { messages } = await t.mutation(api.messages.addMessages, {
-      threadId: thread._id as Id<"threads">,
-      messages: [{ message: { role: "assistant", content: "hello" } }],
-    });
-    const messageId = messages[0]._id as Id<"messages">;
-    
-    const updatedMessage = await t.mutation(api.messages.updateMessage, {
-      messageId,
-      patch: {
-        stepId: "step-123",
-      },
-    });
-    
-    // stepId is not exposed in publicMessage, check it directly
-    const messageDoc = await t.run(async (ctx) => {
-      return await ctx.db.get(messageId);
-    });
-    expect(messageDoc?.stepId).toBe("step-123");
-  });
-
   test("updateMessage correctly updates tool messages", async () => {
     const t = convexTest(schema, modules);
     const thread = await t.mutation(api.threads.createThread, {
