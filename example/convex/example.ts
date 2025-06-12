@@ -167,10 +167,10 @@ export const getThreads = query({
 export const listMessagesByThreadId = query({
   args: { threadId: v.string(), paginationOpts: paginationOptsValidator },
   handler: async (ctx, { threadId, paginationOpts }) => {
-    const messages = await ctx.runQuery(
-      components.agent.messages.listMessagesByThreadId,
-      { threadId, paginationOpts, order: "desc" },
-    );
+    const messages = await weatherAgent.listMessages(ctx, {
+      threadId,
+      paginationOpts,
+    });
     return messages;
   },
 });
@@ -178,10 +178,14 @@ export const listMessagesByThreadId = query({
 export const getInProgressMessages = query({
   args: { threadId: v.string() },
   handler: async (ctx, { threadId }) => {
-    const { page } = await ctx.runQuery(
-      components.agent.messages.listMessagesByThreadId,
-      { threadId, statuses: ["pending"], order: "desc" },
-    );
+    const { page } = await weatherAgent.listMessages(ctx, {
+      threadId,
+      statuses: ["pending"],
+      paginationOpts: {
+        numItems: 10,
+        cursor: null,
+      },
+    });
     return page;
   },
 });
@@ -190,6 +194,7 @@ export const getInProgressMessages = query({
  * Streaming
  */
 
+// Stream the text but don't persist the message until it's done
 export const streamText = action({
   args: { prompt: v.string() },
   handler: async (ctx, { prompt }) => {
@@ -207,7 +212,27 @@ export const streamText = action({
   },
 });
 
-// Registered in http.ts
+// Stream the text, persisting deltas as it goes, so client(s) can subscribe and
+// get streaming results, even if their connection is interrupted or they start
+// subscribing later. See [../examples/chat-streaming](../examples/chat-streaming)
+export const streamTextPersistDeltas = action({
+  args: { threadId: v.string(), prompt: v.string() },
+  handler: async (ctx, { threadId, prompt }) => {
+    const { thread } = await weatherAgent.continueThread(ctx, { threadId });
+    const result = await thread.streamText(
+      { prompt },
+      { saveStreamDeltas: true },
+    );
+    // we consume the stream but don't do anything with it - the client will
+    // subscribe to the stream using a regular query via useThreadMessages
+    await result.consumeStream();
+  },
+});
+
+// To stream text over http, you can use the ai sdk protocols directly
+// This can happen in addition to saving the deltas, or as an alternative
+// if you only care about streaming to one client and waiting for the final
+// result if the http request is interrupted / on other clients.
 export const streamHttpAction = httpAction(async (ctx, request) => {
   const { threadId, prompt } = (await request.json()) as {
     threadId?: string;
@@ -351,14 +376,10 @@ export const runAgentAsTool = action({
 export const askAboutImage = action({
   args: {
     prompt: v.string(),
-    data: v.bytes(),
+    image: v.bytes(),
     mimeType: v.string(),
   },
-  handler: async (ctx, { prompt, data, mimeType }) => {
-    const storageId = await ctx.storage.store(
-      new Blob([data], { type: mimeType }),
-    );
-    const url = (await ctx.storage.getUrl(storageId))!;
+  handler: async (ctx, { prompt, image, mimeType }) => {
     const { thread } = await weatherAgent.createThread(ctx, {});
     const result = await thread.generateText({
       prompt,
@@ -366,7 +387,9 @@ export const askAboutImage = action({
         {
           role: "user",
           content: [
-            { type: "image", image: new URL(url), mimeType },
+            // You can pass the data in directly. It will automatically store
+            // it in file storage and pass around the URL.
+            { type: "image", image, mimeType },
             { type: "text", text: prompt },
           ],
         },
