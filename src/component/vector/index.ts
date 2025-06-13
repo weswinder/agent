@@ -172,6 +172,10 @@ export const updateBatch = mutation({
         model: v.string(),
         id: vVectorId,
         vector: v.array(v.number()),
+        // TODO: support changing the vector length by
+        // deleting from one table and inserting into another.
+        // However this requires updating all the messages that reference
+        // the vector.
       })
     ),
   },
