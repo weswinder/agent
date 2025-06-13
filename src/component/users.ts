@@ -156,6 +156,7 @@ async function deletePageForUserId(
     });
   await Promise.all(messages.page.map((m) => deleteMessage(ctx, m)));
   if (messages.isDone) {
+    // TODO: delete streams - maybe use workpool?
     await ctx.db.delete(threadInProgress);
     threadInProgress = null;
     messagesCursor = null;

@@ -131,6 +131,9 @@ export const deleteAllForThreadIdSync = action({
       }
       cursor = result.cursor;
     }
+    await ctx.runAction(api.streams.deleteAllStreamsForThreadIdSync, {
+      threadId: args.threadId,
+    });
   },
   returns: v.null(),
 });
@@ -153,6 +156,11 @@ export const deleteAllForThreadIdAsync = mutation({
       await ctx.scheduler.runAfter(0, api.threads.deleteAllForThreadIdAsync, {
         threadId: args.threadId,
         cursor: result.cursor,
+      });
+    } else {
+      // Kick off the streams deletion
+      await ctx.scheduler.runAfter(0, api.threads.deleteAllForThreadIdSync, {
+        threadId: args.threadId,
       });
     }
     return result;

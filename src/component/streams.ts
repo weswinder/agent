@@ -5,15 +5,20 @@ import {
   vStreamDelta,
   vStreamMessage,
 } from "../validators.js";
-import { internal } from "./_generated/api.js";
-import type { Id } from "./_generated/dataModel.js";
+import { api, internal } from "./_generated/api.js";
+import type { Doc, Id } from "./_generated/dataModel.js";
 import {
   internalMutation,
   mutation,
   type MutationCtx,
   query,
+  action,
 } from "./_generated/server.js";
 import schema from "./schema.js";
+import type { PaginationResult } from "convex/server";
+import { paginator } from "convex-helpers/server/pagination";
+import { stream } from "convex-helpers/server/stream";
+import { mergedStream } from "convex-helpers/server/stream";
 
 const MAX_DELTAS_PER_REQUEST = 1000;
 const MAX_DELTAS_PER_STREAM = 100;
@@ -205,5 +210,146 @@ export const timeoutStream = internalMutation({
         endedAt: Date.now(),
       },
     });
+  },
+});
+
+async function deletePageForStreamId(
+  ctx: MutationCtx,
+  args: { streamId: Id<"streamingMessages">; cursor?: string }
+) {
+  const deltas = await ctx.db
+    .query("streamDeltas")
+    .withIndex("streamId_start_end", (q) => q.eq("streamId", args.streamId))
+    .paginate({
+      numItems: MAX_DELTAS_PER_REQUEST,
+      cursor: args.cursor ?? null,
+    });
+  await Promise.all(deltas.page.map((d) => ctx.db.delete(d._id)));
+  return deltas;
+}
+
+export async function deleteStreamsPageForThreadId(
+  ctx: MutationCtx,
+  args: { threadId: Id<"threads">; streamOrder?: number; deltaCursor?: string }
+) {
+  const allStreamMessages =
+    schema.tables.streamingMessages.validator.fields.state.members
+      .flatMap((state) => state.fields.kind.value)
+      .map((stateKind) =>
+        stream(ctx.db, schema)
+          .query("streamingMessages")
+          .withIndex("threadId_state_order_stepOrder", (q) =>
+            q
+              .eq("threadId", args.threadId)
+              .eq("state.kind", stateKind)
+              .gte("order", args.streamOrder ?? 0)
+          )
+      );
+  let deltaCursor = args.deltaCursor;
+  const streamMessage = await mergedStream(allStreamMessages, [
+    "threadId",
+    "state.kind",
+    "order",
+    "stepOrder",
+  ]).first();
+  if (!streamMessage) {
+    return {
+      isDone: true,
+      streamOrder: undefined,
+      deltaCursor: undefined,
+    };
+  }
+  const result = await deletePageForStreamId(ctx, {
+    streamId: streamMessage._id,
+    cursor: deltaCursor,
+  });
+  if (result.isDone) {
+    await ctx.db.delete(streamMessage._id);
+    deltaCursor = undefined;
+  }
+  return {
+    isDone: false,
+    streamOrder: streamMessage.order,
+    deltaCursor: result.continueCursor,
+  };
+}
+
+export const deleteStreamsPageForThreadIdMutation = internalMutation({
+  args: {
+    threadId: v.id("threads"),
+    streamOrder: v.optional(v.number()),
+    deltaCursor: v.optional(v.string()),
+  },
+  returns: v.object({
+    isDone: v.boolean(),
+    streamOrder: v.optional(v.number()),
+    deltaCursor: v.optional(v.string()),
+  }),
+  handler: deleteStreamsPageForThreadId,
+});
+
+export const deleteAllStreamsForThreadIdAsync = mutation({
+  args: {
+    threadId: v.id("threads"),
+    streamOrder: v.optional(v.number()),
+    deltaCursor: v.optional(v.string()),
+  },
+  returns: v.object({
+    isDone: v.boolean(),
+    streamOrder: v.optional(v.number()),
+    deltaCursor: v.optional(v.string()),
+  }),
+  handler: async (ctx, args) => {
+    const result = await deleteStreamsPageForThreadId(ctx, args);
+    if (!result.isDone) {
+      await ctx.scheduler.runAfter(
+        0,
+        api.streams.deleteAllStreamsForThreadIdAsync,
+        {
+          threadId: args.threadId,
+          streamOrder: result.streamOrder,
+          deltaCursor: result.deltaCursor,
+        }
+      );
+    } else {
+      await ctx.db.delete(args.threadId);
+    }
+    return result;
+  },
+});
+
+export const deleteStreamSync = mutation({
+  args: { streamId: v.id("streamingMessages") },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    let deltas = await deletePageForStreamId(ctx, args);
+    while (!deltas.isDone) {
+      deltas = await deletePageForStreamId(ctx, {
+        ...args,
+        cursor: deltas.continueCursor,
+      });
+    }
+    await ctx.db.delete(args.streamId);
+  },
+});
+
+export const deleteAllStreamsForThreadIdSync = action({
+  args: { threadId: v.id("threads") },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    let result = await ctx.runMutation(
+      internal.streams.deleteStreamsPageForThreadIdMutation,
+      args
+    );
+    while (!result.isDone) {
+      result = await ctx.runMutation(
+        internal.streams.deleteStreamsPageForThreadIdMutation,
+        {
+          ...args,
+          streamOrder: result.streamOrder,
+          deltaCursor: result.deltaCursor,
+        }
+      );
+    }
   },
 });
