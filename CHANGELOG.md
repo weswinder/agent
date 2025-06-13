@@ -2,6 +2,10 @@
 
 ## 0.1.8 alpha
 
+- Support images in localhost by loading them locally and passing them
+  to the LLM as raw data. (author: @julionav)
+- Add `updateMessage` to the raw components.agent.messages API for patching
+  existing message contents, status, and error details.
 - Add extensions to support NodeNext bundling
 
 ## 0.1.7
