@@ -141,4 +141,144 @@ describe("agent", () => {
       stepOrder: 1,
     });
   });
+
+  test("updateMessage updates message content", async () => {
+    const t = convexTest(schema, modules);
+    const thread = await t.mutation(api.threads.createThread, {
+      userId: "test",
+    });
+    const { messages } = await t.mutation(api.messages.addMessages, {
+      threadId: thread._id as Id<"threads">,
+      messages: [{ message: { role: "user", content: "hello" } }],
+    });
+    const messageId = messages[0]._id as Id<"messages">;
+    
+    const updatedMessage = await t.mutation(api.messages.updateMessage, {
+      messageId,
+      patch: {
+        message: { role: "user", content: "updated content" },
+      },
+    });
+    
+    expect(updatedMessage.message).toEqual({
+      role: "user",
+      content: "updated content",
+    });
+  });
+
+  test("updateMessage updates message status", async () => {
+    const t = convexTest(schema, modules);
+    const thread = await t.mutation(api.threads.createThread, {
+      userId: "test",
+    });
+    const { messages } = await t.mutation(api.messages.addMessages, {
+      threadId: thread._id as Id<"threads">,
+      messages: [{ message: { role: "assistant", content: "hello" } }],
+      pending: true,
+    });
+    const messageId = messages[0]._id as Id<"messages">;
+    
+    // Initial status should be pending
+    expect(messages[0].status).toBe("pending");
+    
+    // Update to success
+    const updatedMessage = await t.mutation(api.messages.updateMessage, {
+      messageId,
+      patch: {
+        status: "success",
+      },
+    });
+    
+    expect(updatedMessage.status).toBe("success");
+  });
+
+  test("updateMessage updates error field", async () => {
+    const t = convexTest(schema, modules);
+    const thread = await t.mutation(api.threads.createThread, {
+      userId: "test",
+    });
+    const { messages } = await t.mutation(api.messages.addMessages, {
+      threadId: thread._id as Id<"threads">,
+      messages: [{ message: { role: "assistant", content: "hello" } }],
+      pending: true,
+    });
+    const messageId = messages[0]._id as Id<"messages">;
+    
+    const updatedMessage = await t.mutation(api.messages.updateMessage, {
+      messageId,
+      patch: {
+        status: "failed",
+        error: "Something went wrong",
+      },
+    });
+    
+    expect(updatedMessage.status).toBe("failed");
+    expect(updatedMessage.error).toBe("Something went wrong");
+  });
+
+  test("updateMessage correctly updates tool messages", async () => {
+    const t = convexTest(schema, modules);
+    const thread = await t.mutation(api.threads.createThread, {
+      userId: "test",
+    });
+    const { messages } = await t.mutation(api.messages.addMessages, {
+      threadId: thread._id as Id<"threads">,
+      messages: [{
+        message: {
+          role: "assistant",
+          content: [
+            {
+              type: "tool-call",
+              args: { a: 1 },
+              toolCallId: "1",
+              toolName: "tool",
+            },
+          ],
+        },
+      }],
+    });
+    const messageId = messages[0]._id as Id<"messages">;
+    
+    const updatedMessage = await t.mutation(api.messages.updateMessage, {
+      messageId,
+      patch: {
+        message: {
+          role: "assistant",
+          content: [
+            {
+              type: "tool-call",
+              args: { a: 2, b: 3 },
+              toolCallId: "1",
+              toolName: "tool",
+            },
+          ],
+        },
+      },
+    });
+    
+    expect(updatedMessage.message).toEqual({
+      role: "assistant",
+      content: [
+        {
+          type: "tool-call",
+          args: { a: 2, b: 3 },
+          toolCallId: "1",
+          toolName: "tool",
+        },
+      ],
+    });
+  });
+
+  test("updateMessage throws error for non-existent message", async () => {
+    const t = convexTest(schema, modules);
+    
+    await expect(
+      t.mutation(api.messages.updateMessage, {
+        messageId: "invalidId" as Id<"messages">,
+        patch: {
+          message: { role: "user", content: "test" },
+        },
+      })
+    ).rejects.toThrow();
+  });
 });
