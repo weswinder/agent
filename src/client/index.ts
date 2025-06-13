@@ -2,11 +2,14 @@ import type { EmbeddingModelV1, LanguageModelV1 } from "@ai-sdk/provider";
 import type {
   CoreMessage,
   DeepPartial,
+  FilePart,
   GenerateObjectResult,
   GenerateTextResult,
+  ImagePart,
   StepResult,
   StreamObjectResult,
   StreamTextResult,
+  TextPart,
   ToolSet,
 } from "ai";
 import { generateObject, generateText, streamObject, streamText } from "ai";
@@ -1495,6 +1498,17 @@ export class Agent<AgentTools extends ToolSet> {
       order = saved.messages.at(-1)?.order;
       stepOrder = saved.messages.at(-1)?.stepOrder;
     }
+
+    let processedMessages = [
+      ...contextMessages.map((m) => deserializeMessage(m.message!)),
+      ...messages,
+    ];
+
+    // Process messages to inline localhost files (if not, file urls pointing to localhost will be sent to LLM providers)
+    if (process.env.CONVEX_CLOUD_URL?.startsWith("http://127.0.0.1")) {
+      processedMessages = await this._inlineMessagesFiles(processedMessages);
+    }
+
     const { prompt: _, model, ...rest } = args;
     return {
       args: {
@@ -1502,10 +1516,7 @@ export class Agent<AgentTools extends ToolSet> {
         maxRetries: args.maxRetries ?? this.options.maxRetries,
         model: model ?? this.options.chat,
         system: args.system ?? this.options.instructions,
-        messages: [
-          ...contextMessages.map((m) => deserializeMessage(m.message!)),
-          ...messages,
-        ],
+        messages: processedMessages,
       } as T & { model: LanguageModelV1 },
       userId,
       messageId,
@@ -1606,6 +1617,85 @@ export class Agent<AgentTools extends ToolSet> {
       });
     }
     return { embeddings: result.embeddings };
+  }
+
+  /**
+   * Process messages to inline file and image URLs that point to localhost
+   * by converting them to base64. This solves the problem of LLMs not being
+   * able to access localhost URLs.
+   */
+  private async _inlineMessagesFiles(
+    messages: CoreMessage[]
+  ): Promise<CoreMessage[]> {
+    // Process each message to convert localhost URLs to base64
+    return Promise.all(
+      messages.map(async (message): Promise<CoreMessage> => {
+        if (
+          message.role !== "user" ||
+          typeof message.content === "string" ||
+          !Array.isArray(message.content)
+        ) {
+          return message;
+        }
+
+        const processedContent = await Promise.all(
+          message.content.map(async (part) => {
+            if (part.type === "image" && part.image instanceof URL) {
+              if (this._isLocalhostUrl(part.image)) {
+                const imageData = await this._downloadFile(part.image);
+                return {
+                  ...part,
+                  image: imageData,
+                } as ImagePart;
+              }
+            }
+
+            // Handle file parts
+            if (part.type === "file" && part.data instanceof URL) {
+              if (this._isLocalhostUrl(part.data)) {
+                const fileData = await this._downloadFile(part.data);
+                return {
+                  ...part,
+                  data: fileData,
+                } as FilePart;
+              }
+            }
+
+            return part;
+          })
+        );
+
+        return {
+          ...message,
+          content: processedContent,
+        };
+      })
+    );
+  }
+
+  /**
+   * Check if a URL points to localhost
+   */
+  private _isLocalhostUrl(url: URL): boolean {
+    return (
+      url.hostname === "localhost" ||
+      url.hostname === "127.0.0.1" ||
+      url.hostname === "::1" ||
+      url.hostname === "0.0.0.0"
+    );
+  }
+
+  /**
+   * Download a file from a URL
+   */
+  private async _downloadFile(url: URL): Promise<ArrayBuffer> {
+    // Fetch the file
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch ${url}: ${response.statusText}`);
+    }
+
+    return await response.arrayBuffer();
   }
 
   /**
