@@ -179,13 +179,6 @@ export class Agent<AgentTools extends ToolSet> {
        * log the raw request body or response headers to a table, or logs.
        */
       rawRequestResponseHandler?: RawRequestResponseHandler;
-      /**
-       * When file or image URLs point to localhost, this will inline them
-       * by converting to base64. This is necessary because LLMs cannot
-       * access localhost URLs.
-       * Defaults to true.
-       */
-      inlineFilesInLocalDevelopment?: boolean;
     }
   ) {}
 
@@ -1511,11 +1504,8 @@ export class Agent<AgentTools extends ToolSet> {
       ...messages,
     ];
 
-    // Process messages to inline localhost files (if not, file urls pointing to localhost will be send to LLM provviders)
-    if (
-      this.options.inlineFilesInLocalDevelopment !== false &&
-      process.env.CONVEX_CLOUD_URL === "http://127.0.0.1:3210"
-    ) {
+    // Process messages to inline localhost files (if not, file urls pointing to localhost will be sent to LLM providers)
+    if (process.env.CONVEX_CLOUD_URL?.startsWith("http://127.0.0.1")) {
       processedMessages = await this._inlineMessagesFiles(processedMessages);
     }
 
@@ -1696,7 +1686,7 @@ export class Agent<AgentTools extends ToolSet> {
   }
 
   /**
-   * Convert a localhost URL to base64 data URI
+   * Download a file from a URL
    */
   private async _downloadFile(url: URL): Promise<ArrayBuffer> {
     // Fetch the file
