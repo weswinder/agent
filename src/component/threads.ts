@@ -159,9 +159,11 @@ export const deleteAllForThreadIdAsync = mutation({
       });
     } else {
       // Kick off the streams deletion
-      await ctx.scheduler.runAfter(0, api.threads.deleteAllForThreadIdSync, {
-        threadId: args.threadId,
-      });
+      await ctx.scheduler.runAfter(
+        0,
+        api.streams.deleteAllStreamsForThreadIdSync,
+        { threadId: args.threadId }
+      );
     }
     return result;
   },
@@ -183,7 +185,10 @@ async function deletePageForThreadIdHandler(
     });
   await Promise.all(messages.page.map((m) => deleteMessage(ctx, m)));
   if (messages.isDone) {
-    await ctx.db.delete(args.threadId);
+    const thread = await ctx.db.get(args.threadId);
+    if (thread) {
+      await ctx.db.delete(args.threadId);
+    }
   }
   return {
     cursor: messages.continueCursor,
