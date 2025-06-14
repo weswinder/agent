@@ -7,6 +7,7 @@
 - Add `updateMessage` to the raw components.agent.messages API for patching
   existing message contents, status, and error details.
 - Add extensions to support NodeNext bundling
+- Fix: delete streams when deleting threads
 
 ## 0.1.7
 

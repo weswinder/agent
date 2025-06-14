@@ -3,7 +3,6 @@ import { test } from "vitest";
 import { convexTest } from "convex-test";
 export const modules = import.meta.glob("./**/*.*s");
 
-import componentSchema from "../component/schema.js";
 import {
   defineSchema,
   type GenericSchema,
@@ -12,12 +11,12 @@ import {
 import { type AgentComponent } from "./index.js";
 import { componentsGeneric } from "convex/server";
 export { componentSchema };
+import componentSchema from "../component/schema.js";
 export const componentModules = import.meta.glob("../component/**/*.ts");
 
 export function initConvexTest<
   Schema extends SchemaDefinition<GenericSchema, boolean>,
 >(schema?: Schema) {
-  console.log({ modules });
   const t = convexTest(schema ?? defineSchema({}), modules);
   t.registerComponent("agent", componentSchema, componentModules);
   return t;

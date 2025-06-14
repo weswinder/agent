@@ -131,6 +131,9 @@ export const deleteAllForThreadIdSync = action({
       }
       cursor = result.cursor;
     }
+    await ctx.runAction(api.streams.deleteAllStreamsForThreadIdSync, {
+      threadId: args.threadId,
+    });
   },
   returns: v.null(),
 });
@@ -154,6 +157,13 @@ export const deleteAllForThreadIdAsync = mutation({
         threadId: args.threadId,
         cursor: result.cursor,
       });
+    } else {
+      // Kick off the streams deletion
+      await ctx.scheduler.runAfter(
+        0,
+        api.streams.deleteAllStreamsForThreadIdSync,
+        { threadId: args.threadId }
+      );
     }
     return result;
   },
@@ -175,7 +185,10 @@ async function deletePageForThreadIdHandler(
     });
   await Promise.all(messages.page.map((m) => deleteMessage(ctx, m)));
   if (messages.isDone) {
-    await ctx.db.delete(args.threadId);
+    const thread = await ctx.db.get(args.threadId);
+    if (thread) {
+      await ctx.db.delete(args.threadId);
+    }
   }
   return {
     cursor: messages.continueCursor,
