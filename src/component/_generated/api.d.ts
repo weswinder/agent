@@ -1484,6 +1484,24 @@ export type Mounts = {
       },
       string
     >;
+    deleteAllStreamsForThreadIdAsync: FunctionReference<
+      "mutation",
+      "public",
+      { deltaCursor?: string; streamOrder?: number; threadId: string },
+      { deltaCursor?: string; isDone: boolean; streamOrder?: number }
+    >;
+    deleteAllStreamsForThreadIdSync: FunctionReference<
+      "action",
+      "public",
+      { threadId: string },
+      null
+    >;
+    deleteStreamSync: FunctionReference<
+      "mutation",
+      "public",
+      { streamId: string },
+      null
+    >;
     finish: FunctionReference<
       "mutation",
       "public",
