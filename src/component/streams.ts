@@ -6,7 +6,7 @@ import {
   vStreamMessage,
 } from "../validators.js";
 import { api, internal } from "./_generated/api.js";
-import type { Doc, Id } from "./_generated/dataModel.js";
+import type { Id } from "./_generated/dataModel.js";
 import {
   internalMutation,
   mutation,
@@ -15,8 +15,6 @@ import {
   action,
 } from "./_generated/server.js";
 import schema from "./schema.js";
-import type { PaginationResult } from "convex/server";
-import { paginator } from "convex-helpers/server/pagination";
 import { stream } from "convex-helpers/server/stream";
 import { mergedStream } from "convex-helpers/server/stream";
 

@@ -12,15 +12,15 @@ describe("users", () => {
     const t = convexTest(schema, modules);
 
     // Create two users with threads and one without
-    const thread1 = await t.mutation(api.threads.createThread, {
+    await t.mutation(api.threads.createThread, {
       userId: "user1",
       title: "Test thread 1",
     });
-    const thread2 = await t.mutation(api.threads.createThread, {
+    await t.mutation(api.threads.createThread, {
       userId: "user2",
       title: "Test thread 2",
     });
-    const thread3 = await t.mutation(api.threads.createThread, {
+    await t.mutation(api.threads.createThread, {
       userId: "user1", // Same user, different thread
       title: "Test thread 3",
     });
