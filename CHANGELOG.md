@@ -1,13 +1,14 @@
 # Changelog
 
-## 0.1.8 alpha
+## 0.1.8
 
 - Support images in localhost by loading them locally and passing them
   to the LLM as raw data. (author: @julionav)
 - Add `updateMessage` to the raw components.agent.messages API for patching
-  existing message contents, status, and error details.
+  existing message contents, status, and error details. (author: @julionav)
 - Add extensions to support NodeNext bundling
-- Fix: delete streams when deleting threads
+- Fix: paginating over all users now works for more than one page
+- Fix: streams are now deleted when deleting threads / user data
 
 ## 0.1.7
 
