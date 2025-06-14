@@ -18,6 +18,9 @@ AI Agent framework built on Convex.
 - Reactive & realtime updates from asynchronous functions / workflows.
 - Support for streaming text and storing the final result.
   See [examples/chat-streaming](./examples/chat-streaming/README.md).
+- Rate limiting for chat messages and token usage via the
+  [Rate Limiter component](https://convex.dev/components/rate-limiter).
+  See [examples/rate-limiting](./examples/rate-limiting/README.md).
 - Optionally filter tool calls out of the thread history.
 
 [Read the associated Stack post here](https://stack.convex.dev/ai-agents).
