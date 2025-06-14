@@ -188,6 +188,7 @@ async function addMessagesHandler(
         refcount: (await ctx.db.get(fileId))!.refcount + 1,
       });
     }
+    // TODO: delete the associated stream data for the order/stepOrder
     toReturn.push((await ctx.db.get(messageId))!);
   }
   return { messages: toReturn.map(publicMessage) };
