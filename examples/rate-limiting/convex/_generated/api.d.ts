@@ -1623,7 +1623,7 @@ export declare const components: {
           start: number;
           streamId: string;
         },
-        null
+        boolean
       >;
       create: FunctionReference<
         "mutation",

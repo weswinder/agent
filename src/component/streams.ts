@@ -27,10 +27,16 @@ const deltaValidator = schema.tables.streamDeltas.validator;
 
 export const addDelta = mutation({
   args: deltaValidator,
-  returns: v.null(),
+  returns: v.boolean(),
   handler: async (ctx, args) => {
     await ctx.db.insert("streamDeltas", args);
     await heartbeatStream(ctx, { streamId: args.streamId });
+    const stream = await ctx.db.get(args.streamId);
+    if (stream?.state.kind !== "streaming") {
+      console.warn(`Stream is not streaming: ${args.streamId}`);
+      return false;
+    }
+    return true;
   },
 });
 
@@ -138,7 +144,10 @@ export const finish = mutation({
       throw new Error(`Stream not found: ${args.streamId}`);
     }
     if (stream.state.kind !== "streaming") {
-      throw new Error(`Stream is not streaming: ${args.streamId}`);
+      console.warn(
+        `Stream trying to finish but not currently streaming: ${args.streamId}`
+      );
+      return;
     }
     if (stream.state.timeoutFnId) {
       const timeoutFn = await ctx.db.system.get(stream.state.timeoutFnId);

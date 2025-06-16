@@ -9,7 +9,6 @@ import type {
   StepResult,
   StreamObjectResult,
   StreamTextResult,
-  TextPart,
   ToolSet,
 } from "ai";
 import { generateObject, generateText, streamObject, streamText } from "ai";
@@ -544,6 +543,7 @@ export class Agent<AgentTools extends ToolSet> {
             providerOptions: aiArgs.providerOptions,
             order,
             stepOrder,
+            abortSignal: aiArgs.abortSignal,
           })
         : undefined;
 
@@ -552,6 +552,7 @@ export class Agent<AgentTools extends ToolSet> {
       maxSteps: this.options.maxSteps,
       ...aiArgs,
       tools,
+      abortSignal: streamer?.abortController.signal ?? aiArgs.abortSignal,
       experimental_transform: mergeTransforms(
         options?.saveStreamDeltas,
         args.experimental_transform

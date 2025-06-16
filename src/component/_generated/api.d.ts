@@ -1467,7 +1467,7 @@ export type Mounts = {
         start: number;
         streamId: string;
       },
-      null
+      boolean
     >;
     create: FunctionReference<
       "mutation",
