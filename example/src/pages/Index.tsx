@@ -52,17 +52,31 @@ export function Index() {
               saved and tracked.
             </p>
           </li>
+          {/* rate limiting */}
+          <li className="border rounded p-4 hover:shadow transition">
+            <Link
+              to="/rate-limiting"
+              className="text-xl font-semibold text-indigo-700 hover:underline"
+            >
+              Rate Limiting
+            </Link>
+            <p className="mt-2 text-gray-700">
+              Demonstrates rate limiting both message sending frequency and
+              based on token usage.
+            </p>
+          </li>
           <li className="border rounded p-4 hover:shadow transition">
             <Link
               to="/weather-fashion"
               className="text-xl font-semibold text-indigo-700 hover:underline"
             >
-              Weather & Fashion
+              Tool Usage
             </Link>
             <p className="mt-2 text-gray-700">
-              Get outfit suggestions for any location, powered by weather and
-              fashion agents. Demonstrates multi-step agent reasoning and tool
-              use.
+              Demonstrates multi-step agent reasoning and tool use, via an
+              example of a weather agent that uses a tool to get the weather and
+              a fashion agent that uses a tool to get outfit suggestions based
+              on the weather.
             </p>
           </li>
         </ul>

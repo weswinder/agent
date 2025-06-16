@@ -1,12 +1,12 @@
 import { BrowserRouter, Routes, Route, Link } from "react-router-dom";
-import { IdeaDetail } from "./pages/IdeaDetail";
 import { Toaster } from "./components/ui/toaster";
+import { Index } from "./pages/Index";
 import ChatBasic from "@example/chat-basic/src/ChatBasic";
 import ChatStreaming from "@example/chat-streaming/src/ChatStreaming";
-import { Index } from "./pages/Index";
-import { WeatherFashion } from "./pages/WeatherFashion";
-import { Images } from "./pages/Images";
 import FilesImages from "@example/files-images/src/FilesImages";
+import RateLimiting from "@example/rate-limiting/src/RateLimiting";
+import { WeatherFashion } from "./pages/WeatherFashion";
+
 export default function App() {
   return (
     <BrowserRouter>
@@ -23,12 +23,11 @@ export default function App() {
         <main className="flex-1 h-full overflow-scroll">
           <Routes>
             <Route path="/" element={<Index />} />
-            <Route path="/weather-fashion" element={<WeatherFashion />} />
             <Route path="/chat-basic" element={<ChatBasic />} />
             <Route path="/chat-streaming" element={<ChatStreaming />} />
             <Route path="/files-images" element={<FilesImages />} />
-            <Route path="/ideas/:id" element={<IdeaDetail />} />
-            <Route path="/images" element={<Images />} />
+            <Route path="/rate-limiting" element={<RateLimiting />} />
+            <Route path="/weather-fashion" element={<WeatherFashion />} />
           </Routes>
         </main>
         <Toaster />
