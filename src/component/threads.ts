@@ -16,6 +16,7 @@ import {
 } from "./_generated/server.js";
 import { deleteMessage } from "./messages.js";
 import { schema, v } from "./schema.js";
+import { deleteStreamsPageForThreadId } from "./streams.js";
 
 function publicThreadOrNull(thread: Doc<"threads"> | null): ThreadDoc | null {
   if (thread === null) {
@@ -100,29 +101,17 @@ export const updateThread = mutation({
 
 // TODO: delete thread
 
-const deleteThreadArgs = {
-  threadId: v.id("threads"),
-  cursor: v.optional(v.string()),
-  limit: v.optional(v.number()),
-};
-type DeleteThreadArgs = ObjectType<typeof deleteThreadArgs>;
-const deleteThreadReturns = {
-  cursor: v.string(),
-  isDone: v.boolean(),
-};
-type DeleteThreadReturns = ObjectType<typeof deleteThreadReturns>;
-
 /**
  * Use this to delete a thread and everything it contains.
  * It will try to delete all pages synchronously.
  * If it times out or fails, you'll have to run it again.
  */
 export const deleteAllForThreadIdSync = action({
-  args: deleteThreadArgs,
+  args: { threadId: v.id("threads"), limit: v.optional(v.number()) },
   handler: async (ctx, args) => {
-    let cursor = args.cursor;
+    let cursor: string | undefined = undefined;
     while (true) {
-      const result = await ctx.runMutation(
+      const result: DeleteThreadReturns = await ctx.runMutation(
         internal.threads._deletePageForThreadId,
         { threadId: args.threadId, cursor, limit: args.limit }
       );
@@ -138,6 +127,22 @@ export const deleteAllForThreadIdSync = action({
   returns: v.null(),
 });
 
+const deleteThreadArgs = {
+  threadId: v.id("threads"),
+  cursor: v.optional(v.string()),
+  messagesDone: v.optional(v.boolean()),
+  streamsDone: v.optional(v.boolean()),
+  streamOrder: v.optional(v.number()),
+  deltaCursor: v.optional(v.string()),
+  limit: v.optional(v.number()),
+};
+type DeleteThreadArgs = ObjectType<typeof deleteThreadArgs>;
+const deleteThreadReturns = {
+  cursor: v.string(),
+  isDone: v.boolean(),
+};
+type DeleteThreadReturns = ObjectType<typeof deleteThreadReturns>;
+
 export const _deletePageForThreadId = internalMutation({
   args: deleteThreadArgs,
   handler: deletePageForThreadIdHandler,
@@ -151,22 +156,39 @@ export const _deletePageForThreadId = internalMutation({
 export const deleteAllForThreadIdAsync = mutation({
   args: deleteThreadArgs,
   handler: async (ctx, args) => {
-    const result = await deletePageForThreadIdHandler(ctx, args);
-    if (!result.isDone) {
-      await ctx.scheduler.runAfter(0, api.threads.deleteAllForThreadIdAsync, {
+    let messagesResult = {
+      isDone: args.messagesDone ?? false,
+      cursor: args.cursor,
+    };
+    if (!args.messagesDone) {
+      messagesResult = await deletePageForThreadIdHandler(ctx, args);
+    }
+    let streamResult = {
+      isDone: args.streamsDone ?? false,
+      streamOrder: args.streamOrder,
+      deltaCursor: args.deltaCursor,
+    };
+    if (!args.streamsDone) {
+      streamResult = await deleteStreamsPageForThreadId(ctx, {
         threadId: args.threadId,
-        cursor: result.cursor,
+        streamOrder: args.streamOrder,
+        deltaCursor: args.deltaCursor,
       });
     }
-    // Kick off the streams deletion
-    await ctx.scheduler.runAfter(
-      0,
-      api.streams.deleteAllStreamsForThreadIdSync,
-      { threadId: args.threadId }
-    );
-    return result;
+    const isDone = messagesResult.isDone && streamResult.isDone;
+    if (!isDone) {
+      await ctx.scheduler.runAfter(0, api.threads.deleteAllForThreadIdAsync, {
+        threadId: args.threadId,
+        cursor: messagesResult.cursor,
+        messagesDone: messagesResult.isDone,
+        streamsDone: streamResult.isDone,
+        streamOrder: streamResult.streamOrder,
+        deltaCursor: streamResult.deltaCursor,
+      });
+    }
+    return { isDone };
   },
-  returns: deleteThreadReturns,
+  returns: v.object({ isDone: v.boolean() }),
 });
 
 async function deletePageForThreadIdHandler(
