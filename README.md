@@ -283,8 +283,8 @@ These options can be provided to the Agent constructor, or per-message.
 const result = await thread.generateText({ prompt }, {
   // Values shown are the defaults.
   contextOptions: {
-    // Whether to include tool messages in the context.
-    includeToolCalls: false,
+    // Whether to exclude tool messages in the context.
+    excludeToolMessages: true,
     // How many recent messages to include. These are added after the search
     // messages, and do not count against the search limit.
     recentMessages: 100,
@@ -415,7 +415,7 @@ export const myAsyncAction = internalAction({
 This is what the agent does automatically, but it can be useful to do manually, e.g. to find custom context to include.
 
 Fetch Messages for a user and/or thread.
-Accepts ContextOptions, e.g. includeToolCalls, searchOptions, etc.
+Accepts ContextOptions, e.g. excludeToolMessages, searchOptions, etc.
 If you provide a `beforeMessageId`, it will only fetch messages from before that message.
 
 ```ts

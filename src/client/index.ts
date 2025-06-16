@@ -1051,8 +1051,7 @@ export class Agent<AgentTools extends ToolSet> {
         this.component.messages.listMessagesByThreadId,
         {
           threadId: args.threadId,
-          excludeToolMessages:
-            opts.includeToolCalls === true ? false : opts.excludeToolMessages,
+          excludeToolMessages: opts.excludeToolMessages,
           paginationOpts: {
             numItems: opts.recentMessages ?? DEFAULT_RECENT_MESSAGES,
             cursor: null,

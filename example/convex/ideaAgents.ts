@@ -115,7 +115,7 @@ const ideaManagerAgent = new Agent(components.agent, {
   contextOptions: {
     recentMessages: 20,
     searchOtherThreads: true,
-    includeToolCalls: true,
+    excludeToolMessages: false,
   },
   maxSteps: 10,
 });

@@ -48,8 +48,6 @@ import type { StreamingOptions } from "./streaming.js";
  * automatically with thread.generateText, or directly via search.
  */
 export type ContextOptions = {
-  /** @deprecated Use excludeToolMessages instead. */
-  includeToolCalls?: boolean;
   /**
    * Whether to include tool messages in the context.
    * By default, tool calls and results are not included.
