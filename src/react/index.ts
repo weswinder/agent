@@ -7,7 +7,7 @@ import {
 } from "convex/react";
 import { usePaginatedQuery } from "convex-helpers/react";
 import type { FunctionArgs } from "convex/server";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import type { MessageDoc } from "../client/index.js";
 import type { SyncStreamsReturnValue } from "../client/types.js";
 import type { StreamArgs } from "../validators.js";
@@ -103,7 +103,11 @@ export function useThreadMessages<
       ThreadMessagesArgs<Query>,
       ThreadMessagesResult<Query>
     >,
-    !options.stream ? "skip" : args
+    !options.stream ||
+      args === "skip" ||
+      paginated.status === "LoadingFirstPage"
+      ? "skip"
+      : { ...args, startOrder: paginated.results.at(0)?.order }
   );
 
   const merged = useMemo(() => {
@@ -150,7 +154,7 @@ export function useStreamingThreadMessages<
   Query extends ThreadStreamQuery<any, any>,
 >(
   query: Query,
-  args: ThreadMessagesArgs<Query> | "skip"
+  args: (ThreadMessagesArgs<Query> & { startOrder?: number }) | "skip"
 ): Array<ThreadMessagesResult<Query>> | undefined {
   // Invariant: streamMessages[streamId] is comprised of all deltas up to the
   // cursor. There can be multiple messages in the same stream, e.g. for tool
@@ -158,6 +162,10 @@ export function useStreamingThreadMessages<
   const [streams, setStreams] = useState<
     Array<{ streamId: string; cursor: number; messages: MessageDoc[] }>
   >([]);
+  const startOrderRef = useRef<number>(0);
+  if (args !== "skip" && !startOrderRef.current && args.startOrder) {
+    startOrderRef.current = args.startOrder;
+  }
   // Get all the active streams
   const streamList = useQuery(
     query,
@@ -166,7 +174,10 @@ export function useStreamingThreadMessages<
       : ({
           ...args,
           paginationOpts: { cursor: null, numItems: 0 },
-          streamArgs: { kind: "list" } as StreamArgs,
+          streamArgs: {
+            kind: "list",
+            startOrder: startOrderRef.current,
+          } as StreamArgs,
         } as FunctionArgs<Query>)
   ) as
     | { streams: Extract<SyncStreamsReturnValue, { kind: "list" }> }

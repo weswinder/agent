@@ -460,6 +460,7 @@ export const vStreamArgs = v.optional(
   v.union(
     v.object({
       kind: v.literal("list"),
+      startOrder: v.optional(v.number()),
     }),
     v.object({
       kind: v.literal("deltas"),

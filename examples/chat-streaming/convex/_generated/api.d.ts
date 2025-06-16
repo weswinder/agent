@@ -1570,6 +1570,12 @@ export declare const components: {
       >;
     };
     streams: {
+      abort: FunctionReference<
+        "mutation",
+        "internal",
+        { reason: string; streamId: string },
+        null
+      >;
       addDelta: FunctionReference<
         "mutation",
         "internal",
@@ -1623,7 +1629,7 @@ export declare const components: {
           start: number;
           streamId: string;
         },
-        null
+        boolean
       >;
       create: FunctionReference<
         "mutation",
@@ -1725,7 +1731,7 @@ export declare const components: {
       list: FunctionReference<
         "query",
         "internal",
-        { threadId: string },
+        { startOrder?: number; threadId: string },
         Array<{
           agentName?: string;
           model?: string;
