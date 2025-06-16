@@ -60,11 +60,6 @@ export const { getRateLimit, getServerTime } = rateLimiter.hookAPI<DataModel>(
   { key: (ctx) => getUserId(ctx) },
 );
 
-function estimateTokens(question: string) {
-  // Assume roughly 4 characters per token
-  return question.length / 4;
-}
-
 // Step 1: Submit a question. It checks to see if you are exceeding rate limits.
 export const submitQuestion = mutation({
   args: {
@@ -86,7 +81,7 @@ export const submitQuestion = mutation({
     await rateLimiter.check(ctx, "tokenUsage", {
       key: userId,
       // TODO: estimate tokens based on all messages, not just the new one.
-      count: estimateTokens(args.question),
+      count: await estimateTokens(ctx, args.threadId, args.question),
       throws: true,
     });
 
@@ -104,6 +99,40 @@ export const submitQuestion = mutation({
     return { threadId };
   },
 });
+
+// This is a rough estimate of the tokens that will be used.
+// It's not perfect, but it's a good enough estimate for a pre-generation check.
+async function estimateTokens(
+  ctx: MutationCtx,
+  threadId: string | undefined,
+  question: string,
+) {
+  // Assume roughly 4 characters per token.
+  const promptTokens = question.length / 4;
+  if (!threadId) {
+    // This is a new thread, so we guess solely based on the question.
+    return promptTokens;
+  }
+  const latestMessages = await agent.fetchContextMessages(ctx, {
+    threadId,
+    userId: await getUserId(ctx),
+    messages: [{ role: "user" as const, content: question }],
+    contextOptions: { recentMessages: 2 },
+  });
+  // Our new usage will roughly be the previous tokens + the question.
+  // The previous tokens include the tokens for the full message history and
+  // output tokens, which will be part of our new history.
+  // Note:
+  // - It over-counts if the history is longer than the context message
+  //   limit, since some messages for the previous prompt won't be included.
+  // - It doesn't account for the output tokens.
+  const lastUsageMessage = latestMessages
+    .reverse()
+    .find((message) => message.usage);
+  const lastPromptTokens = lastUsageMessage?.usage?.totalTokens ?? 0;
+  return lastPromptTokens + promptTokens;
+}
+
 
 // Step 2: Generate a response to the question. This is a convenience way of
 // making an action that does one generateText LLM call.
