@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.9 alpha
+
+- Fix: deleting threads asynchronously will clean up deltas.
+
 ## 0.1.8
 
 - Support images in localhost by loading them locally and passing them
