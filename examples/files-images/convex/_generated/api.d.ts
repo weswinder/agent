@@ -1625,7 +1625,7 @@ export declare const components: {
           start: number;
           streamId: string;
         },
-        null
+        boolean
       >;
       create: FunctionReference<
         "mutation",
@@ -1641,6 +1641,30 @@ export declare const components: {
           userId?: string;
         },
         string
+      >;
+      deleteAllStreamsForThreadIdAsync: FunctionReference<
+        "mutation",
+        "internal",
+        { deltaCursor?: string; streamOrder?: number; threadId: string },
+        { deltaCursor?: string; isDone: boolean; streamOrder?: number }
+      >;
+      deleteAllStreamsForThreadIdSync: FunctionReference<
+        "action",
+        "internal",
+        { threadId: string },
+        null
+      >;
+      deleteStreamAsync: FunctionReference<
+        "mutation",
+        "internal",
+        { cursor?: string; streamId: string },
+        null
+      >;
+      deleteStreamSync: FunctionReference<
+        "mutation",
+        "internal",
+        { streamId: string },
+        null
       >;
       finish: FunctionReference<
         "mutation",
@@ -1797,13 +1821,21 @@ export declare const components: {
       deleteAllForThreadIdAsync: FunctionReference<
         "mutation",
         "internal",
-        { cursor?: string; limit?: number; threadId: string },
-        { cursor: string; isDone: boolean }
+        {
+          cursor?: string;
+          deltaCursor?: string;
+          limit?: number;
+          messagesDone?: boolean;
+          streamOrder?: number;
+          streamsDone?: boolean;
+          threadId: string;
+        },
+        { isDone: boolean }
       >;
       deleteAllForThreadIdSync: FunctionReference<
         "action",
         "internal",
-        { cursor?: string; limit?: number; threadId: string },
+        { limit?: number; threadId: string },
         null
       >;
       getThread: FunctionReference<

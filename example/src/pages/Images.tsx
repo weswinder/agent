@@ -28,7 +28,7 @@ export function Images() {
           void image.arrayBuffer().then((data) => {
             void askAboutImage({
               prompt,
-              data,
+              image: data,
               mimeType: image.type,
             }).then((result) => {
               setResult(result);
