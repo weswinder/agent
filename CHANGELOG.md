@@ -2,6 +2,7 @@
 
 ## 0.1.9 alpha
 
+- Delete stream deltas automatically 5 min after the stream finishes.
 - Fix: deleting threads asynchronously will clean up deltas.
 
 ## 0.1.8
