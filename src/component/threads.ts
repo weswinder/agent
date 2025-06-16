@@ -157,14 +157,13 @@ export const deleteAllForThreadIdAsync = mutation({
         threadId: args.threadId,
         cursor: result.cursor,
       });
-    } else {
-      // Kick off the streams deletion
-      await ctx.scheduler.runAfter(
-        0,
-        api.streams.deleteAllStreamsForThreadIdSync,
-        { threadId: args.threadId }
-      );
     }
+    // Kick off the streams deletion
+    await ctx.scheduler.runAfter(
+      0,
+      api.streams.deleteAllStreamsForThreadIdSync,
+      { threadId: args.threadId }
+    );
     return result;
   },
   returns: deleteThreadReturns,

@@ -295,9 +295,9 @@ describe("threads", () => {
 
     await t.mutation(api.messages.addMessages, {
       threadId: thread._id as Id<"threads">,
-      messages: [
-        { message: { role: "user" as const, content: "Test message" } },
-      ],
+      messages: Array.from({ length: 100 }, (_, i) => ({
+        message: { role: "user" as const, content: `Message ${i}` },
+      })),
     });
 
     // Start async deletion
@@ -319,6 +319,12 @@ describe("threads", () => {
       threadId: thread._id as Id<"threads">,
     });
     expect(afterThread).toBeNull();
+
+    // Verify streams are deleted
+    const afterStreams = await t.query(api.streams.list, {
+      threadId: thread._id as Id<"threads">,
+    });
+    expect(afterStreams).toHaveLength(0);
 
     // Reset to normal timers
     vi.useRealTimers();
