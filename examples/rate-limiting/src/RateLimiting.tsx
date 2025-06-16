@@ -23,8 +23,6 @@ function getThreadIdFromHash() {
 export default function Example() {
   const [question, setQuestion] = useState("What's 1+1?");
   const { status } = useRateLimit(api.rateLimiting.getRateLimit, {
-    // TODO: add a callback on the server to get the user id
-    key: "rate limiting user",
     getServerTimeMutation: api.rateLimiting.getServerTime,
   });
   const [threadId, setThreadId] = useState<string | undefined>(

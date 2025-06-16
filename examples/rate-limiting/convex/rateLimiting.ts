@@ -12,6 +12,7 @@ import {
 } from "./_generated/server";
 import { v } from "convex/values";
 import { MINUTE, RateLimiter, SECOND } from "@convex-dev/rate-limiter";
+import { DataModel } from "./_generated/dataModel";
 
 // Define an agent similarly to the AI SDK
 export const agent = new Agent(components.agent, {
@@ -54,8 +55,10 @@ const rateLimiter = new RateLimiter(components.rateLimiter, {
 
 // This allows us to have a reactive query on the client for when we can send
 // the next message.
-export const { getRateLimit, getServerTime } =
-  rateLimiter.hookAPI("sendMessage");
+export const { getRateLimit, getServerTime } = rateLimiter.hookAPI<DataModel>(
+  "sendMessage",
+  { key: (ctx) => getUserId(ctx) },
+);
 
 function estimateTokens(question: string) {
   // Assume roughly 4 characters per token
