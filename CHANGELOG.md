@@ -2,7 +2,7 @@
 
 ## 0.1.9 alpha
 
-- You can finish a stream asynchronously and have it abort the streaming
+- You can abort a stream asynchronously and have it abort the streaming
   and stop writing deltas smoothly.
 - Delete stream deltas automatically 5 min after the stream finishes.
 - Fix: deleting threads asynchronously will clean up deltas.
