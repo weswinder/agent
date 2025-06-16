@@ -21,6 +21,7 @@ import { mergedStream } from "convex-helpers/server/stream";
 const MAX_DELTAS_PER_REQUEST = 1000;
 const MAX_DELTAS_PER_STREAM = 100;
 const TIMEOUT_INTERVAL = 1000 * 60; // 1 minute
+const DELETE_STREAM_DELAY = 1000 * 60 * 5; // 5 minutes
 
 const deltaValidator = schema.tables.streamDeltas.validator;
 
@@ -148,6 +149,11 @@ export const finish = mutation({
     await ctx.db.patch(args.streamId, {
       state: { kind: "finished", endedAt: Date.now() },
     });
+    await ctx.scheduler.runAfter(
+      DELETE_STREAM_DELAY,
+      api.streams.deleteStreamAsync,
+      { streamId: args.streamId }
+    );
   },
 });
 
@@ -328,6 +334,20 @@ export const deleteStreamSync = mutation({
       });
     }
     await ctx.db.delete(args.streamId);
+  },
+});
+
+export const deleteStreamAsync = mutation({
+  args: { streamId: v.id("streamingMessages"), cursor: v.optional(v.string()) },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const result = await deletePageForStreamId(ctx, args);
+    if (!result.isDone) {
+      await ctx.scheduler.runAfter(0, api.streams.deleteStreamAsync, {
+        streamId: args.streamId,
+        cursor: result.continueCursor,
+      });
+    }
   },
 });
 

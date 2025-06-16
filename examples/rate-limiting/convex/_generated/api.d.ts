@@ -1652,6 +1652,12 @@ export declare const components: {
         { threadId: string },
         null
       >;
+      deleteStreamAsync: FunctionReference<
+        "mutation",
+        "internal",
+        { cursor?: string; streamId: string },
+        null
+      >;
       deleteStreamSync: FunctionReference<
         "mutation",
         "internal",

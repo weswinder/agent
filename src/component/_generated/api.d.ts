@@ -1496,6 +1496,12 @@ export type Mounts = {
       { threadId: string },
       null
     >;
+    deleteStreamAsync: FunctionReference<
+      "mutation",
+      "public",
+      { cursor?: string; streamId: string },
+      null
+    >;
     deleteStreamSync: FunctionReference<
       "mutation",
       "public",
