@@ -1,4 +1,5 @@
 /**
+ * NOTE: THIS IS A WORK IN PROGRESS, AND NOT YET FULLY FUNCTIONAL.
  * This example is a bit of a work in progress, but shows how to chain together calls to agents.
  */
 import { action, ActionCtx, query } from "./_generated/server";
