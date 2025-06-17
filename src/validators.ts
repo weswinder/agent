@@ -472,6 +472,11 @@ export type StreamArgs = Infer<typeof vStreamArgs>;
 
 export const vStreamMessage = v.object({
   streamId: v.string(),
+  status: v.union(
+    v.literal("streaming"),
+    v.literal("finished"),
+    v.literal("aborted")
+  ),
   order: v.number(),
   stepOrder: v.number(),
   // metadata

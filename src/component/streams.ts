@@ -103,33 +103,47 @@ export const list = query({
   args: {
     threadId: v.id("threads"),
     startOrder: v.optional(v.number()),
+    statuses: v.optional(
+      v.array(
+        v.union(
+          v.literal("streaming"),
+          v.literal("finished"),
+          v.literal("aborted")
+        )
+      )
+    ),
   },
   returns: v.array(vStreamMessage),
   handler: async (ctx, args) => {
-    return ctx.db
-      .query("streamingMessages")
-      .withIndex("threadId_state_order_stepOrder", (q) =>
-        q
-          .eq("threadId", args.threadId)
-          .eq("state.kind", "streaming")
-          .gte("order", args.startOrder ?? 0)
-      )
-      .order("desc")
-      .take(100)
-      .then((msgs) =>
-        msgs.map((m) => ({
-          streamId: m._id,
-          ...pick(m, [
-            "order",
-            "stepOrder",
-            "userId",
-            "agentName",
-            "model",
-            "provider",
-            "providerOptions",
-          ]),
-        }))
-      );
+    const statuses = args.statuses ?? ["streaming"];
+    const messages = await mergedStream(
+      statuses.map((status) =>
+        stream(ctx.db, schema)
+          .query("streamingMessages")
+          .withIndex("threadId_state_order_stepOrder", (q) =>
+            q
+              .eq("threadId", args.threadId)
+              .eq("state.kind", status)
+              .gte("order", args.startOrder ?? 0)
+          )
+          .order("desc")
+      ),
+      ["order", "stepOrder"]
+    ).take(100);
+
+    return messages.map((m) => ({
+      streamId: m._id,
+      status: m.state.kind,
+      ...pick(m, [
+        "order",
+        "stepOrder",
+        "userId",
+        "agentName",
+        "model",
+        "provider",
+        "providerOptions",
+      ]),
+    }));
   },
 });
 
