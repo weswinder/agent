@@ -3,7 +3,8 @@
 ## 0.1.9 alpha
 
 - You can abort a stream asynchronously and have it abort the streaming
-  and stop writing deltas smoothly.
+  and stop writing deltas smoothly. You can request that `syncStreams` also
+  return aborted messages, if you want to show those in your UI.
 - Delete stream deltas automatically 5 min after the stream finishes.
 - Fix: deleting threads asynchronously will clean up deltas.
 
