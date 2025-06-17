@@ -1,4 +1,4 @@
-import { useMutation } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import { Toaster } from "./components/ui/toaster";
 import { api } from "../convex/_generated/api";
 import {
@@ -13,11 +13,28 @@ import { isRateLimitError } from "@convex-dev/rate-limiter";
 import { useRateLimit } from "@convex-dev/rate-limiter/react";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
+import { Monitor } from "./Monitor";
 
 dayjs.extend(relativeTime);
 
 function getThreadIdFromHash() {
   return window.location.hash.replace(/^#/, "") || undefined;
+}
+
+function getRelativeTime(timestamp: number | null) {
+  if (!timestamp) return null;
+
+  const now = Date.now();
+  const diffSeconds = Math.ceil((timestamp - now) / 1000);
+
+  // For short durations, show exact seconds
+  if (diffSeconds <= 60) {
+    if (diffSeconds <= 1) return "in the flashest of flashes";
+    return `in ${diffSeconds} second${diffSeconds > 1 ? "s" : ""}`;
+  }
+
+  // For longer durations, use dayjs relative time
+  return dayjs(timestamp).fromNow();
 }
 
 export default function Example() {
@@ -27,6 +44,10 @@ export default function Example() {
   });
   const [threadId, setThreadId] = useState<string | undefined>(
     typeof window !== "undefined" ? getThreadIdFromHash() : undefined,
+  );
+  const previousUsage = useQuery(
+    api.rateLimiting.getPreviousUsage,
+    threadId ? { threadId } : "skip",
   );
   const submitQuestion = useMutation(
     api.rateLimiting.submitQuestion,
@@ -70,7 +91,7 @@ export default function Example() {
             toast({
               title: "Rate limit exceeded",
               description: `Rate limit exceeded for ${e.data.name}.
-              Try again after ${dayjs(Date.now() + e.data.retryAfter).fromNow()}`,
+              Try again after ${getRelativeTime(Date.now() + e.data.retryAfter)}`,
             });
             setQuestion((q) => q || question);
           } else {
@@ -92,78 +113,123 @@ export default function Example() {
           Rate Limiting Example
         </h1>
       </header>
-      <div className="min-h-screen flex flex-col bg-gray-50">
-        <main className="flex-1 flex items-center justify-center p-8">
-          <div className="w-full max-w-xl mx-auto flex flex-col items-center gap-6 bg-white rounded-2xl shadow-lg p-8 border border-gray-200">
-            <div className="text-center">
-              <h2 className="text-2xl font-bold text-gray-800 mb-2">
-                Rate Limited Chat
-              </h2>
-              <p className="text-gray-600 text-sm">
-                This demo shows rate limiting in action. You can send 1 message
-                per 5 seconds and use up to 1000 tokens per minute.
+      <div className="min-h-screen flex bg-gray-50">
+        {/* Left side - Monitors (1/3 width) */}
+        <div className="w-1/3 p-4 space-y-4 border-r border-gray-200">
+          {/* Send Message Monitor */}
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+            <div className="p-3 border-b border-gray-100">
+              <h3 className="text-sm font-medium text-gray-700">
+                Send Message Rate Limit
+              </h3>
+              <p className="text-xs text-gray-500">1 message per 5 seconds</p>
+            </div>
+            <div className="h-64">
+              <Monitor
+                key="sendMessage"
+                getRateLimitValueQuery={api.rateLimiting.getRateLimit}
+                getServerTimeMutation={api.rateLimiting.getServerTime}
+                name="sendMessage"
+              />
+            </div>
+          </div>
+
+          {/* Token Usage Monitor */}
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+            <div className="p-3 border-b border-gray-100">
+              <h3 className="text-sm font-medium text-gray-700">
+                Token Usage Rate Limit
+              </h3>
+              <p className="text-xs text-gray-500">1000 tokens per minute</p>
+              <p className="text-xs text-gray-400">
+                Current: {(previousUsage ?? 0) + question.length} tokens
               </p>
             </div>
-            {/* Chat Messages */}
-            {messages.results?.length > 0 && (
+            <div className="h-64">
+              <Monitor
+                getRateLimitValueQuery={api.rateLimiting.getRateLimit}
+                getServerTimeMutation={api.rateLimiting.getServerTime}
+                count={previousUsage ?? 0 + question.length}
+                name="tokenUsage"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Right side - Chat interface (2/3 width) */}
+        <div className="w-2/3 flex flex-col">
+          <main className="flex-1 flex items-center justify-center p-8">
+            <div className="w-full max-w-xl mx-auto flex flex-col items-center gap-6 bg-white rounded-2xl shadow-lg p-8 border border-gray-200">
+              <div className="text-center">
+                <h2 className="text-2xl font-bold text-gray-800 mb-2">
+                  Rate Limited Chat
+                </h2>
+                <p className="text-gray-600 text-sm">
+                  This demo shows rate limiting in action. You can send 1
+                  message per 5 seconds and use up to 1000 tokens per minute.
+                </p>
+              </div>
+              {/* Chat Messages */}
+              {messages.results?.length > 0 && (
+                <>
+                  <div className="w-full flex flex-col gap-4 overflow-y-auto mb-6 px-2">
+                    {toUIMessages(messages.results ?? []).map((m) => (
+                      <Message key={m.key} message={m} />
+                    ))}
+                  </div>
+                </>
+              )}
               <>
-                <div className="w-full flex flex-col gap-4 overflow-y-auto mb-6 px-2">
-                  {toUIMessages(messages.results ?? []).map((m) => (
-                    <Message key={m.key} message={m} />
-                  ))}
+                <form
+                  className="w-full flex flex-col gap-4 items-center"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    void handleSubmitQuestion(question);
+                  }}
+                >
+                  <input
+                    type="text"
+                    value={question}
+                    onChange={(e) => setQuestion(e.target.value)}
+                    className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-400 bg-gray-50 text-lg"
+                    placeholder="Ask me anything..."
+                  />
+                  {status && !status.ok && (
+                    <div className="text-xs text-gray-500 text-center">
+                      <p>Rate limit exceeded.</p>
+                      <p>Try again after {dayjs(status.retryAt).fromNow()}</p>
+                    </div>
+                  )}
+                  <button
+                    type="submit"
+                    className="w-full px-4 py-3 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition font-semibold text-lg disabled:opacity-50"
+                    disabled={!question.trim() || !status?.ok}
+                  >
+                    Send
+                  </button>
+                </form>
+                {messages.results?.length > 0 && (
+                  <button
+                    className="w-full px-4 py-2 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 transition font-medium mt-2"
+                    onClick={() => {
+                      setThreadId(undefined);
+                      setQuestion("What is the meaning of life?");
+                      window.location.hash = "";
+                    }}
+                    type="button"
+                  >
+                    Start over
+                  </button>
+                )}
+                <div className="text-xs text-gray-500 text-center">
+                  <p>Rate limits:</p>
+                  <p>• 1 message per 5 seconds</p>
+                  <p>• 1000 tokens per minute</p>
                 </div>
               </>
-            )}
-            <>
-              <form
-                className="w-full flex flex-col gap-4 items-center"
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  void handleSubmitQuestion(question);
-                }}
-              >
-                <input
-                  type="text"
-                  value={question}
-                  onChange={(e) => setQuestion(e.target.value)}
-                  className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-400 bg-gray-50 text-lg"
-                  placeholder="Ask me anything..."
-                />
-                {status && !status.ok && (
-                  <div className="text-xs text-gray-500 text-center">
-                    <p>Rate limit exceeded.</p>
-                    <p>Try again after {dayjs(status.retryAt).fromNow()}</p>
-                  </div>
-                )}
-                <button
-                  type="submit"
-                  className="w-full px-4 py-3 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition font-semibold text-lg disabled:opacity-50"
-                  disabled={!question.trim() || !status?.ok}
-                >
-                  Send
-                </button>
-              </form>
-              {messages.results?.length > 0 && (
-                <button
-                  className="w-full px-4 py-2 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 transition font-medium mt-2"
-                  onClick={() => {
-                    setThreadId(undefined);
-                    setQuestion("What is the meaning of life?");
-                    window.location.hash = "";
-                  }}
-                  type="button"
-                >
-                  Start over
-                </button>
-              )}
-              <div className="text-xs text-gray-500 text-center">
-                <p>Rate limits:</p>
-                <p>• 1 message per 5 seconds</p>
-                <p>• 1000 tokens per minute</p>
-              </div>
-            </>
-          </div>
-        </main>
+            </div>
+          </main>
+        </div>
         <Toaster />
       </div>
     </>

@@ -15,7 +15,7 @@
   "dependencies": {
     "@convex-dev/agent": "file:../..",
     "@convex-dev/agent-playground": "file:../../playground",
-    "@convex-dev/rate-limiter": "^0.2.8",
+    "@convex-dev/rate-limiter": "^0.2.9",
     "@convex-dev/workflow": "^0.2.1",
     "@hookform/resolvers": "^5.0.1",
     "@radix-ui/react-accordion": "^1.2.4",
