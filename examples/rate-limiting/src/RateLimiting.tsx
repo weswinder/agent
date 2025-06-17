@@ -2,12 +2,11 @@ import { useMutation, useQuery } from "convex/react";
 import { Toaster } from "./components/ui/toaster";
 import { api } from "../convex/_generated/api";
 import {
-  optimisticallySendMessage,
   toUIMessages,
   useThreadMessages,
   type UIMessage,
 } from "@convex-dev/agent/react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useRef, useReducer } from "react";
 import { toast } from "./hooks/use-toast";
 import { isRateLimitError } from "@convex-dev/rate-limiter";
 import { useRateLimit } from "@convex-dev/rate-limiter/react";
@@ -21,24 +20,10 @@ function getThreadIdFromHash() {
   return window.location.hash.replace(/^#/, "") || undefined;
 }
 
-function getRelativeTime(timestamp: number | null) {
-  if (!timestamp) return null;
-
-  const now = Date.now();
-  const diffSeconds = Math.ceil((timestamp - now) / 1000);
-
-  // For short durations, show exact seconds
-  if (diffSeconds <= 60) {
-    if (diffSeconds <= 1) return "in the flashest of flashes";
-    return `in ${diffSeconds} second${diffSeconds > 1 ? "s" : ""}`;
-  }
-
-  // For longer durations, use dayjs relative time
-  return dayjs(timestamp).fromNow();
-}
-
 export default function Example() {
   const [question, setQuestion] = useState("What's 1+1?");
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
   const { status } = useRateLimit(api.rateLimiting.getRateLimit, {
     getServerTimeMutation: api.rateLimiting.getServerTime,
   });
@@ -49,15 +34,16 @@ export default function Example() {
     api.rateLimiting.getPreviousUsage,
     threadId ? { threadId } : "skip",
   );
-  const submitQuestion = useMutation(
-    api.rateLimiting.submitQuestion,
-  ).withOptimisticUpdate((store, args) => {
-    if (!threadId) return;
-    optimisticallySendMessage(api.rateLimiting.listThreadMessages)(store, {
-      prompt: args.question,
-      threadId,
-    });
-  });
+  const estimatedUsage = previousUsage ?? 0 + question.length;
+  const { status: tokenUsageStatus } = useRateLimit(
+    api.rateLimiting.getRateLimit,
+    {
+      getServerTimeMutation: api.rateLimiting.getServerTime,
+      name: "tokenUsage",
+      count: estimatedUsage,
+    },
+  );
+  const submitQuestion = useMutation(api.rateLimiting.submitQuestion);
   const messages = useThreadMessages(
     api.rateLimiting.listThreadMessages,
     threadId ? { threadId } : "skip",
@@ -72,6 +58,13 @@ export default function Example() {
     window.addEventListener("hashchange", onHashChange);
     return () => window.removeEventListener("hashchange", onHashChange);
   }, []);
+
+  // Auto-scroll to bottom when messages change
+  useEffect(() => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [messages.results]);
 
   const handleSubmitQuestion = useCallback(
     async (question: string) => {
@@ -113,53 +106,56 @@ export default function Example() {
           Rate Limiting Example
         </h1>
       </header>
-      <div className="min-h-screen flex bg-gray-50">
-        {/* Left side - Monitors (1/3 width) */}
-        <div className="w-1/3 p-4 space-y-4 border-r border-gray-200">
-          {/* Send Message Monitor */}
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-            <div className="p-3 border-b border-gray-100">
-              <h3 className="text-sm font-medium text-gray-700">
-                Send Message Rate Limit
-              </h3>
-              <p className="text-xs text-gray-500">1 message per 5 seconds</p>
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        {/* Centered container */}
+        <div className="flex max-w-6xl w-full h-[calc(100vh-120px)] gap-6">
+          {/* Left side - Monitors (1/3 width, no scroll) */}
+          <div className="w-1/3 space-y-4 flex-shrink-0">
+            {/* Send Message Monitor */}
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+              <div className="p-3 border-b border-gray-100">
+                <h3 className="text-sm font-medium text-gray-700">
+                  Send Message Rate Limit
+                </h3>
+                <p className="text-xs text-gray-500">
+                  1 message per 5 seconds (capped at 2 at once)
+                </p>
+              </div>
+              <div className="">
+                <Monitor
+                  key="sendMessage"
+                  getRateLimitValueQuery={api.rateLimiting.getRateLimit}
+                  getServerTimeMutation={api.rateLimiting.getServerTime}
+                  name="sendMessage"
+                />
+              </div>
             </div>
-            <div className="h-64">
-              <Monitor
-                key="sendMessage"
-                getRateLimitValueQuery={api.rateLimiting.getRateLimit}
-                getServerTimeMutation={api.rateLimiting.getServerTime}
-                name="sendMessage"
-              />
+
+            {/* Token Usage Monitor */}
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+              <div className="p-3 border-b border-gray-100">
+                <h3 className="text-sm font-medium text-gray-700">
+                  Token Usage Rate Limit
+                </h3>
+                <p className="text-xs text-gray-500">
+                  2k tokens per minute (capped at 10k at once)
+                </p>
+              </div>
+              <div className="">
+                <Monitor
+                  getRateLimitValueQuery={api.rateLimiting.getRateLimit}
+                  getServerTimeMutation={api.rateLimiting.getServerTime}
+                  count={previousUsage ?? 0 + question.length}
+                  name="tokenUsage"
+                />
+              </div>
             </div>
           </div>
 
-          {/* Token Usage Monitor */}
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-            <div className="p-3 border-b border-gray-100">
-              <h3 className="text-sm font-medium text-gray-700">
-                Token Usage Rate Limit
-              </h3>
-              <p className="text-xs text-gray-500">1000 tokens per minute</p>
-              <p className="text-xs text-gray-400">
-                Current: {(previousUsage ?? 0) + question.length} tokens
-              </p>
-            </div>
-            <div className="h-64">
-              <Monitor
-                getRateLimitValueQuery={api.rateLimiting.getRateLimit}
-                getServerTimeMutation={api.rateLimiting.getServerTime}
-                count={previousUsage ?? 0 + question.length}
-                name="tokenUsage"
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Right side - Chat interface (2/3 width) */}
-        <div className="w-2/3 flex flex-col">
-          <main className="flex-1 flex items-center justify-center p-8">
-            <div className="w-full max-w-xl mx-auto flex flex-col items-center gap-6 bg-white rounded-2xl shadow-lg p-8 border border-gray-200">
+          {/* Right side - Chat interface (2/3 width with scrolling) */}
+          <div className="w-2/3 flex flex-col bg-white rounded-2xl shadow-lg border border-gray-200 overflow-hidden">
+            {/* Chat header */}
+            <div className="p-6 border-b border-gray-200 flex-shrink-0">
               <div className="text-center">
                 <h2 className="text-2xl font-bold text-gray-800 mb-2">
                   Rate Limited Chat
@@ -169,69 +165,100 @@ export default function Example() {
                   message per 5 seconds and use up to 1000 tokens per minute.
                 </p>
               </div>
-              {/* Chat Messages */}
-              {messages.results?.length > 0 && (
-                <>
-                  <div className="w-full flex flex-col gap-4 overflow-y-auto mb-6 px-2">
-                    {toUIMessages(messages.results ?? []).map((m) => (
-                      <Message key={m.key} message={m} />
-                    ))}
-                  </div>
-                </>
+            </div>
+
+            {/* Chat Messages - Scrollable area */}
+            <div className="flex-1 overflow-y-auto p-6">
+              {messages.results?.length > 0 ? (
+                <div className="flex flex-col gap-4 pb-4">
+                  {toUIMessages(messages.results ?? []).map((m) => (
+                    <Message key={m.key} message={m} />
+                  ))}
+                  <div className="h-100" ref={messagesEndRef} />
+                </div>
+              ) : (
+                <div className="flex items-center justify-center h-full text-gray-500">
+                  <p>Start a conversation by asking a question below!</p>
+                </div>
               )}
-              <>
-                <form
-                  className="w-full flex flex-col gap-4 items-center"
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    void handleSubmitQuestion(question);
-                  }}
-                >
-                  <input
-                    type="text"
-                    value={question}
-                    onChange={(e) => setQuestion(e.target.value)}
-                    className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-400 bg-gray-50 text-lg"
-                    placeholder="Ask me anything..."
-                  />
-                  {status && !status.ok && (
-                    <div className="text-xs text-gray-500 text-center">
-                      <p>Rate limit exceeded.</p>
-                      <p>Try again after {dayjs(status.retryAt).fromNow()}</p>
-                    </div>
-                  )}
+            </div>
+
+            {/* Chat Input - Fixed at bottom */}
+            <div className="p-6 border-t border-gray-200 flex-shrink-0">
+              <form
+                className="flex flex-col gap-4"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  void handleSubmitQuestion(question);
+                }}
+              >
+                <input
+                  type="text"
+                  value={question}
+                  onChange={(e) => setQuestion(e.target.value)}
+                  className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-400 bg-gray-50 text-lg"
+                  placeholder="Ask me anything..."
+                />
+                {status && !status.ok && (
+                  <div className="text-xs text-gray-500 text-center">
+                    <p>Message sending rate limit exceeded.</p>
+                    <p>
+                      Try again after <Countdown ts={status.retryAt} />
+                    </p>
+                  </div>
+                )}
+                {tokenUsageStatus && !tokenUsageStatus.ok && (
+                  <div className="text-xs text-gray-500 text-center bg-red-100 p-2 rounded-lg">
+                    <p>Token usage limit exceeded.</p>
+                    <p>
+                      Try again after{" "}
+                      <Countdown ts={tokenUsageStatus.retryAt} />
+                    </p>
+                  </div>
+                )}
+                <p className="text-xs text-gray-400">
+                  Previous usage: {previousUsage ?? 0} tokens Estimated usage:{" "}
+                  {estimatedUsage} tokens
+                </p>
+                <div className="flex gap-3">
                   <button
                     type="submit"
-                    className="w-full px-4 py-3 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition font-semibold text-lg disabled:opacity-50"
-                    disabled={!question.trim() || !status?.ok}
+                    className="flex-1 px-4 py-3 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition font-semibold text-lg disabled:opacity-50"
+                    disabled={
+                      !question.trim() ||
+                      !status?.ok ||
+                      (tokenUsageStatus && !tokenUsageStatus.ok)
+                    }
                   >
                     Send
                   </button>
-                </form>
-                {messages.results?.length > 0 && (
                   <button
-                    className="w-full px-4 py-2 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 transition font-medium mt-2"
-                    onClick={() => {
-                      setThreadId(undefined);
-                      setQuestion("What is the meaning of life?");
-                      window.location.hash = "";
-                    }}
-                    type="button"
+                    type="submit"
+                    className="flex-1 px-4 py-3 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition font-semibold text-lg disabled:opacity-50"
+                    disabled={!question.trim()}
                   >
-                    Start over
+                    Force Send
                   </button>
-                )}
-                <div className="text-xs text-gray-500 text-center">
-                  <p>Rate limits:</p>
-                  <p>• 1 message per 5 seconds</p>
-                  <p>• 1000 tokens per minute</p>
+                  {messages.results?.length > 0 && (
+                    <button
+                      className="px-4 py-3 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 transition font-medium"
+                      onClick={() => {
+                        setThreadId(undefined);
+                        setQuestion("What is the meaning of life?");
+                        window.location.hash = "";
+                      }}
+                      type="button"
+                    >
+                      Start over
+                    </button>
+                  )}
                 </div>
-              </>
+              </form>
             </div>
-          </main>
+          </div>
         </div>
-        <Toaster />
       </div>
+      <Toaster />
     </>
   );
 }
@@ -298,4 +325,31 @@ function Message({ message }: { message: UIMessage }) {
       </div>
     </div>
   );
+}
+
+function getRelativeTime(timestamp: number | null) {
+  if (!timestamp) return null;
+
+  const now = Date.now();
+  const diffSeconds = Math.ceil((timestamp - now) / 1000);
+
+  // For short durations, show exact seconds
+  if (diffSeconds <= 60) {
+    if (diffSeconds <= 1) return "in the flashest of flashes";
+    return `in ${diffSeconds} second${diffSeconds > 1 ? "s" : ""}`;
+  }
+
+  // For longer durations, use dayjs relative time
+  return dayjs(timestamp).fromNow();
+}
+
+function Countdown({ ts }: { ts: number }) {
+  const [, refresh] = useReducer((i) => i + 1, 0);
+  useEffect(() => {
+    const interval = setInterval(() => {
+      refresh();
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [ts]);
+  return <>{getRelativeTime(ts)}</>;
 }

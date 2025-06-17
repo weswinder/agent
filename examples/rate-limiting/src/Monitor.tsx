@@ -6,6 +6,12 @@ import {
   UseRateLimitOptions,
 } from "@convex-dev/rate-limiter/react";
 
+function formatNumber(value: number) {
+  if (value < 1000) return value.toFixed(1);
+  if (value < 100000) return (value / 1000).toFixed(1) + "k";
+  return (value / 1000000).toFixed(1) + "M";
+}
+
 export const Monitor = (
   props: UseRateLimitOptions & {
     getRateLimitValueQuery: GetRateLimitValueQuery;
@@ -33,7 +39,6 @@ export const Monitor = (
     dpr: number;
   } | null>(null);
 
-  // Update timeline data every 250ms with calculated values
   useEffect(() => {
     if (!status) return;
 
@@ -54,7 +59,7 @@ export const Monitor = (
     updateTimeline();
 
     // Set up interval for regular updates
-    const interval = setInterval(updateTimeline, 100);
+    const interval = setInterval(updateTimeline, 250);
 
     return () => {
       clearInterval(interval);
@@ -119,9 +124,15 @@ export const Monitor = (
     ctx.clearRect(0, 0, width, height);
 
     // Set up drawing parameters
-    const padding = 60;
+    const padding = 40;
     const plotWidth = width - 2 * padding;
     const plotHeight = height - 2 * padding;
+
+    // Title for the graph
+    ctx.fillStyle = "#374151";
+    ctx.font = "bold 14px Inter, sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText(props.name ?? "Tokens", width / 2, padding - 10);
 
     // Draw background grid
     ctx.strokeStyle = "#f3f4f6";
@@ -137,12 +148,9 @@ export const Monitor = (
     }
 
     // Horizontal grid lines (values)
-    for (
-      let i = 0;
-      i <= capacity + 2;
-      i += Math.max(1, Math.floor((capacity + 2) / 8))
-    ) {
-      const y = height - padding - (i / (capacity + 2)) * plotHeight;
+    const maxY = Math.ceil(capacity * 1.1);
+    for (let i = 0; i <= maxY; i += Math.max(1, Math.floor(maxY / 8))) {
+      const y = height - padding - (i / maxY) * plotHeight;
       ctx.beginPath();
       ctx.moveTo(padding, y);
       ctx.lineTo(width - padding, y);
@@ -173,8 +181,7 @@ export const Monitor = (
     ctx.setLineDash([8, 4]);
     ctx.strokeStyle = gradient;
     ctx.lineWidth = 2;
-    const capacityY =
-      height - padding - (capacity / (capacity + 2)) * plotHeight;
+    const capacityY = height - padding - (capacity / maxY) * plotHeight;
     ctx.beginPath();
     ctx.moveTo(padding, capacityY);
     ctx.lineTo(width - padding, capacityY);
@@ -201,9 +208,7 @@ export const Monitor = (
       const firstX =
         padding + ((firstPoint.timestamp - tenSecondsAgo) / 10000) * plotWidth;
       const firstY =
-        height -
-        padding -
-        (Math.max(0, firstPoint.value) / (capacity + 2)) * plotHeight;
+        height - padding - (Math.max(0, firstPoint.value) / maxY) * plotHeight;
 
       // Only draw connecting line if first point is within visible area
       if (firstX >= padding) {
@@ -216,9 +221,7 @@ export const Monitor = (
         const x =
           padding + ((point.timestamp - tenSecondsAgo) / 10000) * plotWidth;
         const y =
-          height -
-          padding -
-          (Math.max(0, point.value) / (capacity + 2)) * plotHeight;
+          height - padding - (Math.max(0, point.value) / maxY) * plotHeight;
 
         if (index === 0) {
           // If we didn't draw connecting line, start here
@@ -234,9 +237,7 @@ export const Monitor = (
       if (timelineData.length > 0) {
         const lastPoint = timelineData[timelineData.length - 1];
         const lastY =
-          height -
-          padding -
-          (Math.max(0, lastPoint.value) / (capacity + 2)) * plotHeight;
+          height - padding - (Math.max(0, lastPoint.value) / maxY) * plotHeight;
         ctx.lineTo(width - padding, lastY);
       }
 
@@ -248,16 +249,15 @@ export const Monitor = (
       // Draw current value indicator (always at right edge)
       const lastPoint = timelineData[timelineData.length - 1];
       const y =
-        height -
-        padding -
-        (Math.max(0, lastPoint.value) / (capacity + 2)) * plotHeight;
+        height - padding - (Math.max(0, lastPoint.value) / maxY) * plotHeight;
 
       // Value label with modern styling (positioned to the right of the graph)
-      const labelText = lastPoint.value.toFixed(1);
+      const labelText = formatNumber(lastPoint.value);
+      ctx.font = "bold 12px Inter, sans-serif";
       const labelMetrics = ctx.measureText(labelText);
-      const labelWidth = labelMetrics.width + 16;
+      const labelWidth = labelMetrics.width + 8;
       const labelHeight = 24;
-      const labelX = width - padding + 15; // Position to the right of the graph
+      const labelX = width - padding; // Position to the right of the graph
       const labelY = Math.max(y + labelHeight / 2, padding + labelHeight);
 
       // Label background with shadow
@@ -279,7 +279,6 @@ export const Monitor = (
 
       // Label text
       ctx.fillStyle = "#1f2937";
-      ctx.font = "bold 14px Inter, sans-serif";
       ctx.textAlign = "center";
       ctx.fillText(labelText, labelX + labelWidth / 2, labelY - 6);
     }
@@ -290,36 +289,24 @@ export const Monitor = (
     ctx.textAlign = "right";
 
     // Y-axis labels - position them better to avoid overlap
-    for (
-      let i = 0;
-      i <= capacity + 2;
-      i += Math.max(1, Math.floor((capacity + 2) / 5))
-    ) {
-      const y = height - padding - (i / (capacity + 2)) * plotHeight;
-      ctx.fillText(i.toString(), padding - 10, y + 4);
+    for (let i = 0; i <= maxY; i += Math.max(1, Math.floor(capacity / 5))) {
+      const y = height - padding - (i / maxY) * plotHeight;
+      ctx.fillText(formatNumber(i), padding - 10, y + 4);
     }
 
     // X-axis labels
     ctx.textAlign = "center";
-    ctx.fillText("10s ago", padding, height - 10);
-    ctx.fillText("5s ago", padding + plotWidth / 2, height - 10);
-    ctx.fillText("now", width - padding, height - 10);
+    ctx.fillText("10s ago", padding, height - 20);
+    ctx.fillText("5s ago", padding + plotWidth / 2, height - 20);
+    ctx.fillText("now", width - padding, height - 20);
 
     // Axis titles
     ctx.fillStyle = "#374151";
     ctx.font = "bold 14px Inter, sans-serif";
-    ctx.save();
-    ctx.translate(25, height / 2); // Move the y-axis title further left
-    ctx.rotate(-Math.PI / 2);
-    ctx.textAlign = "center";
-    ctx.fillText("Available Tokens", 0, 0);
-    ctx.restore();
-
-    ctx.fillText("Time", width / 2, height - 25);
 
     // Schedule next frame
     animationRef.current = requestAnimationFrame(drawTimeline);
-  }, [timelineData, capacity]);
+  }, [timelineData, capacity, props.name]);
 
   // Setup canvas when component mounts or container size changes
   useEffect(() => {
@@ -347,72 +334,13 @@ export const Monitor = (
   }, [setupCanvas]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-white">
-      <div className="w-full max-w-7xl mx-auto p-6 space-y-8 animate-fade-in">
-        {/* Header */}
-        <div className="text-center space-y-4 py-8">
-          <h2 className="text-4xl font-bold bg-gradient-to-r from-primary-600 to-primary-700 bg-clip-text text-transparent">
-            Rate Limiter Playground
-          </h2>
-          <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-            Experiment with different rate limiting strategies and watch how
-            they behave in real-time
-          </p>
-        </div>
-
-        {/* Timeline Visualization */}
-        <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden animate-slide-up">
-          <div className="p-6 border-b border-gray-100">
-            <h3 className="text-xl font-semibold text-gray-800 flex items-center">
-              <div className="w-2 h-2 bg-primary-500 rounded-full mr-3"></div>
-              Real-time Timeline
-            </h3>
-            <p className="text-sm text-gray-600 mt-1">
-              Token availability and consumption over the last 10 seconds
-            </p>
-          </div>
-
-          <div className="p-6">
-            <div
-              ref={containerRef}
-              className="relative w-full bg-gradient-to-br from-gray-50 to-white rounded-xl border border-gray-200"
-              style={{ height: "320px" }}
-            >
-              <canvas
-                ref={canvasRef}
-                className="absolute inset-0 w-full h-full"
-              />
-            </div>
-
-            {/* Legend */}
-            <div className="mt-6 flex flex-wrap gap-6 justify-center text-sm">
-              <div className="flex items-center gap-2">
-                <div className="w-4 h-0.5 bg-gradient-to-r from-primary-500 to-primary-700 rounded"></div>
-                <span className="text-gray-700 font-medium">
-                  Available tokens
-                </span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 bg-success-500 rounded-full border border-white"></div>
-                <span className="text-gray-700 font-medium">
-                  Successful consumption
-                </span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 bg-error-500 rounded-full border border-white"></div>
-                <span className="text-gray-700 font-medium">
-                  Failed consumption
-                </span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-4 h-0.5 border-t-2 border-dashed border-yellow-500"></div>
-                <span className="text-gray-700 font-medium">
-                  Capacity limit
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
+    <div className="w-full max-w-7xl mx-auto p-6 space-y-8 animate-fade-in">
+      <div
+        ref={containerRef}
+        className="relative w-full bg-gradient-to-br from-gray-50 to-white rounded-xl border border-gray-200"
+        style={{ height: "250px" }}
+      >
+        <canvas ref={canvasRef} className="absolute inset-0 w-full h-full" />
       </div>
     </div>
   );

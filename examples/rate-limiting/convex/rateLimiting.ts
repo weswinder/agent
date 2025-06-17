@@ -14,6 +14,22 @@ import { v } from "convex/values";
 import { MINUTE, RateLimiter, SECOND } from "@convex-dev/rate-limiter";
 import { DataModel } from "./_generated/dataModel";
 
+const rateLimiter = new RateLimiter(components.rateLimiter, {
+  sendMessage: {
+    kind: "fixed window",
+    period: 5 * SECOND,
+    rate: 1,
+    // Allow accruing usage up to 2 messages to send within 5s (rollover).
+    capacity: 2,
+  },
+  tokenUsage: {
+    kind: "token bucket",
+    period: 1 * MINUTE,
+    rate: 2000,
+    capacity: 10000,
+  },
+});
+
 // Define an agent similarly to the AI SDK
 export const agent = new Agent(components.agent, {
   name: "My First Agent",
@@ -40,17 +56,6 @@ export const agent = new Agent(components.agent, {
       totalTokens: usage.totalTokens,
     });
   },
-});
-
-const rateLimiter = new RateLimiter(components.rateLimiter, {
-  sendMessage: {
-    kind: "fixed window",
-    period: 5 * SECOND,
-    rate: 1,
-    // Allow accruing usage up to 2 messages to send within 5s (rollover).
-    capacity: 2,
-  },
-  tokenUsage: { kind: "token bucket", period: 1 * MINUTE, rate: 1000 },
 });
 
 // This allows us to have a reactive query on the client for when we can send
@@ -81,7 +86,11 @@ export const submitQuestion = mutation({
     await rateLimiter.check(ctx, "tokenUsage", {
       key: userId,
       // TODO: estimate tokens based on all messages, not just the new one.
-      count: await estimateTokens(ctx, args.threadId, args.question),
+      count: Math.max(
+        1,
+        await estimateTokens(ctx, args.threadId, args.question),
+      ),
+      reserve: true,
       throws: true,
     });
 
