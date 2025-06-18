@@ -7,6 +7,7 @@
   return aborted messages, if you want to show those in your UI.
 - Delete stream deltas automatically 5 min after the stream finishes.
 - Fix: deleting threads asynchronously will clean up deltas.
+- Fix: update the reasoning in the top-level message when streaming
 
 ## 0.1.8
 

@@ -189,6 +189,7 @@ export function applyDeltasToStreamMessage(
         contentToAdd = part;
         break;
       case "reasoning":
+        currentMessage.reasoning += part.textDelta;
         if (lastContent?.type === "reasoning") {
           lastContent.text += part.textDelta;
         } else {
