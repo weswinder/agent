@@ -107,7 +107,7 @@ export function useThreadMessages<
       args === "skip" ||
       paginated.status === "LoadingFirstPage"
       ? "skip"
-      : { ...args, startOrder: paginated.results.at(0)?.order }
+      : { ...args, startOrder: paginated.results.at(-1)?.order }
   );
 
   const merged = useMemo(() => {
