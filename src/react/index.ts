@@ -1,5 +1,5 @@
 "use client";
-import type { ErrorMessage } from "convex-helpers";
+import { omit, type ErrorMessage } from "convex-helpers";
 import {
   type PaginatedQueryArgs,
   type UsePaginatedQueryResult,
@@ -163,16 +163,17 @@ export function useStreamingThreadMessages<
     Array<{ streamId: string; cursor: number; messages: MessageDoc[] }>
   >([]);
   const startOrderRef = useRef<number>(0);
+  const queryArgs = args === "skip" ? args : omit(args, ["startOrder"]);
   if (args !== "skip" && !startOrderRef.current && args.startOrder) {
     startOrderRef.current = args.startOrder;
   }
   // Get all the active streams
   const streamList = useQuery(
     query,
-    args === "skip"
-      ? args
+    queryArgs === "skip"
+      ? queryArgs
       : ({
-          ...args,
+          ...queryArgs,
           paginationOpts: { cursor: null, numItems: 0 },
           streamArgs: {
             kind: "list",
@@ -197,10 +198,10 @@ export function useStreamingThreadMessages<
   // Get the deltas for all the active streams, if any.
   const cursorQuery = useQuery(
     query,
-    args === "skip" || !streamList
+    queryArgs === "skip" || !streamList
       ? ("skip" as const)
       : ({
-          ...args,
+          ...queryArgs,
           paginationOpts: { cursor: null, numItems: 0 },
           streamArgs: { kind: "deltas", cursors } as StreamArgs,
         } as FunctionArgs<Query>)
