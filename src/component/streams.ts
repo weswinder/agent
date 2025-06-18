@@ -17,6 +17,7 @@ import {
 import schema from "./schema.js";
 import { stream } from "convex-helpers/server/stream";
 import { mergedStream } from "convex-helpers/server/stream";
+import { paginator } from "convex-helpers/server/pagination";
 
 const MAX_DELTAS_PER_REQUEST = 1000;
 const MAX_DELTAS_PER_STREAM = 100;
@@ -279,7 +280,7 @@ async function deletePageForStreamId(
   ctx: MutationCtx,
   args: { streamId: Id<"streamingMessages">; cursor?: string }
 ) {
-  const deltas = await ctx.db
+  const deltas = await paginator(ctx.db, schema)
     .query("streamDeltas")
     .withIndex("streamId_start_end", (q) => q.eq("streamId", args.streamId))
     .paginate({
