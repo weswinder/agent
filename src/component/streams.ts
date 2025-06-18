@@ -242,6 +242,9 @@ async function deletePageForStreamId(
       cursor: args.cursor ?? null,
     });
   await Promise.all(deltas.page.map((d) => ctx.db.delete(d._id)));
+  if (deltas.isDone) {
+    await ctx.db.delete(args.streamId);
+  }
   return deltas;
 }
 
@@ -281,13 +284,12 @@ export async function deleteStreamsPageForThreadId(
     cursor: deltaCursor,
   });
   if (result.isDone) {
-    await ctx.db.delete(streamMessage._id);
     deltaCursor = undefined;
   }
   return {
     isDone: false,
     streamOrder: streamMessage.order,
-    deltaCursor: result.continueCursor,
+    deltaCursor,
   };
 }
 
@@ -346,7 +348,6 @@ export const deleteStreamSync = mutation({
         cursor: deltas.continueCursor,
       });
     }
-    await ctx.db.delete(args.streamId);
   },
 });
 
