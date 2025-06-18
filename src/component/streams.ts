@@ -19,10 +19,13 @@ import { stream } from "convex-helpers/server/stream";
 import { mergedStream } from "convex-helpers/server/stream";
 import { paginator } from "convex-helpers/server/pagination";
 
+const SECOND = 1000;
+const MINUTE = 60 * SECOND;
+
 const MAX_DELTAS_PER_REQUEST = 1000;
 const MAX_DELTAS_PER_STREAM = 100;
-const TIMEOUT_INTERVAL = 1000 * 60; // 1 minute
-const DELETE_STREAM_DELAY = 1000 * 60 * 5; // 5 minutes
+const TIMEOUT_INTERVAL = 10 * MINUTE;
+const DELETE_STREAM_DELAY = MINUTE * 5; // 5 minutes
 
 const deltaValidator = schema.tables.streamDeltas.validator;
 
