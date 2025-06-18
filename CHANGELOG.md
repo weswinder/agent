@@ -2,10 +2,6 @@
 
 ## 0.1.9 alpha
 
-- You can finish a stream asynchronously and have it abort the streaming
-  and stop writing deltas smoothly. You can request that `syncStreams` also
-  return aborted messages, if you want to show those in your UI.
-  They will have `msg.streaming === false` if they were aborted.
 - The timeout for streaming deltas with no sign of life has been
   increased to 10 minutes.
 - Delete stream deltas automatically 5 min after the stream finishes.
