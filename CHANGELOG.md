@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.1.9 alpha
+## 0.1.9
 
 - You can finish a stream asynchronously and have it abort the streaming.
 - The timeout for streaming deltas with no sign of life has been
