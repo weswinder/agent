@@ -266,7 +266,7 @@ export const timeoutStream = internalMutation({
   returns: v.null(),
   handler: async (ctx, args) => {
     const stream = await ctx.db.get(args.streamId);
-    if (!stream) {
+    if (!stream || stream.state.kind !== "streaming") {
       console.warn("Stream not found", args.streamId);
       return;
     }
@@ -292,7 +292,17 @@ async function deletePageForStreamId(
     });
   await Promise.all(deltas.page.map((d) => ctx.db.delete(d._id)));
   if (deltas.isDone) {
-    await ctx.db.delete(args.streamId);
+    const stream = await ctx.db.get(args.streamId);
+    if (stream) {
+      const state = stream.state;
+      if (state.kind === "streaming" && state.timeoutFnId) {
+        const timeoutFn = await ctx.db.system.get(state.timeoutFnId);
+        if (timeoutFn?.state.kind === "pending") {
+          await ctx.scheduler.cancel(state.timeoutFnId);
+        }
+      }
+      await ctx.db.delete(args.streamId);
+    }
   }
   return deltas;
 }
