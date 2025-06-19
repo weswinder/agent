@@ -2,6 +2,7 @@
 
 ## 0.1.9 alpha
 
+- You can finish a stream asynchronously and have it abort the streaming.
 - The timeout for streaming deltas with no sign of life has been
   increased to 10 minutes.
 - Delete stream deltas automatically 5 min after the stream finishes.
