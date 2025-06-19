@@ -93,6 +93,13 @@ export const createNewThread = mutation({
   handler: async (ctx, { title }) => {
     const userId = await getUserId(ctx);
     const { threadId } = await agent.createThread(ctx, { userId, title });
+    await agent.saveMessage(ctx, {
+      threadId,
+      message: {
+        role: "assistant",
+        content: "What would you like to talk about?",
+      },
+    });
     return threadId;
   },
 });
