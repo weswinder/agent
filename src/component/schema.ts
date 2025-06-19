@@ -108,6 +108,7 @@ export const schema = defineSchema({
       v.object({
         kind: v.literal("finished"),
         endedAt: v.number(),
+        cleanupFnId: v.optional(v.id("_scheduled_functions")),
       }),
       v.object({
         kind: v.literal("aborted"),

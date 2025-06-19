@@ -208,14 +208,14 @@ export const finish = mutation({
       return;
     }
     await cleanupTimeoutFn(ctx, stream);
-    await ctx.db.patch(args.streamId, {
-      state: { kind: "finished", endedAt: Date.now() },
-    });
-    await ctx.scheduler.runAfter(
+    const cleanupFnId = await ctx.scheduler.runAfter(
       DELETE_STREAM_DELAY,
       api.streams.deleteStreamAsync,
       { streamId: args.streamId }
     );
+    await ctx.db.patch(args.streamId, {
+      state: { kind: "finished", endedAt: Date.now(), cleanupFnId },
+    });
   },
 });
 
@@ -294,12 +294,9 @@ async function deletePageForStreamId(
   if (deltas.isDone) {
     const stream = await ctx.db.get(args.streamId);
     if (stream) {
-      const state = stream.state;
-      if (state.kind === "streaming" && state.timeoutFnId) {
-        const timeoutFn = await ctx.db.system.get(state.timeoutFnId);
-        if (timeoutFn?.state.kind === "pending") {
-          await ctx.scheduler.cancel(state.timeoutFnId);
-        }
+      await cleanupTimeoutFn(ctx, stream);
+      if (stream.state.kind === "finished" && stream.state.cleanupFnId) {
+        await ctx.scheduler.cancel(stream.state.cleanupFnId);
       }
       await ctx.db.delete(args.streamId);
     }
