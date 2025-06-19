@@ -707,3 +707,4 @@ workflow. When in doubt, add return types to more `handler` functions, like this
 
 
 <!-- END: Include on https://convex.dev/components -->
+[![DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/get-convex/agent)
