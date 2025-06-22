@@ -44,6 +44,14 @@ export function definePlaygroundAPI(
     agents.map((agent) => [agent.options.name, agent])
   );
 
+  for (const agent of agents) {
+    if (!agent.options.name) {
+      throw new Error(
+        `Agent has no name (instructions: ${agent.options.instructions})`
+      );
+    }
+  }
+
   async function validateApiKey(ctx: RunQueryCtx, apiKey: string) {
     await ctx.runQuery(component.apiKeys.validate, { apiKey });
   }
