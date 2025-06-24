@@ -25,7 +25,7 @@ AI Agent framework built on Convex.
 
 [Read the associated Stack post here](https://stack.convex.dev/ai-agents).
 
-[![Powerful AI Apps Made Easy with the Agent Component](https://img.youtube.com/vi/tUKMPUlOCHY/0.jpg)](https://www.youtube.com/watch?v=tUKMPUlOCHY)
+[![Powerful AI Apps Made Easy with the Agent Component](https://thumbs.video-to-markdown.com/b323ac24.jpg)](https://youtu.be/tUKMPUlOCHY)
 
 Play with the [examples](./examples/) by cloning this repo and running:
 ```sh
