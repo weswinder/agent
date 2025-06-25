@@ -1490,7 +1490,9 @@ export class Agent<AgentTools extends ToolSet> {
         threadId,
         userId,
         messages: coreMessages,
-        metadata: coreMessages.length === 1 ? [{ id: args.id }] : undefined,
+        metadata: coreMessages.map((_, i) =>
+          i === coreMessages.length - 1 ? { id: args.id } : {}
+        ),
         pending: true,
         failPendingSteps: true,
       });
