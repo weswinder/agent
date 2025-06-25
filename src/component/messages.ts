@@ -70,9 +70,69 @@ export async function deleteMessage(
   }
 }
 
+export const deleteByIds = mutation({
+  args: {
+    messageIds: v.array(v.id("messages")),
+  },
+  returns: v.array(v.id("messages")),
+  handler: async (ctx, args) => {
+    const deletedMessageIds = await Promise.all(
+      args.messageIds.map(async (id) => {
+        const message = await ctx.db.get(id);
+        if (message) {
+          await deleteMessage(ctx, message);
+          return id;
+        }
+        return null;
+      })
+    );
+    return deletedMessageIds.filter((id) => id !== null);
+  },
+});
+
 export const messageStatuses = vMessageDoc.fields.status.members.map(
   (m) => m.value
 );
+
+export const deleteByOrder = mutation({
+  args: {
+    threadId: v.id("threads"),
+    startOrder: v.number(),
+    startStepOrder: v.optional(v.number()),
+    endOrder: v.number(),
+    endStepOrder: v.optional(v.number()),
+  },
+  returns: v.object({
+    isDone: v.boolean(),
+    lastOrder: v.optional(v.number()),
+    lastStepOrder: v.optional(v.number()),
+  }),
+  handler: async (ctx, args) => {
+    const messages = await orderedMessagesStream(
+      ctx,
+      args.threadId,
+      "asc",
+      args.startOrder
+    )
+      .narrow({
+        lowerBound: args.startStepOrder
+          ? [args.startOrder, args.startStepOrder]
+          : [args.startOrder],
+        lowerBoundInclusive: true,
+        upperBound: args.endStepOrder
+          ? [args.endOrder, args.endStepOrder]
+          : [args.endOrder],
+        upperBoundInclusive: false,
+      })
+      .take(64);
+    await Promise.all(messages.map((m) => deleteMessage(ctx, m)));
+    return {
+      isDone: messages.length < 64,
+      lastOrder: messages[messages.length - 1]?.order,
+      lastStepOrder: messages[messages.length - 1]?.stepOrder,
+    };
+  },
+});
 
 const addMessagesArgs = {
   userId: v.optional(v.string()),
