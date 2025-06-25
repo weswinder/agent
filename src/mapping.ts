@@ -85,6 +85,7 @@ export async function serializeNewMessagesInStep<TOOLS extends ToolSet>(
     usage: step.usage,
     warnings: step.warnings,
     finishReason: step.finishReason,
+    sources: step.stepType === "tool-result" ? undefined : step.sources,
   };
   const toolFields = {
     sources: step.sources,
