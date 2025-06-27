@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.10
+
+- Fix object serialization
+- Sources will be populated to non-tool results
+- Deleting files will return the files actually deleted
+- Agents without names will warn if used in the playground
+- More graceful deletion of streams
+
 ## 0.1.9
 
 - You can finish a stream asynchronously and have it abort the streaming.
