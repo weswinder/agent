@@ -624,7 +624,7 @@ export class Agent<AgentTools extends ToolSet> {
    * to a thread (and optionally userId).
    */
   async generateObject<T>(
-    ctx: RunActionCtx,
+    ctx: ActionCtx,
     {
       userId: argsUserId,
       threadId,
@@ -705,7 +705,7 @@ export class Agent<AgentTools extends ToolSet> {
    * to a thread (and optionally userId).
    */
   async streamObject<T>(
-    ctx: RunActionCtx,
+    ctx: ActionCtx,
     {
       userId: argsUserId,
       threadId,
@@ -1347,7 +1347,7 @@ export class Agent<AgentTools extends ToolSet> {
    * @param args The arguments to the saveObject function.
    */
   async saveObject(
-    ctx: RunActionCtx,
+    ctx: ActionCtx,
     args: {
       userId: string | undefined;
       threadId: string;
@@ -1356,10 +1356,15 @@ export class Agent<AgentTools extends ToolSet> {
       metadata?: Omit<MessageWithMetadata, "message">;
     }
   ): Promise<void> {
-    const { messages } = serializeObjectResult(args.result, {
-      model: this.options.chat.modelId,
-      provider: this.options.chat.provider,
-    });
+    const { messages } = await serializeObjectResult(
+      ctx,
+      this.component,
+      args.result,
+      {
+        model: this.options.chat.modelId,
+        provider: this.options.chat.provider,
+      }
+    );
     const embeddings = await this.generateEmbeddings(
       ctx,
       { userId: args.userId, threadId: args.threadId },

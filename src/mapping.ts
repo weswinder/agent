@@ -114,17 +114,19 @@ export async function serializeNewMessagesInStep<TOOLS extends ToolSet>(
   return messages;
 }
 
-export function serializeObjectResult(
+export async function serializeObjectResult(
+  ctx: ActionCtx,
+  component: AgentComponent,
   result: GenerateObjectResult<unknown>,
   metadata: { model: string; provider: string }
-): { messages: MessageWithMetadata[] } {
+): Promise<{ messages: MessageWithMetadata[] }> {
   const text = JSON.stringify(result.object);
 
-  const message = {
+  const { message, fileIds } = await serializeMessage(ctx, component, {
     role: "assistant" as const,
     content: text,
     id: result.response.id,
-  };
+  });
   return {
     messages: [
       {
@@ -137,6 +139,7 @@ export function serializeObjectResult(
         text,
         usage: result.usage,
         warnings: result.warnings,
+        fileIds,
       },
     ],
   };
