@@ -7,13 +7,7 @@ import reactHooks from "eslint-plugin-react-hooks";
 export default [
   { files: ["src/**/*.{js,mjs,cjs,ts,tsx}"] },
   {
-    ignores: [
-      "dist/**",
-      "eslint.config.js",
-      "setup.cjs",
-      "**/_generated/",
-      "node10stubs.mjs",
-    ],
+    ignores: ["dist/**", "eslint.config.js", "setup.cjs", "**/_generated/"],
   },
   {
     languageOptions: {
