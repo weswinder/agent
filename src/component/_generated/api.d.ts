@@ -67,7 +67,7 @@ export type Mounts = {
       "mutation",
       "public",
       { fileIds: Array<string>; force?: boolean },
-      null
+      Array<string>
     >;
     get: FunctionReference<
       "query",
