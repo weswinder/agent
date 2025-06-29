@@ -1071,9 +1071,7 @@ export class Agent<AgentTools extends ToolSet> {
       const targetMessage = contextMessages.find(
         (m) => m._id === args.upToAndIncludingMessageId
       )?.message;
-      const messagesToSearch = targetMessage
-        ? [targetMessage, ...args.messages]
-        : args.messages;
+      const messagesToSearch = targetMessage ? [targetMessage] : args.messages;
       if (!("runAction" in ctx)) {
         throw new Error("searchUserMessages only works in an action");
       }
@@ -1443,18 +1441,16 @@ export class Agent<AgentTools extends ToolSet> {
   }> {
     contextOptions ||= this.options.contextOptions;
     storageOptions ||= this.options.storageOptions;
-    // If only a messageId is provided, this will be empty.
-    const messages = args.promptMessageId
-      ? []
-      : promptOrMessagesToCoreMessages(args);
+    // If only a promptMessageId is provided, this will be empty.
+    const messages = promptOrMessagesToCoreMessages(args);
     const userId =
       argsUserId ??
       (threadId &&
         (await ctx.runQuery(this.component.threads.getThread, { threadId }))
           ?.userId);
     assert(
-      !args.promptMessageId || !(args.prompt || args.messages),
-      "you can't specify a prompt or message if you specify a promptMessageId"
+      !args.promptMessageId || !args.prompt,
+      "you can't specify a prompt if you specify a promptMessageId"
     );
     // If only a messageId is provided, this will add that message to the end.
     const contextMessages = await this.fetchContextMessages(ctx, {
@@ -1464,29 +1460,33 @@ export class Agent<AgentTools extends ToolSet> {
       messages,
       contextOptions,
     });
-    // Lazily generate embeddings for the prompt message, if it doesn't have
-    // embeddings yet. This can happen if the message was saved in a mutation
-    // where the LLM is not available.
-    if (
-      args.promptMessageId &&
-      !contextMessages.at(-1)?.embeddingId &&
-      this.options.textEmbedding
-    ) {
-      await this.generateAndSaveEmbeddings(ctx, {
-        messageIds: [args.promptMessageId],
-      });
+    // If it was a promptMessageId, pop it off context messages
+    // and add to the end of messages.
+    const promptMessage =
+      !!args.promptMessageId &&
+      contextMessages.at(-1)?._id === args.promptMessageId
+        ? contextMessages.pop()
+        : undefined;
+    if (promptMessage?.message) {
+      messages.push(deserializeMessage(promptMessage.message));
+      // Lazily generate embeddings for the prompt message, if it doesn't have
+      // embeddings yet. This can happen if the message was saved in a mutation
+      // where the LLM is not available.
+      if (!promptMessage.embeddingId && this.options.textEmbedding) {
+        await this.generateAndSaveEmbeddings(ctx, {
+          messageIds: [promptMessage._id],
+        });
+      }
     }
-    let messageId = args.promptMessageId;
-    let order = args.promptMessageId
-      ? contextMessages.at(-1)?.order
-      : undefined;
-    let stepOrder = args.promptMessageId
-      ? contextMessages.at(-1)?.stepOrder
-      : undefined;
+    let messageId = promptMessage?._id;
+    let order = promptMessage?.order;
+    let stepOrder = promptMessage?.stepOrder;
     if (
       threadId &&
       messages.length &&
       storageOptions?.saveMessages !== "none" &&
+      // If it was a promptMessageId, we don't want to save it again.
+      (!args.promptMessageId || storageOptions?.saveMessages === "all") &&
       storageOptions?.saveAnyInputMessages !== false
     ) {
       const saveAll = storageOptions?.saveMessages === "all";

@@ -334,9 +334,17 @@ function encodeBase64(data: ArrayBuffer): string {
 export function promptOrMessagesToCoreMessages(args: {
   prompt?: string;
   messages?: CoreMessage[] | AIMessageWithoutId[];
+  promptMessageId?: string;
 }): CoreMessage[] {
   const messages: CoreMessage[] = [];
-  assert(args.prompt || args.messages, "messages or prompt is required");
+  assert(
+    args.prompt || args.messages || args.promptMessageId,
+    "messages or prompt or promptMessageId is required"
+  );
+  assert(
+    !args.promptMessageId || !args.prompt,
+    "you can't specify a prompt if you specify a promptMessageId. use messages instead."
+  );
   if (args.messages) {
     if (
       args.messages.some(
@@ -357,6 +365,5 @@ export function promptOrMessagesToCoreMessages(args: {
   if (args.prompt) {
     messages.push({ role: "user", content: args.prompt });
   }
-  assert(messages.length > 0, "Messages must contain at least one message");
   return messages;
 }
