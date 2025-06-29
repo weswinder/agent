@@ -6,6 +6,7 @@ import ChatStreaming from "@example/chat-streaming/src/ChatStreaming";
 import FilesImages from "@example/files-images/src/FilesImages";
 import RateLimiting from "@example/rate-limiting/src/RateLimiting";
 import { WeatherFashion } from "./pages/WeatherFashion";
+import RagBasic from "./pages/RagBasic";
 
 export default function App() {
   return (
@@ -26,6 +27,7 @@ export default function App() {
             <Route path="/chat-basic" element={<ChatBasic />} />
             <Route path="/chat-streaming" element={<ChatStreaming />} />
             <Route path="/files-images" element={<FilesImages />} />
+            <Route path="/rag-basic" element={<RagBasic />} />
             <Route path="/rate-limiting" element={<RateLimiting />} />
             <Route path="/weather-fashion" element={<WeatherFashion />} />
           </Routes>

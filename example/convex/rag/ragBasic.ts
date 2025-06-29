@@ -78,7 +78,6 @@ export const generateTextAsync = internalAction({
       namespace: "global",
       query: args.query,
       limit: 5,
-      chunkContext: { before: 1, after: 1 },
     });
     await ctx.runMutation(internal.rag.ragBasic.recordContextUsed, {
       messageId: args.messageId,
