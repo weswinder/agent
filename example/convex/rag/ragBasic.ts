@@ -44,7 +44,7 @@ export const addKnowledge = action({
 export const sendMessage = mutation({
   args: {
     threadId: v.optional(v.string()),
-    message: v.string(),
+    prompt: v.string(),
   },
   handler: async (ctx, args) => {
     let threadId = args.threadId;
@@ -53,11 +53,11 @@ export const sendMessage = mutation({
     }
     const { messageId } = await agent.saveMessage(ctx, {
       threadId,
-      message: { role: "user", content: args.message },
+      message: { role: "user", content: args.prompt },
     });
     await ctx.scheduler.runAfter(0, internal.rag.ragBasic.generateTextAsync, {
       threadId,
-      query: args.message,
+      query: args.prompt,
       messageId,
     });
     return threadId;
@@ -103,10 +103,22 @@ export const listMessages = query({
     paginationOpts: paginationOptsValidator,
   },
   handler: async (ctx, args) => {
-    return agent.listMessages(ctx, {
+    const results = await agent.listMessages(ctx, {
       threadId: args.threadId,
       paginationOpts: args.paginationOpts,
     });
+    return {
+      ...results,
+      page: await Promise.all(
+        results.page.map(async (message) => ({
+          ...message,
+          contextUsed: await ctx.db
+            .query("contextUsed")
+            .withIndex("messageId", (q) => q.eq("messageId", message._id))
+            .first(),
+        })),
+      ),
+    };
   },
 });
 
