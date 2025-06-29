@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.11
+
+- Supports passing both a promptMessageId and messages, so you
+  can pass context messages while also generating the propt message
+  ahead of time in a mutation.
+- Now includes an example of RAG using the Memory component.
+
 ## 0.1.10
 
 - Fix object serialization
