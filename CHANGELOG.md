@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.12
+
+- Pass the final model & provider when storing messages, in case
+  it was overriden at the thread/callsite level.
+
 ## 0.1.11
 
 - Supports passing both a promptMessageId and messages, so you
