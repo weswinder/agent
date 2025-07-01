@@ -3,6 +3,7 @@
 ## 0.1.13 alpha
 
 - Allow updating a thread's userId
+- Auth is available in the `createTool` ctx.
 
 ## 0.1.12
 
