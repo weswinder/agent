@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.13 alpha
+
+- Allow updating a thread's userId
+
 ## 0.1.12
 
 - Pass the final model & provider when storing messages, in case
