@@ -71,12 +71,17 @@ export const createThread = mutation({
   returns: vThreadDoc,
 });
 
+export const threadFieldsSupportingPatch = [
+  "title" as const,
+  "summary" as const,
+  "status" as const,
+  "userId" as const,
+];
+
 export const updateThread = mutation({
   args: {
     threadId: v.id("threads"),
-    patch: v.object(
-      partial(pick(vThread.fields, ["title", "summary", "status"]))
-    ),
+    patch: v.object(partial(pick(vThread.fields, threadFieldsSupportingPatch))),
   },
   handler: async (ctx, args) => {
     const thread = await ctx.db.get(args.threadId);

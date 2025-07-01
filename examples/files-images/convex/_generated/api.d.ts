@@ -1889,6 +1889,7 @@ export declare const components: {
             status?: "active" | "archived";
             summary?: string;
             title?: string;
+            userId?: string;
           };
           threadId: string;
         },

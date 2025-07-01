@@ -76,6 +76,7 @@ import type {
   Thread,
   UsageHandler,
 } from "./types.js";
+import type { threadFieldsSupportingPatch } from "../component/threads.js";
 
 export { storeFile, getFile } from "./files.js";
 export { serializeDataOrUrl } from "../mapping.js";
@@ -1147,7 +1148,12 @@ export class Agent<AgentTools extends ToolSet> {
    */
   async updateThreadMetadata(
     ctx: RunMutationCtx,
-    args: { threadId: string; patch: Partial<WithoutSystemFields<ThreadDoc>> }
+    args: {
+      threadId: string;
+      patch: Partial<
+        Pick<ThreadDoc, (typeof threadFieldsSupportingPatch)[number]>
+      >;
+    }
   ): Promise<ThreadDoc> {
     const thread = await ctx.runMutation(
       this.component.threads.updateThread,
