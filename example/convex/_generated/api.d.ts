@@ -2511,7 +2511,8 @@ export declare const components: {
             contentHash?: string;
             filterValues: Array<{ name: string; value: any }>;
             importance: number;
-            key: string;
+            key?: string;
+            metadata?: Record<string, any>;
             namespaceId: string;
             title?: string;
           };
@@ -2525,7 +2526,8 @@ export declare const components: {
             entryId: string;
             filterValues: Array<{ name: string; value: any }>;
             importance: number;
-            key: string;
+            key?: string;
+            metadata?: Record<string, any>;
             status: "pending" | "ready" | "replaced";
             title?: string;
           } | null;
@@ -2541,17 +2543,14 @@ export declare const components: {
             contentHash?: string;
             filterValues: Array<{ name: string; value: any }>;
             importance: number;
-            key: string;
+            key?: string;
+            metadata?: Record<string, any>;
             namespaceId: string;
             title?: string;
           };
           onComplete?: string;
         },
-        {
-          created: boolean;
-          entryId: string;
-          status: "pending" | "ready" | "replaced";
-        }
+        { created: boolean; entryId: string; status: "pending" | "ready" }
       >;
       deleteAsync: FunctionReference<
         "mutation",
@@ -2575,7 +2574,8 @@ export declare const components: {
           entryId: string;
           filterValues: Array<{ name: string; value: any }>;
           importance: number;
-          key: string;
+          key?: string;
+          metadata?: Record<string, any>;
           status: "pending" | "ready" | "replaced";
           title?: string;
         } | null
@@ -2589,7 +2589,8 @@ export declare const components: {
           entryId: string;
           filterValues: Array<{ name: string; value: any }>;
           importance: number;
-          key: string;
+          key?: string;
+          metadata?: Record<string, any>;
           status: "pending" | "ready" | "replaced";
           title?: string;
         } | null
@@ -2618,7 +2619,8 @@ export declare const components: {
             entryId: string;
             filterValues: Array<{ name: string; value: any }>;
             importance: number;
-            key: string;
+            key?: string;
+            metadata?: Record<string, any>;
             status: "pending" | "ready" | "replaced";
             title?: string;
           }>;
@@ -2636,7 +2638,8 @@ export declare const components: {
             entryId: string;
             filterValues: Array<{ name: string; value: any }>;
             importance: number;
-            key: string;
+            key?: string;
+            metadata?: Record<string, any>;
             status: "pending" | "ready" | "replaced";
             title?: string;
           } | null;
@@ -2672,12 +2675,10 @@ export declare const components: {
           filterNames: Array<string>;
           modelId: string;
           namespace: string;
-          status:
-            | { kind: "pending"; onComplete?: string }
-            | { kind: "ready" }
-            | { kind: "replaced"; replacedAt: number };
+          onComplete?: string;
+          status: "pending" | "ready";
         },
-        { namespaceId: string; status: "pending" | "ready" | "replaced" }
+        { namespaceId: string; status: "pending" | "ready" }
       >;
       list: FunctionReference<
         "query",
@@ -2721,6 +2722,23 @@ export declare const components: {
         },
         null | string
       >;
+      promoteToReady: FunctionReference<
+        "mutation",
+        "internal",
+        { namespaceId: string },
+        {
+          replacedVersion: null | {
+            createdAt: number;
+            dimension: number;
+            filterNames: Array<string>;
+            modelId: string;
+            namespace: string;
+            namespaceId: string;
+            status: "pending" | "ready" | "replaced";
+            version: number;
+          };
+        }
+      >;
     };
     search: {
       search: FunctionReference<
@@ -2741,7 +2759,8 @@ export declare const components: {
             entryId: string;
             filterValues: Array<{ name: string; value: any }>;
             importance: number;
-            key: string;
+            key?: string;
+            metadata?: Record<string, any>;
             status: "pending" | "ready" | "replaced";
             title?: string;
           }>;

@@ -1,17 +1,18 @@
-import {
-  query,
-  action,
-  mutation,
-  internalAction,
-  internalMutation,
-} from "../_generated/server";
-import { components, internal } from "../_generated/api";
-import { Memory, vEntry, vEntryId, vSearchResult } from "@convex-dev/memory";
 import { openai } from "@ai-sdk/openai";
-import { v } from "convex/values";
-import { paginationOptsValidator } from "convex/server";
+import { Agent, createTool } from "@convex-dev/agent";
+import { Memory, vEntry, vEntryId, vSearchResult } from "@convex-dev/memory";
 import { RecursiveCharacterTextSplitter } from "@langchain/textsplitters";
-import { Agent } from "@convex-dev/agent";
+import { paginationOptsValidator } from "convex/server";
+import { v } from "convex/values";
+import { z } from "zod";
+import { components, internal } from "../_generated/api";
+import {
+  action,
+  ActionCtx,
+  internalMutation,
+  query,
+  QueryCtx,
+} from "../_generated/server";
 
 const memory = new Memory(components.memory, {
   textEmbeddingModel: openai.embedding("text-embedding-3-small"),
@@ -23,75 +24,118 @@ const agent = new Agent(components.agent, {
   instructions: `You are a helpful assistant.`,
 });
 
-export const addKnowledge = action({
-  args: {
-    key: v.string(),
-    text: v.string(),
-  },
+export const addMemory = action({
+  args: { title: v.string(), text: v.string() },
   handler: async (ctx, args) => {
     const textSplitter = new RecursiveCharacterTextSplitter({
-      chunkSize: 1000,
+      chunkSize: 500,
     });
     const chunks = await textSplitter.splitText(args.text);
     await memory.add(ctx, {
       namespace: "global", // Could set a per-user namespace here
+      title: args.title,
       chunks,
-      key: args.key,
     });
   },
 });
 
-export const sendMessage = mutation({
+export const sendMessageWithRAG = action({
   args: {
     threadId: v.optional(v.string()),
     prompt: v.string(),
   },
   handler: async (ctx, args) => {
-    let threadId = args.threadId;
-    if (!threadId) {
-      ({ threadId } = await agent.createThread(ctx));
+    let thread;
+    if (args.threadId) {
+      ({ thread } = await agent.continueThread(ctx, {
+        threadId: args.threadId,
+      }));
+    } else {
+      ({ thread } = await agent.createThread(ctx));
     }
-    const { messageId } = await agent.saveMessage(ctx, {
-      threadId,
-      message: { role: "user", content: args.prompt },
-    });
-    await ctx.scheduler.runAfter(0, internal.rag.ragBasic.generateTextAsync, {
-      threadId,
-      query: args.prompt,
-      messageId,
-    });
-    return threadId;
-  },
-});
-
-export const generateTextAsync = internalAction({
-  args: {
-    threadId: v.string(),
-    query: v.string(),
-    messageId: v.string(),
-  },
-  handler: async (ctx, args) => {
-    const { thread } = await agent.continueThread(ctx, {
-      threadId: args.threadId,
-    });
     const context = await memory.search(ctx, {
       namespace: "global",
-      query: args.query,
+      query: args.prompt,
       limit: 5,
     });
-    await ctx.runMutation(internal.rag.ragBasic.recordContextUsed, {
-      messageId: args.messageId,
-      entries: context.entries,
-      results: context.results,
-    });
-    await thread.generateText({
+    const { messageId } = await thread.generateText({
       messages: [
         {
           role: "user",
-          content: `Here is some context:\n\n ${context.text.join("\n---\n")}`,
+          content: `Here is some context:\n\n ${context.text}`,
         },
       ],
-      promptMessageId: args.messageId,
+      prompt: args.prompt,
+    });
+    // To show the context in the demo UI, we record the context used
+    await ctx.runMutation(internal.rag.ragBasic.recordContextUsed, {
+      messageId,
+      entries: context.entries,
+      results: context.results,
+    });
+  },
+});
+
+export const sendMessageWithTools = action({
+  args: {
+    threadId: v.optional(v.string()),
+    prompt: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getUserId(ctx);
+    let thread;
+    if (args.threadId) {
+      ({ thread } = await agent.continueThread(ctx, {
+        threadId: args.threadId,
+      }));
+    } else {
+      ({ thread } = await agent.createThread(ctx));
+    }
+    const { messageId } = await thread.generateText({
+      prompt: args.prompt,
+      tools: {
+        createMemory: createTool({
+          description: "Create a new memory",
+          args: z.object({
+            title: z.string().describe("The title of the memory"),
+            text: z.string().describe("The text of the memory"),
+          }),
+          handler: async (ctx, args) => {
+            await memory.add(ctx, {
+              namespace: userId,
+              title: args.title,
+              chunks: args.text.split("\n\n"),
+            });
+          },
+        }),
+        searchMemories: createTool({
+          description: "Search for memories",
+          args: z.object({
+            query: z
+              .string()
+              .describe("Describe the memory you're looking for"),
+          }),
+          handler: async (ctx, args) => {
+            const context = await memory.search(ctx, {
+              namespace: userId,
+              query: args.query,
+              limit: 5,
+            });
+            // To show the context in the demo UI, we record the context used
+            await ctx.runMutation(internal.rag.ragBasic.recordContextUsed, {
+              messageId,
+              entries: context.entries,
+              results: context.results,
+            });
+            return (
+              `Found results in ${context.entries
+                .map((e) => e.title || null)
+                .filter((t) => t !== null)
+                .join(", ")}` + `Here is the context:\n\n ${context.text}`
+            );
+          },
+        }),
+      },
     });
   },
 });
@@ -164,3 +208,11 @@ export const recordContextUsed = internalMutation({
     await ctx.db.insert("contextUsed", args);
   },
 });
+
+/**
+ * Demo functions: in a real app you'd have auth
+ */
+
+async function getUserId(_ctx: QueryCtx | ActionCtx) {
+  return "Memory test user";
+}
