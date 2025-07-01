@@ -1,6 +1,12 @@
 import { openai } from "@ai-sdk/openai";
 import { Agent, createTool } from "@convex-dev/agent";
-import { Memory, vEntry, vEntryId, vSearchResult } from "@convex-dev/memory";
+import {
+  Memory,
+  vEntry,
+  vEntryId,
+  vSearchEntry,
+  vSearchResult,
+} from "@convex-dev/memory";
 import { RecursiveCharacterTextSplitter } from "@langchain/textsplitters";
 import { paginationOptsValidator } from "convex/server";
 import { v } from "convex/values";
@@ -10,9 +16,11 @@ import {
   action,
   ActionCtx,
   internalMutation,
+  mutation,
   query,
   QueryCtx,
 } from "../_generated/server";
+import { vStreamArgs, vStreamDelta } from "../../../dist/esm/validators";
 
 const memory = new Memory(components.memory, {
   textEmbeddingModel: openai.embedding("text-embedding-3-small"),
@@ -40,59 +48,40 @@ export const addMemory = action({
 });
 
 export const sendMessageWithRAG = action({
-  args: {
-    threadId: v.optional(v.string()),
-    prompt: v.string(),
-  },
-  handler: async (ctx, args) => {
-    let thread;
-    if (args.threadId) {
-      ({ thread } = await agent.continueThread(ctx, {
-        threadId: args.threadId,
-      }));
-    } else {
-      ({ thread } = await agent.createThread(ctx));
-    }
+  args: { threadId: v.string(), prompt: v.string() },
+  handler: async (ctx, { threadId, prompt }) => {
+    const { thread } = await agent.continueThread(ctx, { threadId });
     const context = await memory.search(ctx, {
       namespace: "global",
-      query: args.prompt,
-      limit: 5,
+      query: prompt,
+      limit: 2,
+      chunkContext: { before: 1, after: 1 },
     });
-    const { messageId } = await thread.generateText({
-      messages: [
-        {
-          role: "user",
-          content: `Here is some context:\n\n ${context.text}`,
-        },
-      ],
-      prompt: args.prompt,
-    });
+    const contextPrompt = `Here is some context:\n\n ${context.text}`;
+    const result = await thread.streamText(
+      {
+        messages: [{ role: "user", content: contextPrompt }],
+        prompt,
+      },
+      { saveStreamDeltas: true },
+    );
     // To show the context in the demo UI, we record the context used
     await ctx.runMutation(internal.rag.ragBasic.recordContextUsed, {
-      messageId,
+      messageId: result.messageId,
       entries: context.entries,
       results: context.results,
     });
+    await result.consumeStream();
   },
 });
 
 export const sendMessageWithTools = action({
-  args: {
-    threadId: v.optional(v.string()),
-    prompt: v.string(),
-  },
-  handler: async (ctx, args) => {
+  args: { threadId: v.string(), prompt: v.string() },
+  handler: async (ctx, { threadId, prompt }) => {
     const userId = await getUserId(ctx);
-    let thread;
-    if (args.threadId) {
-      ({ thread } = await agent.continueThread(ctx, {
-        threadId: args.threadId,
-      }));
-    } else {
-      ({ thread } = await agent.createThread(ctx));
-    }
+    const { thread } = await agent.continueThread(ctx, { threadId });
     const { messageId } = await thread.generateText({
-      prompt: args.prompt,
+      prompt,
       tools: {
         createMemory: createTool({
           description: "Create a new memory",
@@ -140,17 +129,32 @@ export const sendMessageWithTools = action({
   },
 });
 
+export const createThread = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await getUserId(ctx);
+    const { threadId } = await agent.createThread(ctx, { userId });
+    return threadId;
+  },
+});
+
 export const listMessages = query({
   args: {
     threadId: v.string(),
     paginationOpts: paginationOptsValidator,
+    streamArgs: vStreamArgs,
   },
   handler: async (ctx, args) => {
     const results = await agent.listMessages(ctx, {
       threadId: args.threadId,
       paginationOpts: args.paginationOpts,
     });
+    const streams = await agent.syncStreams(ctx, {
+      threadId: args.threadId,
+      streamArgs: args.streamArgs,
+    });
     return {
+      streams,
       ...results,
       page: await Promise.all(
         results.page.map(async (message) => ({
@@ -165,7 +169,7 @@ export const listMessages = query({
   },
 });
 
-export const listKnowledge = query({
+export const listMemories = query({
   args: {
     paginationOpts: paginationOptsValidator,
   },
@@ -201,7 +205,7 @@ export const listChunks = query({
 export const recordContextUsed = internalMutation({
   args: {
     messageId: v.string(),
-    entries: v.array(vEntry),
+    entries: v.array(vSearchEntry),
     results: v.array(vSearchResult),
   },
   handler: async (ctx, args) => {

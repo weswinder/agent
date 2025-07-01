@@ -1,9 +1,10 @@
 import "./RagBasic.css";
 import { useAction, useMutation, usePaginatedQuery } from "convex/react";
-import { useThreadMessages } from "@convex-dev/agent/react";
+import { useSmoothText, useThreadMessages } from "@convex-dev/agent/react";
 import { api } from "../../convex/_generated/api";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { EntryId } from "@convex-dev/memory";
+import { toast } from "@/hooks/use-toast";
 
 type SearchType = "global" | "user" | "category" | "document";
 
@@ -50,13 +51,19 @@ function getMessageContent(message: any): string {
 function Example() {
   const [selectedEntry, setSelectedEntry] = useState<EntryId | null>(null);
   const [threadId, setThreadId] = useState<string | undefined>(undefined);
+  const createThread = useMutation(api.rag.ragBasic.createThread);
+  useEffect(() => {
+    void createThread().then((threadId) => {
+      setThreadId(threadId);
+    });
+  }, [createThread]);
 
-  // Knowledge form state
-  const [addKnowledgeForm, setAddKnowledgeForm] = useState({
+  // Memory form state
+  const [addMemoryForm, setAddMemoryForm] = useState({
     key: "",
     text: "",
   });
-  const [isAddingKnowledge, setIsAddingKnowledge] = useState(false);
+  const [isAddingMemory, setIsAddingMemory] = useState(false);
 
   // Chat state
   const [prompt, setPrompt] = useState("");
@@ -65,15 +72,15 @@ function Example() {
   );
 
   // Actions and queries
-  const addKnowledge = useAction(api.rag.ragBasic.addKnowledge);
-  const sendMessage = useMutation(api.rag.ragBasic.sendMessage);
+  const addMemory = useAction(api.rag.ragBasic.addMemory);
+  const sendMessage = useAction(api.rag.ragBasic.sendMessageWithRAG);
   const listMessages = useThreadMessages(
     api.rag.ragBasic.listMessages,
     threadId ? { threadId } : "skip",
-    { initialNumItems: 10 },
+    { initialNumItems: 10, stream: true },
   );
   const globalDocuments = usePaginatedQuery(
-    api.rag.ragBasic.listKnowledge,
+    api.rag.ragBasic.listMemories,
     {},
     { initialNumItems: 10 },
   );
@@ -84,39 +91,42 @@ function Example() {
   );
 
   // Handle adding knowledge
-  const handleAddKnowledge = useCallback(async () => {
-    if (!addKnowledgeForm.key.trim() || !addKnowledgeForm.text.trim()) return;
+  const handleAddMemory = useCallback(async () => {
+    if (!addMemoryForm.key.trim() || !addMemoryForm.text.trim()) return;
 
-    setIsAddingKnowledge(true);
+    setIsAddingMemory(true);
     try {
-      await addKnowledge({
-        key: addKnowledgeForm.key.trim(),
-        text: addKnowledgeForm.text.trim(),
+      await addMemory({
+        title: addMemoryForm.key.trim(),
+        text: addMemoryForm.text.trim(),
       });
-      setAddKnowledgeForm({ key: "", text: "" });
+      setAddMemoryForm({ key: "", text: "" });
     } catch (error) {
       console.error("Error adding knowledge:", error);
     } finally {
-      setIsAddingKnowledge(false);
+      setIsAddingMemory(false);
     }
-  }, [addKnowledge, addKnowledgeForm]);
+  }, [addMemory, addMemoryForm]);
 
   // Handle sending message
-  const handleSendMessage = useCallback(async () => {
+  const onSendClicked = useCallback(() => {
     if (!prompt.trim()) return;
 
-    try {
-      const newThreadId = await sendMessage({
-        threadId,
-        prompt: prompt.trim(),
+    if (!threadId) {
+      toast({
+        title: "Thread ID is not set",
+        description: "Please create a thread first",
       });
-      if (!threadId) {
-        setThreadId(newThreadId);
-      }
-      setPrompt("");
-    } catch (error) {
-      console.error("Error sending message:", error);
+      return;
     }
+    setPrompt("");
+    sendMessage({
+      threadId,
+      prompt: prompt.trim(),
+    }).catch((error) => {
+      console.error("Error sending message:", error);
+      setPrompt(prompt);
+    });
   }, [sendMessage, threadId, prompt]);
 
   // Toggle context expansion
@@ -132,27 +142,14 @@ function Example() {
     });
   }, []);
 
-  function onSendClicked() {
-    const trimmedPrompt = prompt.trim();
-    if (trimmedPrompt === "") return;
-    void sendMessage({ threadId, prompt: trimmedPrompt })
-      .then((newThreadId) => {
-        if (!threadId) {
-          setThreadId(newThreadId);
-        }
-        setPrompt("");
-      })
-      .catch(() => setPrompt(prompt));
-  }
-
   return (
     <div className="h-full flex flex-col">
       <div className="h-full flex flex-row bg-gray-50 flex-1 min-h-0">
-        {/* Left Panel - Knowledge Entries */}
+        {/* Left Panel - Memory Entries */}
         <div className="w-80 bg-white border-r border-gray-200 flex flex-col h-full min-h-0">
           <div className="p-4 border-b border-gray-200">
             <h2 className="text-lg font-semibold text-gray-900 mb-4">
-              Add Knowledge
+              Add Memory
             </h2>
 
             <div className="space-y-3">
@@ -162,9 +159,9 @@ function Example() {
                 </label>
                 <input
                   type="text"
-                  value={addKnowledgeForm.key}
+                  value={addMemoryForm.key}
                   onChange={(e) =>
-                    setAddKnowledgeForm((prev) => ({
+                    setAddMemoryForm((prev) => ({
                       ...prev,
                       key: e.target.value,
                     }))
@@ -179,9 +176,9 @@ function Example() {
                   Text
                 </label>
                 <textarea
-                  value={addKnowledgeForm.text}
+                  value={addMemoryForm.text}
                   onChange={(e) =>
-                    setAddKnowledgeForm((prev) => ({
+                    setAddMemoryForm((prev) => ({
                       ...prev,
                       text: e.target.value,
                     }))
@@ -193,24 +190,22 @@ function Example() {
               </div>
 
               <button
-                onClick={() => void handleAddKnowledge()}
+                onClick={() => void handleAddMemory()}
                 disabled={
-                  isAddingKnowledge ||
-                  !addKnowledgeForm.key.trim() ||
-                  !addKnowledgeForm.text.trim()
+                  isAddingMemory ||
+                  !addMemoryForm.key.trim() ||
+                  !addMemoryForm.text.trim()
                 }
                 className="w-full px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
               >
-                {isAddingKnowledge ? "Adding..." : "Add Knowledge"}
+                {isAddingMemory ? "Adding..." : "Add Memory"}
               </button>
             </div>
           </div>
 
           <div className="flex-1 overflow-y-auto min-h-0">
             <div className="p-4">
-              <h3 className="mb-3 font-medium text-gray-900">
-                Knowledge Entries
-              </h3>
+              <h3 className="mb-3 font-medium text-gray-900">Memory Entries</h3>
               <div className="space-y-2">
                 {globalDocuments.results?.map((entry) => (
                   <div
@@ -266,7 +261,7 @@ function Example() {
             <div className="flex-1 overflow-y-auto min-h-0">
               {documentChunks.results && documentChunks.results.length > 0 ? (
                 <div className="p-4 space-y-3">
-                  {documentChunks.results.map((chunk, index) => (
+                  {documentChunks.results.map((chunk) => (
                     <div
                       key={chunk.order}
                       className="bg-gray-50 border border-gray-200 rounded-lg p-4"
@@ -325,78 +320,89 @@ function Example() {
           <div className="w-full max-w-2xl bg-white rounded-xl shadow-lg p-6 flex flex-col gap-6 h-full min-h-0 justify-end">
             {listMessages.results && listMessages.results.length > 0 && (
               <div className="flex flex-col gap-4 overflow-y-auto mb-4 flex-1 min-h-0">
-                {listMessages.results.map((message) => (
-                  <div key={message._id} className="space-y-2">
-                    {/* Message */}
-                    <div
-                      className={`flex ${message.message?.role === "user" ? "justify-end" : "justify-start"}`}
-                    >
-                      <div
-                        className={`rounded-lg px-4 py-2 max-w-lg whitespace-pre-wrap shadow-sm ${
-                          message.message?.role === "user"
-                            ? "bg-blue-100 text-blue-900"
-                            : "bg-gray-200 text-gray-800"
-                        }`}
-                      >
-                        {getMessageContent(message)}
-                      </div>
-                    </div>
-
-                    {/* Context Section (expandable) - shown after user message */}
-                    {message.contextUsed &&
-                      message.message?.role === "user" && (
-                        <div className="bg-gray-50 border border-gray-200 rounded-lg">
-                          <button
-                            onClick={() => toggleContextExpansion(message._id)}
-                            className="w-full px-4 py-2 text-left text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-t-lg flex items-center justify-between"
+                {listMessages.results.map(
+                  (message) =>
+                    message.text && (
+                      <div key={message._id} className="space-y-2">
+                        {/* Message */}
+                        <div
+                          className={`flex ${message.message?.role === "user" ? "justify-end" : "justify-start"}`}
+                        >
+                          <div
+                            className={`rounded-lg px-4 py-2 max-w-lg whitespace-pre-wrap shadow-sm ${
+                              message.message?.role === "user"
+                                ? "bg-blue-100 text-blue-900"
+                                : "bg-gray-200 text-gray-800"
+                            }`}
                           >
-                            <span>
-                              Context Used ({message.contextUsed.results.length}{" "}
-                              results)
-                            </span>
-                            <span className="text-gray-400">
-                              {expandedContexts.has(message._id) ? "−" : "+"}
-                            </span>
-                          </button>
+                            <MessageText
+                              text={message.text}
+                              streaming={message.streaming}
+                            />
+                          </div>
+                        </div>
 
-                          {expandedContexts.has(message._id) && (
-                            <div className="px-4 pb-4 space-y-2">
-                              {message.contextUsed.results.map(
-                                (result, index) => (
-                                  <div
-                                    key={index}
-                                    className="bg-white border border-gray-200 rounded p-3"
-                                  >
-                                    <div className="flex items-center justify-between mb-2">
-                                      <div className="text-xs font-medium text-gray-600">
-                                        Entry:{" "}
-                                        {message.contextUsed!.entries.find(
-                                          (e) => e.entryId === result.entryId,
-                                        )?.key || "Unknown"}
-                                      </div>
-                                      <div className="text-xs text-gray-500">
-                                        Score: {result.score.toFixed(3)} |
-                                        Order: {result.order}
-                                      </div>
-                                    </div>
-                                    <div className="text-sm text-gray-800 space-y-1">
-                                      {result.content.map(
-                                        (content, contentIndex) => (
-                                          <div key={contentIndex}>
-                                            {content.text}
+                        {/* Context Section (expandable) - shown after user message */}
+                        {message.contextUsed &&
+                          message.message?.role === "user" && (
+                            <div className="bg-gray-50 border border-gray-200 rounded-lg">
+                              <button
+                                onClick={() =>
+                                  toggleContextExpansion(message._id)
+                                }
+                                className="w-full px-4 py-2 text-left text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-t-lg flex items-center justify-between"
+                              >
+                                <span>
+                                  Context Used (
+                                  {message.contextUsed.results.length} results)
+                                </span>
+                                <span className="text-gray-400">
+                                  {expandedContexts.has(message._id)
+                                    ? "−"
+                                    : "+"}
+                                </span>
+                              </button>
+
+                              {expandedContexts.has(message._id) && (
+                                <div className="px-4 pb-4 space-y-2">
+                                  {message.contextUsed.results.map(
+                                    (result, index) => (
+                                      <div
+                                        key={index}
+                                        className="bg-white border border-gray-200 rounded p-3"
+                                      >
+                                        <div className="flex items-center justify-between mb-2">
+                                          <div className="text-xs font-medium text-gray-600">
+                                            Entry:{" "}
+                                            {message.contextUsed!.entries.find(
+                                              (e) =>
+                                                e.entryId === result.entryId,
+                                            )?.key || "Unknown"}
                                           </div>
-                                        ),
-                                      )}
-                                    </div>
-                                  </div>
-                                ),
+                                          <div className="text-xs text-gray-500">
+                                            Score: {result.score.toFixed(3)} |
+                                            Order: {result.order}
+                                          </div>
+                                        </div>
+                                        <div className="text-sm text-gray-800 space-y-1">
+                                          {result.content.map(
+                                            (content, contentIndex) => (
+                                              <div key={contentIndex}>
+                                                {content.text}
+                                              </div>
+                                            ),
+                                          )}
+                                        </div>
+                                      </div>
+                                    ),
+                                  )}
+                                </div>
                               )}
                             </div>
                           )}
-                        </div>
-                      )}
-                  </div>
-                ))}
+                      </div>
+                    ),
+                )}
               </div>
             )}
             <form
@@ -416,7 +422,7 @@ function Example() {
               <button
                 type="submit"
                 className="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition font-semibold disabled:opacity-50"
-                disabled={!prompt.trim()}
+                disabled={!prompt.trim() || !threadId}
               >
                 Send
               </button>
@@ -426,6 +432,17 @@ function Example() {
       </div>
     </div>
   );
+}
+
+function MessageText({
+  text,
+  streaming,
+}: {
+  text: string;
+  streaming?: boolean;
+}) {
+  const [smoothText] = useSmoothText(text, { startStreaming: streaming });
+  return smoothText;
 }
 
 export default Example;
