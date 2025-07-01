@@ -417,6 +417,8 @@ export class Agent<AgentTools extends ToolSet> {
               userId,
               threadId,
               promptMessageId: messageId,
+              model: aiArgs.model.modelId,
+              provider: aiArgs.model.provider,
               step,
             });
           }
@@ -579,6 +581,8 @@ export class Agent<AgentTools extends ToolSet> {
           const saved = await this.saveStep(ctx, {
             userId,
             threadId,
+            model: aiArgs.model.modelId,
+            provider: aiArgs.model.provider,
             promptMessageId: messageId,
             step,
           });
@@ -662,6 +666,8 @@ export class Agent<AgentTools extends ToolSet> {
           promptMessageId: messageId,
           result,
           userId,
+          model: aiArgs.model.modelId,
+          provider: aiArgs.model.provider,
         });
       }
       result.messageId = messageId;
@@ -760,6 +766,8 @@ export class Agent<AgentTools extends ToolSet> {
               logprobs: undefined,
               toJsonResponse: stream.toTextStreamResponse,
             },
+            model: aiArgs.model.modelId,
+            provider: aiArgs.model.provider,
           });
         }
         if (trackUsage && result.usage) {
@@ -1350,6 +1358,8 @@ export class Agent<AgentTools extends ToolSet> {
       userId: string | undefined;
       threadId: string;
       promptMessageId: string;
+      model: string | undefined;
+      provider: string | undefined;
       result: GenerateObjectResult<unknown>;
       metadata?: Omit<MessageWithMetadata, "message">;
     }
@@ -1359,8 +1369,8 @@ export class Agent<AgentTools extends ToolSet> {
       this.component,
       args.result,
       {
-        model: this.options.chat.modelId,
-        provider: this.options.chat.provider,
+        model: args.model ?? this.options.chat.modelId,
+        provider: args.provider ?? this.options.chat.provider,
       }
     );
     const embeddings = await this.generateEmbeddings(
