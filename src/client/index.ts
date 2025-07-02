@@ -1488,10 +1488,6 @@ export class Agent<AgentTools extends ToolSet> {
       (threadId &&
         (await ctx.runQuery(this.component.threads.getThread, { threadId }))
           ?.userId);
-    assert(
-      !args.promptMessageId || !args.prompt,
-      "you can't specify a prompt if you specify a promptMessageId"
-    );
     // If only a messageId is provided, this will add that message to the end.
     const contextMessages = await this.fetchContextMessages(ctx, {
       userId,
@@ -1507,16 +1503,10 @@ export class Agent<AgentTools extends ToolSet> {
       contextMessages.at(-1)?._id === args.promptMessageId
         ? contextMessages.pop()
         : undefined;
-    if (promptMessage?.message) {
-      messages.push(deserializeMessage(promptMessage.message));
-      // Lazily generate embeddings for the prompt message, if it doesn't have
-      // embeddings yet. This can happen if the message was saved in a mutation
-      // where the LLM is not available.
-      if (!promptMessage.embeddingId && this.options.textEmbedding) {
-        await this.generateAndSaveEmbeddings(ctx, {
-          messageIds: [promptMessage._id],
-        });
-      }
+    if (promptMessage && args.prompt) {
+      // If they specify both a promptMessageId and a prompt, we prefer
+      // the prompt to stand in for the promptMessageId message.
+      promptMessage.message = { role: "user", content: args.prompt };
     }
     let messageId = promptMessage?._id;
     let order = promptMessage?.order;
@@ -1544,6 +1534,18 @@ export class Agent<AgentTools extends ToolSet> {
       messageId = saved.lastMessageId;
       order = saved.messages.at(-1)?.order;
       stepOrder = saved.messages.at(-1)?.stepOrder;
+    }
+    if (promptMessage?.message) {
+      // Add the message after saving the messages, so it's not saved again.
+      messages.push(deserializeMessage(promptMessage.message));
+      // Lazily generate embeddings for the prompt message, if it doesn't have
+      // embeddings yet. This can happen if the message was saved in a mutation
+      // where the LLM is not available.
+      if (!promptMessage.embeddingId && this.options.textEmbedding) {
+        await this.generateAndSaveEmbeddings(ctx, {
+          messageIds: [promptMessage._id],
+        });
+      }
     }
 
     let processedMessages = [

@@ -341,10 +341,6 @@ export function promptOrMessagesToCoreMessages(args: {
     args.prompt || args.messages || args.promptMessageId,
     "messages or prompt or promptMessageId is required"
   );
-  assert(
-    !args.promptMessageId || !args.prompt,
-    "you can't specify a prompt if you specify a promptMessageId. use messages instead."
-  );
   if (args.messages) {
     if (
       args.messages.some(
@@ -362,7 +358,9 @@ export function promptOrMessagesToCoreMessages(args: {
       messages.push(...coreMessageSchema.array().parse(args.messages));
     }
   }
-  if (args.prompt) {
+  // If they specify both a promptMessageId and a prompt, we will replace the
+  // promptMessageId message with the prompt later.
+  if (args.prompt && !args.promptMessageId) {
     messages.push({ role: "user", content: args.prompt });
   }
   return messages;
