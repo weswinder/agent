@@ -26,6 +26,8 @@ import type {
   GenericDataModel,
   GenericMutationCtx,
   GenericQueryCtx,
+  PaginationOptions,
+  PaginationResult,
   StorageActionWriter,
   StorageReader,
   WithoutSystemFields,
@@ -352,6 +354,13 @@ export interface Thread<DefaultTools extends ToolSet> {
   updateMetadata: (
     patch: Partial<WithoutSystemFields<ThreadDoc>>
   ) => Promise<ThreadDoc>;
+  /**
+   * Search for threads by title.
+   */
+  searchThreadTitles(args: {
+    query: string;
+    paginationOpts?: PaginationOptions;
+  }): Promise<PaginationResult<ThreadDoc>>;
   /**
    * This behaves like {@link generateText} from the "ai" package except that
    * it add context based on the userId and threadId and saves the input and

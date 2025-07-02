@@ -92,6 +92,29 @@ export const updateThread = mutation({
   returns: vThreadDoc,
 });
 
+export const searchThreadTitles = query({
+  args: {
+    query: v.string(),
+    userId: v.optional(v.union(v.string(), v.null())),
+    paginationOpts: v.optional(paginationOptsValidator),
+  },
+  handler: async (ctx, args) => {
+    const threads = await ctx.db
+      .query("threads")
+      .withSearchIndex("title", (q) =>
+        args.userId
+          ? q.search("title", args.query).eq("userId", args.userId ?? undefined)
+          : q.search("title", args.query)
+      )
+      .paginate(args.paginationOpts ?? { cursor: null, numItems: 100 });
+    return {
+      ...threads,
+      page: threads.page.map(publicThread),
+    };
+  },
+  returns: vPaginationResult(vThreadDoc),
+});
+
 // When we expose this, we need to also hide all the messages and steps
 // export const archiveThread = mutation({
 //   args: { threadId: v.id("threads") },

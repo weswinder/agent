@@ -208,11 +208,12 @@ export function definePlaygroundAPI(
       await validateApiKey(ctx, args.apiKey);
       const agent = agentMap[args.agentName];
       if (!agent) throw new Error(`Unknown agent: ${args.agentName}`);
-      return agent.createThread(ctx, {
+      const { threadId } = await agent.createThread(ctx, {
         userId: args.userId,
         title: args.title,
         summary: args.summary,
       });
+      return { threadId };
     },
     returns: v.object({ threadId: v.string() }),
   });

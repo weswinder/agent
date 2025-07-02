@@ -75,6 +75,7 @@ import type {
   TextArgs,
   Thread,
   UsageHandler,
+  QueryCtx,
 } from "./types.js";
 import type { threadFieldsSupportingPatch } from "../component/threads.js";
 
@@ -284,7 +285,33 @@ export class Agent<AgentTools extends ToolSet> {
       }
     );
     if (!("runAction" in ctx)) {
-      return { threadId: threadDoc._id };
+      return {
+        threadId: threadDoc._id,
+        thread: {
+          threadId: threadDoc._id,
+          getMetadata: this.getThreadMetadata.bind(this, ctx, {
+            threadId: threadDoc._id,
+          }),
+          updateMetadata: (patch: Partial<WithoutSystemFields<ThreadDoc>>) =>
+            ctx.runMutation(this.component.threads.updateThread, {
+              threadId: threadDoc._id,
+              patch,
+            }),
+          searchThreadTitles: this.searchThreadTitles.bind(this, ctx, args),
+          generateText: () => {
+            throw new Error("You can only generate text from an action");
+          },
+          streamText: () => {
+            throw new Error("You can only stream text from an action");
+          },
+          generateObject: () => {
+            throw new Error("You can only generate objects from an action");
+          },
+          streamObject: () => {
+            throw new Error("You can only stream objects from an action");
+          },
+        },
+      };
     }
     const { thread } = await this.continueThread(ctx, {
       threadId: threadDoc._id,
@@ -343,12 +370,24 @@ export class Agent<AgentTools extends ToolSet> {
             threadId: args.threadId,
             patch,
           }),
+        searchThreadTitles: this.searchThreadTitles.bind(this, ctx, args),
         generateText: this.generateText.bind(this, ctx, args),
         streamText: this.streamText.bind(this, ctx, args),
         generateObject: this.generateObject.bind(this, ctx, args),
         streamObject: this.streamObject.bind(this, ctx, args),
       } as Thread<ThreadTools extends undefined ? AgentTools : ThreadTools>,
     };
+  }
+
+  async searchThreadTitles(
+    ctx: RunQueryCtx,
+    { userId }: { userId?: string | undefined } = {},
+    args: { query: string; paginationOpts?: PaginationOptions }
+  ): Promise<PaginationResult<ThreadDoc>> {
+    return ctx.runQuery(this.component.threads.searchThreadTitles, {
+      userId,
+      ...args,
+    });
   }
 
   /**
