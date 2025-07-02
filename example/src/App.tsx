@@ -1,12 +1,12 @@
 import { BrowserRouter, Routes, Route, Link } from "react-router-dom";
 import { Toaster } from "./components/ui/toaster";
-import { Index } from "./pages/Index";
+import { Index } from "./examples/Index";
 import ChatBasic from "@example/chat-basic/src/ChatBasic";
 import ChatStreaming from "@example/chat-streaming/src/ChatStreaming";
 import FilesImages from "@example/files-images/src/FilesImages";
 import RateLimiting from "@example/rate-limiting/src/RateLimiting";
-import { WeatherFashion } from "./pages/WeatherFashion";
-import RagBasic from "./pages/RagBasic";
+import { WeatherFashion } from "./examples/WeatherFashion";
+import RagBasic from "./examples/RagBasic";
 
 export default function App() {
   return (

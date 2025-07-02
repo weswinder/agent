@@ -1,69 +1,26 @@
-import "./RagBasic.css";
 import { useAction, useMutation, usePaginatedQuery } from "convex/react";
 import { useSmoothText, useThreadMessages } from "@convex-dev/agent/react";
 import { api } from "../../convex/_generated/api";
 import { useCallback, useEffect, useState } from "react";
-import { EntryId } from "@convex-dev/memory";
+import { EntryId } from "@convex-dev/rag";
 import { toast } from "@/hooks/use-toast";
 
-type SearchType = "global" | "user" | "category" | "document";
-
-interface Source {
-  title?: string;
-  key: string;
-  importance?: number;
-  filterValues?: { [x: string]: any };
-  documentId?: string;
-  storageId?: string;
-  url?: string;
-  score: number;
-}
-interface SearchResult {
-  results: {
-    content: Array<{
-      metadata?: { [x: string]: any };
-      text: string;
-    }>;
-    documentId: string;
-    document: Source;
-    order: number;
-    score: number;
-    startOrder: number;
-  }[];
-  text: string[];
-  sources: Array<Source>;
-}
-
-// Helper function to extract text content from message
-function getMessageContent(message: any): string {
-  if (typeof message.message?.content === "string") {
-    return message.message.content;
-  }
-  if (Array.isArray(message.message?.content)) {
-    return message.message.content
-      .filter((part: any) => part.type === "text")
-      .map((part: any) => part.text)
-      .join(" ");
-  }
-  return message.content || "";
-}
-
-function Example() {
+function RagBasicUI() {
   const [selectedEntry, setSelectedEntry] = useState<EntryId | null>(null);
   const [threadId, setThreadId] = useState<string | undefined>(undefined);
-  const createThread = useMutation(api.rag.ragBasic.createThread);
+  const createThread = useMutation(api.rag.utils.createThread);
   useEffect(() => {
     void createThread().then((threadId) => {
       setThreadId(threadId);
     });
   }, [createThread]);
 
-  // Memory form state
-  const [addMemoryForm, setAddMemoryForm] = useState({
+  // Context form state
+  const [addContextForm, setAddContextForm] = useState({
     key: "",
     text: "",
   });
-  const [isAddingMemory, setIsAddingMemory] = useState(false);
+  const [isAddingContext, setIsAddingContext] = useState(false);
 
   // Chat state
   const [prompt, setPrompt] = useState("");
@@ -72,41 +29,41 @@ function Example() {
   );
 
   // Actions and queries
-  const addMemory = useAction(api.rag.ragBasic.addMemory);
+  const addContext = useAction(api.rag.ragBasic.addContext);
   const sendMessage = useAction(api.rag.ragBasic.sendMessage);
   const listMessages = useThreadMessages(
-    api.rag.ragBasic.listMessages,
+    api.rag.utils.listMessages,
     threadId ? { threadId } : "skip",
     { initialNumItems: 10, stream: true },
   );
   const globalDocuments = usePaginatedQuery(
-    api.rag.ragBasic.listMemories,
+    api.rag.utils.listEntries,
     {},
     { initialNumItems: 10 },
   );
   const documentChunks = usePaginatedQuery(
-    api.rag.ragBasic.listChunks,
+    api.rag.utils.listChunks,
     selectedEntry ? { entryId: selectedEntry } : "skip",
     { initialNumItems: 10 },
   );
 
-  // Handle adding knowledge
-  const handleAddMemory = useCallback(async () => {
-    if (!addMemoryForm.key.trim() || !addMemoryForm.text.trim()) return;
+  // Handle adding context
+  const handleAddContext = useCallback(async () => {
+    if (!addContextForm.key.trim() || !addContextForm.text.trim()) return;
 
-    setIsAddingMemory(true);
+    setIsAddingContext(true);
     try {
-      await addMemory({
-        title: addMemoryForm.key.trim(),
-        text: addMemoryForm.text.trim(),
+      await addContext({
+        title: addContextForm.key.trim(),
+        text: addContextForm.text.trim(),
       });
-      setAddMemoryForm({ key: "", text: "" });
+      setAddContextForm({ key: "", text: "" });
     } catch (error) {
-      console.error("Error adding knowledge:", error);
+      console.error("Error adding context:", error);
     } finally {
-      setIsAddingMemory(false);
+      setIsAddingContext(false);
     }
-  }, [addMemory, addMemoryForm]);
+  }, [addContext, addContextForm]);
 
   // Handle sending message
   const onSendClicked = useCallback(() => {
@@ -145,29 +102,29 @@ function Example() {
   return (
     <div className="h-full flex flex-col">
       <div className="h-full flex flex-row bg-gray-50 flex-1 min-h-0">
-        {/* Left Panel - Memory Entries */}
+        {/* Left Panel - Context Entries */}
         <div className="w-80 bg-white border-r border-gray-200 flex flex-col h-full min-h-0">
           <div className="p-4 border-b border-gray-200">
             <h2 className="text-lg font-semibold text-gray-900 mb-4">
-              Add Memory
+              Add Context
             </h2>
 
             <div className="space-y-3">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Key
+                  Title
                 </label>
                 <input
                   type="text"
-                  value={addMemoryForm.key}
+                  value={addContextForm.key}
                   onChange={(e) =>
-                    setAddMemoryForm((prev) => ({
+                    setAddContextForm((prev) => ({
                       ...prev,
                       key: e.target.value,
                     }))
                   }
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="Enter knowledge key"
+                  placeholder="Enter context title"
                 />
               </div>
 
@@ -176,36 +133,38 @@ function Example() {
                   Text
                 </label>
                 <textarea
-                  value={addMemoryForm.text}
+                  value={addContextForm.text}
                   onChange={(e) =>
-                    setAddMemoryForm((prev) => ({
+                    setAddContextForm((prev) => ({
                       ...prev,
                       text: e.target.value,
                     }))
                   }
                   rows={4}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="Enter knowledge text"
+                  placeholder="Enter context body"
                 />
               </div>
 
               <button
-                onClick={() => void handleAddMemory()}
+                onClick={() => void handleAddContext()}
                 disabled={
-                  isAddingMemory ||
-                  !addMemoryForm.key.trim() ||
-                  !addMemoryForm.text.trim()
+                  isAddingContext ||
+                  !addContextForm.key.trim() ||
+                  !addContextForm.text.trim()
                 }
                 className="w-full px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
               >
-                {isAddingMemory ? "Adding..." : "Add Memory"}
+                {isAddingContext ? "Adding..." : "Add Context"}
               </button>
             </div>
           </div>
 
           <div className="flex-1 overflow-y-auto min-h-0">
             <div className="p-4">
-              <h3 className="mb-3 font-medium text-gray-900">Memory Entries</h3>
+              <h3 className="mb-3 font-medium text-gray-900">
+                Context Entries
+              </h3>
               <div className="space-y-2">
                 {globalDocuments.results?.map((entry) => (
                   <div
@@ -227,7 +186,7 @@ function Example() {
                 ))}
                 {globalDocuments.results?.length === 0 && (
                   <div className="text-sm text-gray-500 text-center py-4">
-                    No knowledge entries yet
+                    No context entries yet
                   </div>
                 )}
               </div>
@@ -417,7 +376,7 @@ function Example() {
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
                 className="flex-1 px-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-400 bg-gray-50"
-                placeholder="Ask me anything about your knowledge..."
+                placeholder="Ask me anything and I'll leverage the context you added..."
               />
               <button
                 type="submit"
@@ -445,4 +404,4 @@ function MessageText({
   return smoothText;
 }
 
-export default Example;
+export default RagBasicUI;
