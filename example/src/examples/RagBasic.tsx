@@ -1,5 +1,9 @@
 import { useAction, useMutation, usePaginatedQuery } from "convex/react";
-import { useSmoothText, useThreadMessages } from "@convex-dev/agent/react";
+import {
+  optimisticallySendMessage,
+  useSmoothText,
+  useThreadMessages,
+} from "@convex-dev/agent/react";
 import { api } from "../../convex/_generated/api";
 import { useCallback, useEffect, useState } from "react";
 import { EntryId } from "@convex-dev/rag";
@@ -10,10 +14,14 @@ function RagBasicUI() {
   const [threadId, setThreadId] = useState<string | undefined>(undefined);
   const createThread = useMutation(api.rag.utils.createThread);
   useEffect(() => {
+    if (threadId) return;
     void createThread().then((threadId) => {
       setThreadId(threadId);
     });
-  }, [createThread]);
+  }, [createThread, threadId]);
+
+  // Error state
+  const [error, setError] = useState<Error | undefined>(undefined);
 
   // Context form state
   const [addContextForm, setAddContextForm] = useState({
@@ -30,7 +38,9 @@ function RagBasicUI() {
 
   // Actions and queries
   const addContext = useAction(api.rag.ragBasic.addContext);
-  const sendMessage = useAction(api.rag.ragBasic.sendMessage);
+  const sendMessage = useMutation(
+    api.rag.ragBasic.sendMessage,
+  ).withOptimisticUpdate(optimisticallySendMessage(api.rag.utils.listMessages));
   const listMessages = useThreadMessages(
     api.rag.utils.listMessages,
     threadId ? { threadId } : "skip",
@@ -81,6 +91,7 @@ function RagBasicUI() {
       threadId,
       prompt: prompt.trim(),
     }).catch((error) => {
+      setError(error);
       console.error("Error sending message:", error);
       setPrompt(prompt);
     });
@@ -177,7 +188,7 @@ function RagBasicUI() {
                     onClick={() => setSelectedEntry(entry.entryId)}
                   >
                     <div className="text-sm font-medium text-gray-900 truncate">
-                      {entry.key}
+                      {entry.title || entry.key}
                     </div>
                     <div className="text-xs text-gray-500 mt-1">
                       Status: {entry.status}
@@ -196,7 +207,7 @@ function RagBasicUI() {
 
         {/* Middle Panel - Entry Chunks */}
         {selectedEntry && (
-          <div className="w-96 bg-white border-r border-gray-200 flex flex-col h-full min-h-0">
+          <div className="w-1/3 bg-white border-r border-gray-200 flex flex-col h-full min-h-0">
             <div className="p-4 border-b border-gray-200">
               <div className="flex items-center justify-between">
                 <h2 className="text-lg font-semibold text-gray-900">
@@ -221,30 +232,19 @@ function RagBasicUI() {
               {documentChunks.results && documentChunks.results.length > 0 ? (
                 <div className="p-4 space-y-3">
                   {documentChunks.results.map((chunk) => (
-                    <div
-                      key={chunk.order}
-                      className="bg-gray-50 border border-gray-200 rounded-lg p-4"
-                    >
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="text-sm font-medium text-gray-700">
-                          Chunk {chunk.order}
-                        </div>
-                        <div
-                          className={`text-xs px-2 py-1 rounded-full ${
-                            chunk.state === "ready"
-                              ? "bg-green-100 text-green-700"
-                              : chunk.state === "pending"
-                                ? "bg-yellow-100 text-yellow-700"
-                                : "bg-gray-100 text-gray-700"
-                          }`}
-                        >
-                          {chunk.state}
+                    <>
+                      <div className="text-sm font-medium text-gray-500">
+                        Chunk {chunk.order}
+                      </div>
+                      <div
+                        key={chunk.order}
+                        className="bg-gray-50 border border-gray-200 rounded-lg p-4"
+                      >
+                        <div className="text-sm text-gray-800 leading-relaxed">
+                          {chunk.text}
                         </div>
                       </div>
-                      <div className="text-sm text-gray-800 leading-relaxed">
-                        {chunk.text}
-                      </div>
-                    </div>
+                    </>
                   ))}
 
                   {documentChunks.status === "CanLoadMore" && (
@@ -385,10 +385,21 @@ function RagBasicUI() {
               >
                 Send
               </button>
+              <button
+                className="px-4 py-2 rounded-lg bg-gray-400 text-white hover:bg-red-500 transition font-semibold disabled:opacity-50"
+                title="Start over"
+                onClick={() => {
+                  setThreadId(undefined);
+                }}
+                disabled={!listMessages.results?.length}
+              >
+                Start over
+              </button>
             </form>
           </div>
         </main>
       </div>
+      {error && <div className="text-red-500 text-center">{error.message}</div>}
     </div>
   );
 }
