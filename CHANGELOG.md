@@ -5,9 +5,6 @@
 - Allow updating a thread's userId
 - Auth is available in the `createTool` ctx.
 - Add text search on thread titles.
-- Breaking: if you previously did `return agent.createThread(...)`
-  from a query/mutation, then you need to change it to:
-  `const { threadId } = await agent.createThread(..); return threadId`
 
 ## 0.1.12
 
