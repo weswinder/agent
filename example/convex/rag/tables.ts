@@ -1,9 +1,9 @@
-import { vSearchEntry, vSearchResult } from "@convex-dev/memory";
+import { vSearchEntry, vSearchResult } from "@convex-dev/rag";
 import { defineTable } from "convex/server";
 import { v } from "convex/values";
 
 export default {
-  // ragFilesBasic tables
+  // tables for the basic rag example
   contextUsed: defineTable({
     messageId: v.string(),
     entries: v.array(vSearchEntry),

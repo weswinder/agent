@@ -17,8 +17,11 @@ import type * as ideaAgents from "../ideaAgents.js";
 import type * as ideas from "../ideas.js";
 import type * as playground from "../playground.js";
 import type * as rag_ragBasic from "../rag/ragBasic.js";
+import type * as rag_ragWithTools from "../rag/ragWithTools.js";
 import type * as rag_tables from "../rag/tables.js";
+import type * as rag_utils from "../rag/utils.js";
 import type * as rateLimiting from "../rateLimiting.js";
+import type * as utils from "../utils.js";
 import type * as weather from "../weather.js";
 
 import type {
@@ -45,8 +48,11 @@ declare const fullApi: ApiFromModules<{
   ideas: typeof ideas;
   playground: typeof playground;
   "rag/ragBasic": typeof rag_ragBasic;
+  "rag/ragWithTools": typeof rag_ragWithTools;
   "rag/tables": typeof rag_tables;
+  "rag/utils": typeof rag_utils;
   rateLimiting: typeof rateLimiting;
+  utils: typeof utils;
   weather: typeof weather;
 }>;
 declare const fullApiWithMounts: typeof fullApi;
@@ -2478,7 +2484,7 @@ export declare const components: {
       getServerTime: FunctionReference<"mutation", "internal", {}, number>;
     };
   };
-  memory: {
+  rag: {
     chunks: {
       insert: FunctionReference<
         "mutation",
