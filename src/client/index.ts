@@ -75,7 +75,6 @@ import type {
   TextArgs,
   Thread,
   UsageHandler,
-  QueryCtx,
 } from "./types.js";
 import type { threadFieldsSupportingPatch } from "../component/threads.js";
 
@@ -285,33 +284,7 @@ export class Agent<AgentTools extends ToolSet> {
       }
     );
     if (!("runAction" in ctx)) {
-      return {
-        threadId: threadDoc._id,
-        thread: {
-          threadId: threadDoc._id,
-          getMetadata: this.getThreadMetadata.bind(this, ctx, {
-            threadId: threadDoc._id,
-          }),
-          updateMetadata: (patch: Partial<WithoutSystemFields<ThreadDoc>>) =>
-            ctx.runMutation(this.component.threads.updateThread, {
-              threadId: threadDoc._id,
-              patch,
-            }),
-          searchThreadTitles: this.searchThreadTitles.bind(this, ctx, args),
-          generateText: () => {
-            throw new Error("You can only generate text from an action");
-          },
-          streamText: () => {
-            throw new Error("You can only stream text from an action");
-          },
-          generateObject: () => {
-            throw new Error("You can only generate objects from an action");
-          },
-          streamObject: () => {
-            throw new Error("You can only stream objects from an action");
-          },
-        },
-      };
+      return { threadId: threadDoc._id };
     }
     const { thread } = await this.continueThread(ctx, {
       threadId: threadDoc._id,
@@ -370,7 +343,6 @@ export class Agent<AgentTools extends ToolSet> {
             threadId: args.threadId,
             patch,
           }),
-        searchThreadTitles: this.searchThreadTitles.bind(this, ctx, args),
         generateText: this.generateText.bind(this, ctx, args),
         streamText: this.streamText.bind(this, ctx, args),
         generateObject: this.generateObject.bind(this, ctx, args),
@@ -379,14 +351,27 @@ export class Agent<AgentTools extends ToolSet> {
     };
   }
 
+  /**
+   * Search for threads by title, paginated.
+   * @param ctx The context passed from the query/mutation/action.
+   * @returns The threads matching the search, paginated.
+   */
   async searchThreadTitles(
     ctx: RunQueryCtx,
-    { userId }: { userId?: string | undefined } = {},
-    args: { query: string; paginationOpts?: PaginationOptions }
+    {
+      userId,
+      query,
+      paginationOpts,
+    }: {
+      userId?: string | undefined;
+      query: string;
+      paginationOpts?: PaginationOptions;
+    }
   ): Promise<PaginationResult<ThreadDoc>> {
     return ctx.runQuery(this.component.threads.searchThreadTitles, {
       userId,
-      ...args,
+      query,
+      paginationOpts,
     });
   }
 

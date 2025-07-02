@@ -355,13 +355,6 @@ export interface Thread<DefaultTools extends ToolSet> {
     patch: Partial<WithoutSystemFields<ThreadDoc>>
   ) => Promise<ThreadDoc>;
   /**
-   * Search for threads by title.
-   */
-  searchThreadTitles(args: {
-    query: string;
-    paginationOpts?: PaginationOptions;
-  }): Promise<PaginationResult<ThreadDoc>>;
-  /**
    * This behaves like {@link generateText} from the "ai" package except that
    * it add context based on the userId and threadId and saves the input and
    * resulting messages to the thread, if specified.
