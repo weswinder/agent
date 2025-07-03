@@ -9,7 +9,9 @@ AI Agent framework built on Convex.
 - Automatic storage of chat history, per-user or per-thread, that can span multiple agents.
 - Playground UI for testing, debugging, and development. See [playground/README.md](playground/README.md) for more.
 - RAG for chat context, via hybrid text & vector search, with configuration options.
-  Use the API to query the history yourself and do it your way.
+  You can also pair it with the [RAG component](https://convex.dev/components/rag)
+  to search for other context either before the prompt or via tool calls.
+  See [examples/convex/rag](./example/convex/rag/README.md).
 - Opt-in search for messages from other threads (for the same specified user).
 - Support for generating / streaming objects and storing them in messages (as JSON).
 - Tool calls via the AI SDK, along with Convex-specific tool wrappers.
