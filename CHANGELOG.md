@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.14 alpha
+
+- Fix thread title text search
+
 ## 0.1.13
 
 - Allow updating a thread's userId
