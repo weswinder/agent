@@ -107,11 +107,9 @@ export const searchThreadTitles = query({
           : q.search("title", args.query)
       )
       .take(args.limit);
-    return {
-      threads: threads.map(publicThread),
-    };
+    return threads.map(publicThread);
   },
-  returns: v.object({ threads: v.array(vThreadDoc) }),
+  returns: v.array(vThreadDoc),
 });
 
 // When we expose this, we need to also hide all the messages and steps

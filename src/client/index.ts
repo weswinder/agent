@@ -367,7 +367,7 @@ export class Agent<AgentTools extends ToolSet> {
       query: string;
       limit?: number;
     }
-  ): Promise<{ threads: ThreadDoc[] }> {
+  ): Promise<ThreadDoc[]> {
     return ctx.runQuery(this.component.threads.searchThreadTitles, {
       userId,
       query,

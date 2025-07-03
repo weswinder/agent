@@ -1727,16 +1727,14 @@ export type Mounts = {
       "query",
       "public",
       { limit: number; query: string; userId?: string | null },
-      {
-        threads: Array<{
-          _creationTime: number;
-          _id: string;
-          status: "active" | "archived";
-          summary?: string;
-          title?: string;
-          userId?: string;
-        }>;
-      }
+      Array<{
+        _creationTime: number;
+        _id: string;
+        status: "active" | "archived";
+        summary?: string;
+        title?: string;
+        userId?: string;
+      }>
     >;
     updateThread: FunctionReference<
       "mutation",
