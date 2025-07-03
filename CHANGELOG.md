@@ -1,10 +1,11 @@
 # Changelog
 
-## 0.1.13 alpha
+## 0.1.13
 
 - Allow updating a thread's userId
 - Auth is available in the `createTool` ctx.
 - Add text search on thread titles.
+- Add RAG example & docs
 
 ## 0.1.12
 
