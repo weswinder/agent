@@ -361,17 +361,17 @@ export class Agent<AgentTools extends ToolSet> {
     {
       userId,
       query,
-      paginationOpts,
+      limit,
     }: {
       userId?: string | undefined;
       query: string;
-      paginationOpts?: PaginationOptions;
+      limit?: number;
     }
-  ): Promise<PaginationResult<ThreadDoc>> {
+  ): Promise<{ threads: ThreadDoc[] }> {
     return ctx.runQuery(this.component.threads.searchThreadTitles, {
       userId,
       query,
-      paginationOpts,
+      limit: limit ?? 10,
     });
   }
 

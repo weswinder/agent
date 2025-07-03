@@ -96,7 +96,7 @@ export const searchThreadTitles = query({
   args: {
     query: v.string(),
     userId: v.optional(v.union(v.string(), v.null())),
-    paginationOpts: v.optional(paginationOptsValidator),
+    limit: v.number(),
   },
   handler: async (ctx, args) => {
     const threads = await ctx.db
@@ -106,13 +106,12 @@ export const searchThreadTitles = query({
           ? q.search("title", args.query).eq("userId", args.userId ?? undefined)
           : q.search("title", args.query)
       )
-      .paginate(args.paginationOpts ?? { cursor: null, numItems: 100 });
+      .take(args.limit);
     return {
-      ...threads,
-      page: threads.page.map(publicThread),
+      threads: threads.map(publicThread),
     };
   },
-  returns: vPaginationResult(vThreadDoc),
+  returns: v.object({ threads: v.array(vThreadDoc) }),
 });
 
 // When we expose this, we need to also hide all the messages and steps

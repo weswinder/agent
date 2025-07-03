@@ -1884,22 +1884,9 @@ export declare const components: {
       searchThreadTitles: FunctionReference<
         "query",
         "internal",
+        { limit: number; query: string; userId?: string | null },
         {
-          paginationOpts?: {
-            cursor: string | null;
-            endCursor?: string | null;
-            id?: number;
-            maximumBytesRead?: number;
-            maximumRowsRead?: number;
-            numItems: number;
-          };
-          query: string;
-          userId?: string | null;
-        },
-        {
-          continueCursor: string;
-          isDone: boolean;
-          page: Array<{
+          threads: Array<{
             _creationTime: number;
             _id: string;
             status: "active" | "archived";
@@ -1907,8 +1894,6 @@ export declare const components: {
             title?: string;
             userId?: string;
           }>;
-          pageStatus?: "SplitRecommended" | "SplitRequired" | null;
-          splitCursor?: string | null;
         }
       >;
       updateThread: FunctionReference<
