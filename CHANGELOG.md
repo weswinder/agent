@@ -2,6 +2,7 @@
 
 ## 0.1.14 alpha
 
+- Expose delete functions for messages & threads on the Agent class
 - Fix thread title text search
 
 ## 0.1.13
