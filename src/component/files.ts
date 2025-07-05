@@ -97,6 +97,39 @@ export const useExistingFile = mutation({
   ),
 });
 
+export async function changeRefcount(
+  ctx: MutationCtx,
+  prev: Id<"files">[],
+  next: Id<"files">[]
+) {
+  const prevSet = new Set(prev);
+  const nextSet = new Set(next);
+  for (const fileId of prevSet) {
+    if (!nextSet.has(fileId)) {
+      const file = await ctx.db.get(fileId);
+      if (file) {
+        await ctx.db.patch(fileId, {
+          refcount: file.refcount - 1,
+        });
+      } else {
+        console.error(`File ${fileId} not found when decrementing refcount`);
+      }
+    }
+  }
+  for (const fileId of nextSet) {
+    if (!prevSet.has(fileId)) {
+      const file = await ctx.db.get(fileId);
+      if (file) {
+        await ctx.db.patch(fileId, {
+          refcount: file.refcount + 1,
+        });
+      } else {
+        throw new Error(`File ${fileId} not found when incrementing refcount`);
+      }
+    }
+  }
+}
+
 export const copyFile = mutation({
   args: {
     fileId: v.id("files"),

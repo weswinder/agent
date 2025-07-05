@@ -39,6 +39,7 @@ import {
   type VectorTableId,
   vVectorId,
 } from "./vector/tables.js";
+import { changeRefcount } from "./files.js";
 
 /** @deprecated Use *.threads.listMessagesByThreadId instead. */
 export const listThreadsByUserId = _listThreadsByUserId;
@@ -61,12 +62,8 @@ export async function deleteMessage(
   if (messageDoc.embeddingId) {
     await ctx.db.delete(messageDoc.embeddingId);
   }
-  for (const fileId of messageDoc.fileIds ?? []) {
-    if (!fileId) continue;
-    const file = await ctx.db.get(fileId);
-    if (file) {
-      await ctx.db.patch(fileId, { refcount: file.refcount - 1 });
-    }
+  if (messageDoc.fileIds) {
+    await changeRefcount(ctx, messageDoc.fileIds, []);
   }
 }
 
@@ -242,11 +239,8 @@ async function addMessagesHandler(
     //     id: messageId,
     //   });
     // }
-    for (const fileId of message.fileIds ?? []) {
-      if (!fileId) continue;
-      await ctx.db.patch(fileId, {
-        refcount: (await ctx.db.get(fileId))!.refcount + 1,
-      });
+    if (message.fileIds) {
+      await changeRefcount(ctx, [], message.fileIds);
     }
     // TODO: delete the associated stream data for the order/stepOrder
     toReturn.push((await ctx.db.get(messageId))!);
@@ -332,6 +326,7 @@ export const updateMessage = mutation({
     messageId: v.id("messages"),
     patch: v.object({
       message: v.optional(vMessageDoc.fields.message),
+      fileIds: v.optional(v.array(v.id("files"))),
       status: v.optional(vMessageStatus),
       error: v.optional(v.string()),
     }),
@@ -340,6 +335,10 @@ export const updateMessage = mutation({
   handler: async (ctx, args) => {
     const message = await ctx.db.get(args.messageId);
     assert(message, `Message ${args.messageId} not found`);
+
+    if (args.patch.fileIds) {
+      await changeRefcount(ctx, message.fileIds ?? [], args.patch.fileIds);
+    }
 
     const patch: Partial<Doc<"messages">> = {
       ...args.patch,

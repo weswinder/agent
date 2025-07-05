@@ -1202,6 +1202,7 @@ export type Mounts = {
         messageId: string;
         patch: {
           error?: string;
+          fileIds?: Array<string>;
           message?:
             | {
                 content:

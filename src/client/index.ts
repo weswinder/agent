@@ -1451,6 +1451,55 @@ export class Agent<AgentTools extends ToolSet> {
   }
 
   /**
+   * Update a message by its id.
+   * @param ctx The ctx argument to your mutation or action.
+   * @param args The message fields to update.
+   */
+  async updateMessage(
+    ctx: RunMutationCtx,
+    args: {
+      /** The id of the message to update. */
+      messageId: string;
+      patch: {
+        /** The message to replace the existing message. */
+        message: CoreMessage & { id?: string };
+        /** The status to set on the message. */
+        status: "success" | "error";
+        /** The error message to set on the message. */
+        error?: string;
+        /**
+         * These will override the fileIds in the message.
+         * To remove all existing files, pass an empty array.
+         * If passing in a new message, pass in the fileIds you explicitly want to keep
+         * from the previous message, as the new files generated from the new message
+         * will be added to the list.
+         * If you pass undefined, it will not change the fileIds unless new
+         * files are generated from the message. In that case, the new fileIds
+         * will replace the old fileIds.
+         */
+        fileIds?: string[];
+      };
+    }
+  ): Promise<void> {
+    const { message, fileIds } = await serializeMessage(
+      ctx,
+      this.component,
+      args.patch.message
+    );
+    await ctx.runMutation(this.component.messages.updateMessage, {
+      messageId: args.messageId,
+      patch: {
+        message,
+        fileIds: args.patch.fileIds
+          ? [...args.patch.fileIds, ...(fileIds ?? [])]
+          : fileIds,
+        status: args.patch.status === "success" ? "success" : "failed",
+        error: args.patch.error,
+      },
+    });
+  }
+
+  /**
    * Delete multiple messages by their ids, including their embeddings
    * and reduce the refcount of any files they reference.
    * @param ctx The ctx argument to your mutation or action.

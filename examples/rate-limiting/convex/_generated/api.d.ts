@@ -1334,6 +1334,7 @@ export declare const components: {
           messageId: string;
           patch: {
             error?: string;
+            fileIds?: Array<string>;
             message?:
               | {
                   content:
