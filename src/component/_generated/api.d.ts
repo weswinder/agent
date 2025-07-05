@@ -418,11 +418,23 @@ export type Mounts = {
       { messageId: string },
       null
     >;
-    deleteMessages: FunctionReference<
+    deleteByIds: FunctionReference<
       "mutation",
       "public",
       { messageIds: Array<string> },
-      null
+      Array<string>
+    >;
+    deleteByOrder: FunctionReference<
+      "mutation",
+      "public",
+      {
+        endOrder: number;
+        endStepOrder?: number;
+        startOrder: number;
+        startStepOrder?: number;
+        threadId: string;
+      },
+      { isDone: boolean; lastOrder?: number; lastStepOrder?: number }
     >;
     getMessagesByIds: FunctionReference<
       "query",

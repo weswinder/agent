@@ -494,11 +494,23 @@ export declare const components: {
         { messageId: string },
         null
       >;
-      deleteMessages: FunctionReference<
+      deleteByIds: FunctionReference<
         "mutation",
         "internal",
         { messageIds: Array<string> },
-        null
+        Array<string>
+      >;
+      deleteByOrder: FunctionReference<
+        "mutation",
+        "internal",
+        {
+          endOrder: number;
+          endStepOrder?: number;
+          startOrder: number;
+          startStepOrder?: number;
+          threadId: string;
+        },
+        { isDone: boolean; lastOrder?: number; lastStepOrder?: number }
       >;
       getMessagesByIds: FunctionReference<
         "query",

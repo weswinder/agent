@@ -1450,26 +1450,101 @@ export class Agent<AgentTools extends ToolSet> {
     }
   }
 
+  /**
+   * Delete multiple messages by their ids, including their embeddings
+   * and reduce the refcount of any files they reference.
+   * @param ctx The ctx argument to your mutation or action.
+   * @param args The ids of the messages to delete.
+   */
   async deleteMessages(
     ctx: RunMutationCtx,
     args: {
       messageIds: string[];
     }
   ): Promise<void> {
-    await ctx.runMutation(this.component.messages.deleteMessages, args);
+    await ctx.runMutation(this.component.messages.deleteByIds, args);
   }
 
+  /**
+   * Delete a single message by its id, including its embedding
+   * and reduce the refcount of any files it references.
+   * @param ctx The ctx argument to your mutation or action.
+   * @param args The id of the message to delete.
+   */
   async deleteMessage(
     ctx: RunMutationCtx,
     args: {
       messageId: string;
     }
   ): Promise<void> {
-    await ctx.runMutation(this.component.messages.deleteMessages, {
+    await ctx.runMutation(this.component.messages.deleteByIds, {
       messageIds: [args.messageId],
     });
   }
 
+  /**
+   * Delete a range of messages by their order and step order.
+   * Each "order" is a set of associated messages in response to the message
+   * at stepOrder 0.
+   * The (startOrder, startStepOrder) is inclusive
+   * and the (endOrder, endStepOrder) is exclusive.
+   * To delete all messages at "order" 1, you can pass:
+   * `{ startOrder: 1, endOrder: 2 }`
+   * To delete a message at step (order=1, stepOrder=1), you can pass:
+   * `{ startOrder: 1, startStepOrder: 1, endOrder: 1, endStepOrder: 2 }`
+   * To delete all messages between (1, 1) up to and including (3, 5), you can pass:
+   * `{ startOrder: 1, startStepOrder: 1, endOrder: 3, endStepOrder: 6 }`
+   *
+   * If it cannot do it in one transaction, it returns information you can use
+   * to resume the deletion.
+   * e.g.
+   * ```ts
+   * let isDone = false;
+   * let lastOrder = args.startOrder;
+   * let lastStepOrder = args.startStepOrder ?? 0;
+   * while (!isDone) {
+   *   // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   *   ({ isDone, lastOrder, lastStepOrder } = await agent.deleteMessageRange(
+   *     ctx,
+   *     {
+   *       threadId: args.threadId,
+   *       startOrder: lastOrder,
+   *       startStepOrder: lastStepOrder,
+   *       endOrder: args.endOrder,
+   *       endStepOrder: args.endStepOrder,
+   *     }
+   *   ));
+   * }
+   * ```
+   * @param ctx The ctx argument to your mutation or action.
+   * @param args The range of messages to delete.
+   */
+  async deleteMessageRange(
+    ctx: RunMutationCtx,
+    args: {
+      threadId: string;
+      startOrder: number;
+      startStepOrder?: number;
+      endOrder: number;
+      endStepOrder?: number;
+    }
+  ): Promise<void> {
+    await ctx.runMutation(this.component.messages.deleteByOrder, {
+      threadId: args.threadId,
+      startOrder: args.startOrder,
+      startStepOrder: args.startStepOrder,
+      endOrder: args.endOrder,
+      endStepOrder: args.endStepOrder,
+    });
+  }
+
+  /**
+   * Delete a thread and all its messages and streams asynchronously (in batches)
+   * This uses a mutation to that processes one page and recursively queues the
+   * next page for deletion.
+   * @param ctx The ctx argument to your mutation or action.
+   * @param args The id of the thread to delete and optionally the page size to use for the delete.
+   */
   async deleteThreadAsync(
     ctx: RunMutationCtx,
     args: {
@@ -1483,6 +1558,13 @@ export class Agent<AgentTools extends ToolSet> {
     });
   }
 
+  /**
+   * Delete a thread and all its messages and streams synchronously.
+   * This uses an action to iterate through all pages. If the action fails
+   * partway, it will not automatically restart.
+   * @param ctx The ctx argument to your action.
+   * @param args The id of the thread to delete and optionally the page size to use for the delete.
+   */
   async deleteThreadSync(
     ctx: RunActionCtx,
     args: {
