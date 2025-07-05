@@ -1450,6 +1450,52 @@ export class Agent<AgentTools extends ToolSet> {
     }
   }
 
+  async deleteMessages(
+    ctx: RunMutationCtx,
+    args: {
+      messageIds: string[];
+    }
+  ): Promise<void> {
+    await ctx.runMutation(this.component.messages.deleteMessages, args);
+  }
+
+  async deleteMessage(
+    ctx: RunMutationCtx,
+    args: {
+      messageId: string;
+    }
+  ): Promise<void> {
+    await ctx.runMutation(this.component.messages.deleteMessages, {
+      messageIds: [args.messageId],
+    });
+  }
+
+  async deleteThreadAsync(
+    ctx: RunMutationCtx,
+    args: {
+      threadId: string;
+      pageSize?: number;
+    }
+  ): Promise<void> {
+    await ctx.runMutation(this.component.threads.deleteAllForThreadIdAsync, {
+      threadId: args.threadId,
+      limit: args.pageSize,
+    });
+  }
+
+  async deleteThreadSync(
+    ctx: RunActionCtx,
+    args: {
+      threadId: string;
+      pageSize?: number;
+    }
+  ): Promise<void> {
+    await ctx.runAction(this.component.threads.deleteAllForThreadIdSync, {
+      threadId: args.threadId,
+      limit: args.pageSize,
+    });
+  }
+
   async _saveMessagesAndFetchContext<
     T extends {
       id?: string;

@@ -418,6 +418,12 @@ export type Mounts = {
       { messageId: string },
       null
     >;
+    deleteMessages: FunctionReference<
+      "mutation",
+      "public",
+      { messageIds: Array<string> },
+      null
+    >;
     getMessagesByIds: FunctionReference<
       "query",
       "public",

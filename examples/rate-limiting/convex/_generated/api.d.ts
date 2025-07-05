@@ -494,6 +494,12 @@ export declare const components: {
         { messageId: string },
         null
       >;
+      deleteMessages: FunctionReference<
+        "mutation",
+        "internal",
+        { messageIds: Array<string> },
+        null
+      >;
       getMessagesByIds: FunctionReference<
         "query",
         "internal",

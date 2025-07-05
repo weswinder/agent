@@ -70,6 +70,25 @@ export async function deleteMessage(
   }
 }
 
+export const deleteMessages = mutation({
+  args: {
+    messageIds: v.array(v.id("messages")),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    await Promise.all(
+      args.messageIds.map(async (id) => {
+        const message = await ctx.db.get(id);
+        if (message) {
+          await deleteMessage(ctx, message);
+        } else {
+          console.warn(`Message ${id} not found when trying to delete`);
+        }
+      })
+    );
+  },
+});
+
 export const messageStatuses = vMessageDoc.fields.status.members.map(
   (m) => m.value
 );
