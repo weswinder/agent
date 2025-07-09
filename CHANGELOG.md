@@ -6,6 +6,7 @@
 - Expose updating messages on the Agent class
 - Fix thread title text search
 - Fix loading state of pagination (peer bump)
+- Expose the types for ThreadQuery, StreamArgs, and SyncStreamsReturnValue
 
 ## 0.1.13
 
