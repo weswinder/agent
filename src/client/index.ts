@@ -102,6 +102,7 @@ export type {
   MessageDoc,
   ProviderMetadata,
   StorageOptions,
+  StreamArgs,
   SyncStreamsReturnValue,
   Thread,
   ThreadDoc,
