@@ -5,6 +5,7 @@
 - Expose delete functions for messages & threads on the Agent class
 - Expose updating messages on the Agent class
 - Fix thread title text search
+- Fix loading state of pagination (peer bump)
 
 ## 0.1.13
 
