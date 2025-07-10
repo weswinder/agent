@@ -1706,8 +1706,8 @@ export class Agent<AgentTools extends ToolSet> {
         metadata: coreMessages.map((_, i) =>
           i === coreMessages.length - 1 ? { id: args.id } : {}
         ),
-        pending: true,
-        failPendingSteps: true,
+        pending: !args.prompt,
+        failPendingSteps: !args.prompt,
       });
       messageId = saved.lastMessageId;
       order = saved.messages.at(-1)?.order;
