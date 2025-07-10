@@ -1372,7 +1372,7 @@ export class Agent<AgentTools extends ToolSet> {
       messages,
       embeddings,
       failPendingSteps: args.step.finishReason === "error",
-      pending: args.step.finishReason !== "tool-calls",
+      pending: args.step.finishReason === "tool-calls",
     });
     return saved;
   }
