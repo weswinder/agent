@@ -1371,7 +1371,8 @@ export class Agent<AgentTools extends ToolSet> {
       promptMessageId: args.promptMessageId,
       messages,
       embeddings,
-      failPendingSteps: false,
+      failPendingSteps: args.step.finishReason === "error",
+      pending: args.step.finishReason !== "tool-calls",
     });
     return saved;
   }
