@@ -174,6 +174,16 @@ export const createThread = mutation({
 });
 ```
 
+Note: if you're in an environment where you don't have access to the Agent, then
+you can create the thread more manually:
+
+```ts
+const { _id: threadId } = await ctx.runMutation(
+  components.agent.threads.createThread,
+  { userId, title, summary }
+);
+```
+
 ### Continuing a thread
 
 If you specify a userId too, you can search the user's history for relevant messages
